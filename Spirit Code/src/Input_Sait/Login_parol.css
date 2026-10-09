@@ -1,0 +1,19 @@
+* {
+    padding: 0;
+    margin: 0;
+}
+
+body {
+    display: flex;
+    justify-content: center;
+    margin-top: 20%;
+}
+input {
+    margin: 0, auto;
+    margin-top: 10px;
+    height: 25px;
+    width: 250px;
+}
+p {
+    color: aliceblue;
+}

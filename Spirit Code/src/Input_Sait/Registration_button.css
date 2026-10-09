@@ -1,0 +1,20 @@
+* {
+    padding: 0;
+    margin: 0;
+}
+
+li {
+    list-style: none;
+}
+body {
+    display: flex;
+    justify-content: center;
+}
+button {
+    margin-top: 20px;
+    width: 200px;
+    height: 30px;
+    color: #140F0F;
+    background: #FF8400;
+    margin-left: 25px;
+}
