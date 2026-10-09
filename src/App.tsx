@@ -1,4 +1,4 @@
-import { Routes, Route } from 'react-router-dom';
+п»їimport { Routes, Route } from 'react-router-dom';
 import Registration_Place from './Input_Sait/Registration_Place';
 import Home_Pages from './Home_Pages/Home_Pages';
 
@@ -7,10 +7,10 @@ function App() {
     <Routes>
       <Route path="/" element={<Registration_Place />} />
       
-      {/* Добавляем маршрут для dashboard */}
+      {/* Р”РѕР±Р°РІР»СЏРµРј РјР°СЂС€СЂСѓС‚ РґР»СЏ dashboard */}
       <Route path="/dashboard" element={<Home_Pages />} /> 
       
-      {/* Или можно оставить /home, если хотите */}
+      {/* РР»Рё РјРѕР¶РЅРѕ РѕСЃС‚Р°РІРёС‚СЊ /home, РµСЃР»Рё С…РѕС‚РёС‚Рµ */}
       <Route path="/home" element={<Home_Pages />} />
     </Routes>
   )

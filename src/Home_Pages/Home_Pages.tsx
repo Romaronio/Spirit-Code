@@ -2,7 +2,7 @@ import './Home_Pages.css'
 function Home_Pages() {
   return (
     <div>
-      <h1>Добро пожаловать Roman</h1>
+      <h1>Р”РѕР±СЂРѕ РїРѕР¶Р°Р»РѕРІР°С‚СЊ Roman</h1>
     </div>
   );
 }

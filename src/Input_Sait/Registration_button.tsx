@@ -1,4 +1,4 @@
-﻿function Registration_Button() {
+function Registration_Button() {
 
 
   return (
