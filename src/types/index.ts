@@ -5,6 +5,10 @@ export interface User {
   role: Role
 }
 
+export interface Account extends User {
+  password: string
+}
+
 export interface LessonFile {
   id: string
   name: string
@@ -20,3 +24,4 @@ export interface Assignment {
   description?: string
   files?: LessonFile[]
 }
+

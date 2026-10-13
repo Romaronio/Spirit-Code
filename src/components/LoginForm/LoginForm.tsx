@@ -1,50 +1,73 @@
 import styles from './LoginForm.module.css'
 import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import type { Role } from '../../types'
+import type { Account, User } from '../../types'
 
+interface Props {
+  accounts: Account[]
+}
 
-function LoginForm() {
-    const [name, setName] = useState('')
-    const[role, setRole] = useState<Role>('student')
-    const [error, setError] = useState('')
-    const navigate = useNavigate()
+function LoginForm({ accounts }: Props) {
+  const [name, setName] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+  const navigate = useNavigate()
 
-    function handelSubmit(e: FormEvent<HTMLFormElement>) {
-        e.preventDefault()
-        const trimmedName = name.trim()
-        if (trimmedName == '') {
-            setError('Введите коректное имя')
-            return
-        }
-        navigate('/home', { state: { name: trimmedName, role } })
+  function handleSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    const trimmedName = name.trim()
+
+    if (trimmedName === '' || password === '') {
+      setError('Введите имя и пароль')
+      return
     }
 
-
-    return (
-        <form className={styles.form} onSubmit={handelSubmit}>
-            <h1 className={styles.title}>Spirit Code</h1>
-            <input
-                type="text"
-                placeholder="Ваше имя"
-                value={name}
-                onChange={(e) => { setName(e.target.value); setError('') }}
-            />
-            <div className={styles.roles}>
-            <button type="button" className={`${styles.role} ${role === 'student' ? styles.active : ''}`} onClick={() => setRole('student')}>
-                Я ученик
-            </button>
-            <button type="button" className={`${styles.role} ${role === 'teacher' ? styles.active : ''}`} onClick={() => setRole('teacher')}>
-                Я учитель
-            </button>
-            </div>
-            {error && <p className={styles.error}>{error}</p>}
-
-            <button type="submit" className={styles.submit}>
-                Войти
-            </button>
-            </form>
+    const account = accounts.find(
+      (a) =>
+        a.name.toLowerCase() === trimmedName.toLowerCase() &&
+        a.password === password
     )
+
+    if (!account) {
+      setError('Неверное имя или пароль')
+      return
+    }
+
+    // Пароль дальше не передаём: только имя и роль
+    const user: User = { name: account.name, role: account.role }
+    navigate('/home', { state: user })
+  }
+
+  return (
+    <form className={styles.form} onSubmit={handleSubmit}>
+      <h1 className={styles.title}>Spirit Code</h1>
+      <input
+        type="text"
+        placeholder="Ваше имя"
+        autoComplete="username"
+        value={name}
+        onChange={(e) => {
+          setName(e.target.value)
+          setError('')
+        }}
+      />
+      <input
+        type="password"
+        placeholder="Пароль"
+        autoComplete="current-password"
+        value={password}
+        onChange={(e) => {
+          setPassword(e.target.value)
+          setError('')
+        }}
+      />
+      {error && <p className={styles.error}>{error}</p>}
+
+      <button type="submit" className={styles.submit}>
+        Войти
+      </button>
+    </form>
+  )
 }
 
 export default LoginForm

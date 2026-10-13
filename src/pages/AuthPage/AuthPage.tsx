@@ -1,11 +1,15 @@
 import styles from './AuthPage.module.css'
 import LoginForm from '../../components/LoginForm/LoginForm'
-import AuthButton from '../../components/AuthButton/AuthButton'
+import type { Account } from '../../types'
 
-function AuthPage() {
+interface Props {
+  accounts: Account[]
+}
+
+function AuthPage({ accounts }: Props) {
   return (
     <div className={styles.page}>
-      <LoginForm />
+      <LoginForm accounts={accounts} />
     </div>
   )
 }

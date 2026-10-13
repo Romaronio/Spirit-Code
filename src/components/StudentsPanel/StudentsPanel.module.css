@@ -1,0 +1,106 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 420px;
+  padding: 16px;
+  margin-top: 24px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.form input {
+  padding: 10px 12px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  font-size: 16px;
+  font-family: inherit;
+}
+
+.passwordRow {
+  display: flex;
+  gap: 8px;
+}
+
+.passwordRow input {
+  flex: 1;
+  min-width: 0;
+}
+
+.secondary {
+  padding: 0 12px;
+  border: 1px solid #ff8400;
+  border-radius: 8px;
+  background: transparent;
+  color: #140f0f;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.error {
+  color: #d93025;
+  font-size: 14px;
+}
+
+.submit {
+  height: 42px;
+  border: none;
+  border-radius: 8px;
+  background: #ff8400;
+  color: #140f0f;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.empty {
+  color: #777;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-left: 0;
+  list-style: none;
+}
+
+.list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: #f6f1f1;
+  border-radius: 8px;
+}
+
+.password {
+  font-family: ui-monospace, monospace;
+  color: #555;
+}
+
+.studentName {
+  flex: 1;
+  min-width: 0;
+  word-break: break-word;
+}
+
+.delete {
+  border: none;
+  background: none;
+  color: #d93025;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.delete:hover {
+  text-decoration: underline;
+}

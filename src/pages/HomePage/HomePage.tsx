@@ -1,29 +1,25 @@
-import { useState } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 import styles from './HomePage.module.css'
-import type { Assignment, User } from '../../types'
-import { assignments as initialAssignments } from '../../data/assignments'
+import type { Account, Assignment, User } from '../../types'
 import AssignmentCard from '../../components/AssignmentCard/AssignmentCard'
 import AssignmentForm from '../../components/AssignmentForm/AssignmentForm'
+import StudentsPanel from '../../components/StudentsPanel/StudentsPanel'
 
-function HomePage() {
+interface Props {
+  items: Assignment[]
+  onAdd: (assignment: Assignment) => void
+  accounts: Account[]
+  onAddStudent: (student: Account) => void
+  onDeleteStudent: (name: string) => void
+}
+
+
+function HomePage({ items, onAdd, accounts, onAddStudent }: Props) {
   const location = useLocation()
-  console.log(location)
   const user = location.state as User | null
-  const [items, setItems] = useState<Assignment[]>(initialAssignments)
 
   if (!user) {
     return <Navigate to="/" replace />
-  }
-
-  function handleAdd(assignment: Assignment) {
-    setItems((prev) => [assignment, ...prev])
-  }
-
-  function handleUpdate(id: Assignment['id'], changes: Partial<Assignment>) {
-  setItems((prev) =>
-    prev.map((item) => (item.id === id ? { ...item, ...changes } : item))
-    )
   }
 
   const roleLabel = user.role === 'teacher' ? 'Учитель' : 'Ученик'
@@ -33,7 +29,16 @@ function HomePage() {
       <h1>Добро пожаловать, {user.name}</h1>
       <p>Ваша роль: {roleLabel}</p>
 
-      {user.role === 'teacher' && <AssignmentForm onAdd={handleAdd} />}
+      {user.role === 'teacher' && (
+        <>
+          <AssignmentForm onAdd={onAdd} />
+           <StudentsPanel
+            accounts={accounts}
+            onAddStudent={onAddStudent}
+            onDeleteStudent={onDeleteStudent}
+          />
+        </>
+      )}
 
       <h2 className={styles.heading}>Задания</h2>
 
@@ -42,7 +47,7 @@ function HomePage() {
       ) : (
         <div className={styles.grid}>
           {items.map((item) => (
-            <AssignmentCard key={item.id} assignment={item} canEdit={user.role === 'teacher'} onUpdate={handleUpdate} />
+            <AssignmentCard key={item.id} assignment={item} user={user} />
           ))}
         </div>
       )}
