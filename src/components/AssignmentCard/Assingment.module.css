@@ -1,0 +1,32 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+.subject {
+  align-self: flex-start;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: #ff8400;
+  color: #140f0f;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.title {
+  font-size: 20px;
+}
+
+.description {
+  color: #444;
+}
+
+.deadline {
+  margin-top: auto;
+  color: #777;
+}

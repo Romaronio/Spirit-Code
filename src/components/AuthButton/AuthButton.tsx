@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import styles from './AuthButtons.module.css'
+import styles from './AuthButton.module.css'
 
 function AuthButton() {
   const navigate = useNavigate()
