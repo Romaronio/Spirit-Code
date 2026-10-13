@@ -8,16 +8,18 @@ import { hasSubject, normalize, subjectsOf } from '../../utils/subjects'
 
 interface Props {
   items: Assignment[]
-  onAdd: (assignment: Assignment) => void
+  onAdd: (assignment: Omit<Assignment, 'id'>) => void
+  onDelete: (id: number) => void
   accounts: Account[]
-  onAddStudent: (student: Account) => void
-  onDeleteStudent: (name: string) => void
-  onSetSubjects: (name: string, subjects: string[]) => void
+  onAddStudent: (student: Omit<Account, 'id'>) => void
+  onDeleteStudent: (id: number) => void
+  onSetSubjects: (id: number, subjects: string[]) => void
 }
 
 function HomePage({
   items,
   onAdd,
+  onDelete,
   accounts,
   onAddStudent,
   onDeleteStudent,
@@ -42,6 +44,9 @@ function HomePage({
     ? items
     : items.filter((item) => hasSubject(mySubjects, item.subject))
 
+  // Сортируем по ID в обратном порядке (последние добавленные первыми)
+  const sortedItems = [...visibleItems].sort((a, b) => (b.id ?? 0) - (a.id ?? 0))
+
   const emptyMessage = isTeacher
     ? 'Заданий пока нет'
     : mySubjects.length === 0
@@ -57,7 +62,7 @@ function HomePage({
       )}
 
       {isTeacher && (
-        <>
+        <div className={styles.tools}>
           <AssignmentForm onAdd={onAdd} />
           <StudentsPanel
             accounts={accounts}
@@ -66,17 +71,17 @@ function HomePage({
             onDeleteStudent={onDeleteStudent}
             onSetSubjects={onSetSubjects}
           />
-        </>
+        </div>
       )}
 
       <h2 className={styles.heading}>Задания</h2>
 
-      {visibleItems.length === 0 ? (
+      {sortedItems.length === 0 ? (
         <p>{emptyMessage}</p>
       ) : (
         <div className={styles.grid}>
-          {visibleItems.map((item) => (
-            <AssignmentCard key={item.id} assignment={item} user={user} />
+          {sortedItems.map((item) => (
+            <AssignmentCard key={item.id} assignment={item} user={user} onDelete={onDelete} />
           ))}
         </div>
       )}

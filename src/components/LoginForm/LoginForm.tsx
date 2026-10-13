@@ -1,19 +1,17 @@
 import styles from './LoginForm.module.css'
 import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import type { Account, User } from '../../types'
+import type { User } from '../../types'
+import * as api from '../../services/api'
 
-interface Props {
-  accounts: Account[]
-}
-
-function LoginForm({ accounts }: Props) {
+function LoginForm() {
   const [name, setName] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
 
-  function handleSubmit(e: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     const trimmedName = name.trim()
 
@@ -22,20 +20,18 @@ function LoginForm({ accounts }: Props) {
       return
     }
 
-    const account = accounts.find(
-      (a) =>
-        a.name.toLowerCase() === trimmedName.toLowerCase() &&
-        a.password === password
-    )
+    setLoading(true)
+    setError('')
 
-    if (!account) {
+    try {
+      const account = await api.login(trimmedName, password)
+      const user: User = { name: account.name, role: account.role }
+      navigate('/home', { state: user })
+    } catch (err) {
       setError('Неверное имя или пароль')
-      return
+    } finally {
+      setLoading(false)
     }
-
-    // Пароль дальше не передаём: только имя и роль
-    const user: User = { name: account.name, role: account.role }
-    navigate('/home', { state: user })
   }
 
   return (
@@ -63,8 +59,8 @@ function LoginForm({ accounts }: Props) {
       />
       {error && <p className={styles.error}>{error}</p>}
 
-      <button type="submit" className={styles.submit}>
-        Войти
+      <button type="submit" className={styles.submit} disabled={loading}>
+        {loading ? 'Вход...' : 'Войти'}
       </button>
     </form>
   )

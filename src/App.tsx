@@ -1,74 +1,116 @@
-﻿import { useState } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { Routes, Route } from 'react-router-dom'
 import AuthPage from './pages/AuthPage/AuthPage'
 import HomePage from './pages/HomePage/HomePage'
 import AssignmentPage from './pages/AssignmentPage/AssignmentPage'
 import type { Account, Assignment } from './types'
-import { assignments as initialAssignments } from './data/assignments'
-import { accounts as initialAccounts } from './data/users'
-
-const ACCOUNTS_KEY = 'spirit-code-accounts'
-
-function loadAccounts(): Account[] {
-  try {
-    const raw = localStorage.getItem(ACCOUNTS_KEY)
-    return raw ? (JSON.parse(raw) as Account[]) : initialAccounts
-  } catch {
-    return initialAccounts
-  }
-}
-
-function saveAccounts(accounts: Account[]) {
-  try {
-    localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts))
-  } catch {
-    // хранилище недоступно: аккаунты просто не сохранятся между перезагрузками
-  }
-}
+import * as api from './services/api'
 
 function App() {
-  const [items, setItems] = useState<Assignment[]>(initialAssignments)
-  const [accounts, setAccounts] = useState<Account[]>(loadAccounts)
+  const [items, setItems] = useState<Assignment[]>([])
+  const [accounts, setAccounts] = useState<Account[]>([])
+  const [loading, setLoading] = useState(true)
 
-  function handleAdd(assignment: Assignment) {
-    setItems((prev) => [assignment, ...prev])
+  // Загрузка данных при монтировании
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const [accountsData, assignmentsData] = await Promise.all([
+          api.getAllAccounts(),
+          api.getAllAssignments(),
+        ])
+        setAccounts(accountsData)
+        setItems(assignmentsData)
+      } catch (error) {
+        console.error('Ошибка загрузки данных:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadData()
+  }, [])
+
+  async function handleAdd(assignment: Omit<Assignment, 'id'>) {
+    try {
+      const newAssignment = await api.createAssignment(assignment)
+      setItems((prev) => [newAssignment, ...prev])
+    } catch (error) {
+      console.error('Ошибка создания задания:', error)
+      throw error
+    }
   }
 
-  function handleUpdate(id: Assignment['id'], changes: Partial<Assignment>) {
-    setItems((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, ...changes } : item))
-    )
+  async function handleUpdate(id: Assignment['id'], changes: Partial<Assignment>) {
+    try {
+      const updated = await api.updateAssignment(id, changes)
+      setItems((prev) =>
+        prev.map((item) => (item.id === id ? updated : item))
+      )
+    } catch (error) {
+      console.error('Ошибка обновления задания:', error)
+      throw error
+    }
   }
 
-  function handleAddStudent(student: Account) {
-    const next = [...accounts, student]
-    setAccounts(next)
-    saveAccounts(next)
+  async function handleDelete(id: number) {
+    try {
+      await api.deleteAssignment(id)
+      setItems((prev) => prev.filter((item) => item.id !== id))
+    } catch (error) {
+      console.error('Ошибка удаления задания:', error)
+      throw error
+    }
   }
 
-  function handleDeleteStudent(name: string) {
-    const next = accounts.filter((a) => !(a.role === 'student' && a.name === name))
-    setAccounts(next)
-    saveAccounts(next)
+  async function handleAddStudent(student: Omit<Account, 'id'>) {
+    try {
+      const newStudent = await api.createAccount(student)
+      setAccounts((prev) => [...prev, newStudent])
+    } catch (error) {
+      console.error('Ошибка добавления ученика:', error)
+      throw error
+    }
   }
 
-  function handleSetSubjects(name: string, subjects: string[]) {
-    const next = accounts.map((a) =>
-      a.role === 'student' && a.name === name ? { ...a, subjects } : a
-    )
-    setAccounts(next)
-    saveAccounts(next)
+  async function handleDeleteStudent(id: number) {
+    try {
+      await api.deleteAccount(id)
+      setAccounts((prev) => prev.filter((a) => a.id !== id))
+    } catch (error) {
+      console.error('Ошибка удаления ученика:', error)
+      throw error
+    }
+  }
+
+  async function handleSetSubjects(id: number, subjects: string[]) {
+    try {
+      const account = accounts.find((a) => a.id === id)
+      if (!account) return
+
+      const updated = await api.updateAccount(id, { ...account, subjects })
+      setAccounts((prev) =>
+        prev.map((a) => (a.id === id ? updated : a))
+      )
+    } catch (error) {
+      console.error('Ошибка обновления предметов:', error)
+      throw error
+    }
+  }
+
+  if (loading) {
+    return <div style={{ padding: '20px', textAlign: 'center' }}>Загрузка...</div>
   }
 
   return (
     <Routes>
-      <Route path="/" element={<AuthPage accounts={accounts} />} />
+      <Route path="/" element={<AuthPage />} />
       <Route
         path="/home"
         element={
           <HomePage
             items={items}
             onAdd={handleAdd}
+            onDelete={handleDelete}
             accounts={accounts}
             onAddStudent={handleAddStudent}
             onDeleteStudent={handleDeleteStudent}

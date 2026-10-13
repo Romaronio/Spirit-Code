@@ -1,15 +1,10 @@
 import styles from './AuthPage.module.css'
 import LoginForm from '../../components/LoginForm/LoginForm'
-import type { Account } from '../../types'
 
-interface Props {
-  accounts: Account[]
-}
-
-function AuthPage({ accounts }: Props) {
+function AuthPage() {
   return (
     <div className={styles.page}>
-      <LoginForm accounts={accounts} />
+      <LoginForm />
     </div>
   )
 }

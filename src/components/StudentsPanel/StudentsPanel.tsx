@@ -6,9 +6,9 @@ import { hasSubject, toggleSubject, uniqueSubjects } from '../../utils/subjects'
 interface Props {
   accounts: Account[]
   availableSubjects: string[]
-  onAddStudent: (student: Account) => void
-  onDeleteStudent: (name: string) => void
-  onSetSubjects: (name: string, subjects: string[]) => void
+  onAddStudent: (student: Omit<Account, 'id'>) => void
+  onDeleteStudent: (id: number) => void
+  onSetSubjects: (id: number, subjects: string[]) => void
 }
 
 const MIN_PASSWORD_LENGTH = 4
@@ -61,6 +61,7 @@ function StudentsPanel({
   const [password, setPassword] = useState('')
   const [newSubjects, setNewSubjects] = useState<string[]>([])
   const [error, setError] = useState('')
+  const [isOpen, setIsOpen] = useState(true)
 
   const students = accounts.filter((a) => a.role === 'student')
 
@@ -96,98 +97,114 @@ function StudentsPanel({
     setError('')
   }
 
-  function handleDelete(studentName: string) {
+  function handleDelete(studentId: number, studentName: string) {
     if (window.confirm(`Удалить ученика «${studentName}»?`)) {
-      onDeleteStudent(studentName)
+      onDeleteStudent(studentId)
     }
   }
 
   return (
     <section className={styles.panel}>
-      <h2>Ученики</h2>
-
-      <form className={styles.form} onSubmit={handleSubmit}>
-        <input
-          type="text"
-          placeholder="Имя ученика"
-          value={name}
-          onChange={(e) => {
-            setName(e.target.value)
-            setError('')
-          }}
-        />
-
-        <div className={styles.passwordRow}>
-          <input
-            type="text"
-            placeholder="Пароль"
-            autoComplete="off"
-            value={password}
-            onChange={(e) => {
-              setPassword(e.target.value)
-              setError('')
-            }}
-          />
-          <button
-            type="button"
-            className={styles.secondary}
-            onClick={() => {
-              setPassword(generatePassword())
-              setError('')
-            }}
-          >
-            Сгенерировать
-          </button>
-        </div>
-
-        <p className={styles.label}>Предметы ученика</p>
-        <SubjectPicker
-          options={availableSubjects}
-          selected={newSubjects}
-          onToggle={(subject) => setNewSubjects((prev) => toggleSubject(prev, subject))}
-        />
-
-        {error && <p className={styles.error}>{error}</p>}
-
-        <button type="submit" className={styles.submit}>
-          Добавить ученика
+      <div className={styles.header}>
+        <h2>
+          Ученики <span className={styles.count}>({students.length})</span>
+        </h2>
+        <button
+          type="button"
+          className={styles.toggle}
+          onClick={() => setIsOpen((open) => !open)}
+          aria-expanded={isOpen}
+        >
+          {isOpen ? 'Свернуть ▲' : 'Развернуть ▼'}
         </button>
-      </form>
+      </div>
 
-      {students.length === 0 ? (
-        <p className={styles.empty}>Учеников пока нет</p>
-      ) : (
-        <ul className={styles.list}>
-          {students.map((s) => {
-            const current = s.subjects ?? []
-            // показываем и предметы, которые уже назначены, даже если заданий по ним нет
-            const options = uniqueSubjects([...availableSubjects, ...current])
+      {isOpen && (
+        <>
+          <form className={styles.form} onSubmit={handleSubmit}>
+            <input
+              type="text"
+              placeholder="Имя ученика"
+              value={name}
+              onChange={(e) => {
+                setName(e.target.value)
+                setError('')
+              }}
+            />
 
-            return (
-              <li key={s.name}>
-                <div className={styles.studentRow}>
-                  <span className={styles.studentName}>{s.name}</span>
-                  <span className={styles.password}>{s.password}</span>
-                  <button
-                    type="button"
-                    className={styles.delete}
-                    onClick={() => handleDelete(s.name)}
-                  >
-                    Удалить
-                  </button>
-                </div>
+            <div className={styles.passwordRow}>
+              <input
+                type="text"
+                placeholder="Пароль"
+                autoComplete="off"
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value)
+                  setError('')
+                }}
+              />
+              <button
+                type="button"
+                className={styles.secondary}
+                onClick={() => {
+                  setPassword(generatePassword())
+                  setError('')
+                }}
+              >
+                Сгенерировать
+              </button>
+            </div>
 
-                <SubjectPicker
-                  options={options}
-                  selected={current}
-                  onToggle={(subject) =>
-                    onSetSubjects(s.name, toggleSubject(current, subject))
-                  }
-                />
-              </li>
-            )
-          })}
-        </ul>
+            <p className={styles.label}>Предметы ученика</p>
+            <SubjectPicker
+              options={availableSubjects}
+              selected={newSubjects}
+              onToggle={(subject) => setNewSubjects((prev) => toggleSubject(prev, subject))}
+            />
+
+            {error && <p className={styles.error}>{error}</p>}
+
+            <button type="submit" className={styles.submit}>
+              Добавить ученика
+            </button>
+          </form>
+
+          {students.length === 0 ? (
+            <p className={styles.empty}>Учеников пока нет</p>
+          ) : (
+            <ul className={styles.list}>
+              {students.map((s) => {
+                const current = s.subjects ?? []
+                // показываем и предметы, которые уже назначены, даже если заданий по ним нет
+                const options = uniqueSubjects([...availableSubjects, ...current])
+
+                return (
+                  <li key={s.id}>
+                    <div className={styles.studentRow}>
+                      <span className={styles.studentName}>{s.name}</span>
+                      <span className={styles.password}>{s.password}</span>
+                      <button
+                        type="button"
+                        className={styles.delete}
+                        onClick={() => handleDelete(s.id!, s.name)}
+                      >
+                        Удалить
+                      </button>
+                    </div>
+
+                    <SubjectPicker
+                      options={options}
+                      selected={current}
+                      onToggle={(subject) =>
+                        onSetSubjects(s.id!, toggleSubject(current, subject))
+                      }
+                    />
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </>
       )}
     </section>
   )

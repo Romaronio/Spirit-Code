@@ -3,8 +3,10 @@ import styles from './AssignmentForm.module.css'
 import type { Assignment } from '../../types'
 
 interface AssignmentFormProps {
-  onAdd: (assignment: Assignment) => void
+  onAdd: (assignment: Omit<Assignment, 'id'>) => void
 }
+
+const SUBJECTS = ['Математика', 'Информатика', 'Русский язык']
 
 function AssignmentForm({ onAdd }: AssignmentFormProps) {
   const [title, setTitle] = useState('')
@@ -16,15 +18,14 @@ function AssignmentForm({ onAdd }: AssignmentFormProps) {
   function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
 
-    if (title.trim() === '' || subject.trim() === '' || deadline === '') {
+    if (title.trim() === '' || subject === '' || deadline === '') {
       setError('Заполните название, предмет и срок сдачи')
       return
     }
 
     onAdd({
-      id: String(Date.now()),
       title: title.trim(),
-      subject: subject.trim(),
+      subject: subject,
       description: description.trim(),
       deadline,
     })
@@ -46,12 +47,25 @@ function AssignmentForm({ onAdd }: AssignmentFormProps) {
         value={title}
         onChange={(e) => setTitle(e.target.value)}
       />
-      <input
-        type="text"
-        placeholder="Предмет"
-        value={subject}
-        onChange={(e) => setSubject(e.target.value)}
-      />
+
+      <div className={styles.subjectSection}>
+        <label className={styles.label}>Предмет</label>
+        <div className={styles.subjectOptions}>
+          {SUBJECTS.map((subj) => (
+            <label key={subj} className={styles.radioLabel}>
+              <input
+                type="radio"
+                name="subject"
+                value={subj}
+                checked={subject === subj}
+                onChange={(e) => setSubject(e.target.value)}
+              />
+              {subj}
+            </label>
+          ))}
+        </div>
+      </div>
+
       <textarea
         placeholder="Описание"
         rows={3}

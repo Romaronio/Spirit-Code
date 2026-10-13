@@ -19,6 +19,50 @@
   font-family: inherit;
 }
 
+.subjectSection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.label {
+  font-weight: 600;
+  font-size: 14px;
+  color: #333;
+}
+
+.subjectOptions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.radioLabel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 2px solid #ddd;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.radioLabel:hover {
+  border-color: #ff8400;
+  background: #fff5e6;
+}
+
+.radioLabel input[type="radio"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+.radioLabel input[type="radio"]:checked {
+  accent-color: #ff8400;
+}
+
 .error {
   color: #d93025;
   font-size: 14px;

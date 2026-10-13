@@ -6,27 +6,28 @@ export interface User {
 }
 
 export interface Account extends User {
+  id?: number
   password: string
+  subjects?: string[] // предметы, которые изучает ученик
+  created_at?: string
+  updated_at?: string
 }
 
 export interface LessonFile {
-  id: string
+  id?: number
   name: string
   url: string
-}
-
-export interface Account extends User {
-  password: string
-  subjects?: string[] // предметы, которые изучает ученик
+  created_at?: string
 }
 
 export interface Assignment {
-  id: string
+  id?: number
   title: string
   subject: string
   deadline: string // формат 'ГГГГ-ММ-ДД'
-  recordingUrl?: string
+  recording_url?: string
   description?: string
   files?: LessonFile[]
+  created_at?: string
+  updated_at?: string
 }
-
