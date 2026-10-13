@@ -15,6 +15,11 @@ export interface LessonFile {
   url: string
 }
 
+export interface Account extends User {
+  password: string
+  subjects?: string[] // предметы, которые изучает ученик
+}
+
 export interface Assignment {
   id: string
   title: string

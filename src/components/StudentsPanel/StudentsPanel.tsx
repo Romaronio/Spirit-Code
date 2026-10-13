@@ -1,11 +1,14 @@
 import { useState, type FormEvent } from 'react'
 import styles from './StudentsPanel.module.css'
 import type { Account } from '../../types'
+import { hasSubject, toggleSubject, uniqueSubjects } from '../../utils/subjects'
 
 interface Props {
   accounts: Account[]
+  availableSubjects: string[]
   onAddStudent: (student: Account) => void
   onDeleteStudent: (name: string) => void
+  onSetSubjects: (name: string, subjects: string[]) => void
 }
 
 const MIN_PASSWORD_LENGTH = 4
@@ -16,9 +19,47 @@ function generatePassword(length = 8) {
   return Array.from(bytes, (b) => chars[b % chars.length]).join('')
 }
 
-function StudentsPanel({ accounts, onAddStudent, onDeleteStudent }: Props) {
+interface PickerProps {
+  options: string[]
+  selected: string[]
+  onToggle: (subject: string) => void
+}
+
+function SubjectPicker({ options, selected, onToggle }: PickerProps) {
+  if (options.length === 0) {
+    return (
+      <p className={styles.hint}>
+        Предметов пока нет: они появятся, когда вы создадите задания
+      </p>
+    )
+  }
+
+  return (
+    <div className={styles.subjects}>
+      {options.map((subject) => (
+        <label key={subject} className={styles.subject}>
+          <input
+            type="checkbox"
+            checked={hasSubject(selected, subject)}
+            onChange={() => onToggle(subject)}
+          />
+          {subject}
+        </label>
+      ))}
+    </div>
+  )
+}
+
+function StudentsPanel({
+  accounts,
+  availableSubjects,
+  onAddStudent,
+  onDeleteStudent,
+  onSetSubjects,
+}: Props) {
   const [name, setName] = useState('')
   const [password, setPassword] = useState('')
+  const [newSubjects, setNewSubjects] = useState<string[]>([])
   const [error, setError] = useState('')
 
   const students = accounts.filter((a) => a.role === 'student')
@@ -43,9 +84,15 @@ function StudentsPanel({ accounts, onAddStudent, onDeleteStudent }: Props) {
       return
     }
 
-    onAddStudent({ name: trimmedName, password, role: 'student' })
+    onAddStudent({
+      name: trimmedName,
+      password,
+      role: 'student',
+      subjects: newSubjects,
+    })
     setName('')
     setPassword('')
+    setNewSubjects([])
     setError('')
   }
 
@@ -93,6 +140,13 @@ function StudentsPanel({ accounts, onAddStudent, onDeleteStudent }: Props) {
           </button>
         </div>
 
+        <p className={styles.label}>Предметы ученика</p>
+        <SubjectPicker
+          options={availableSubjects}
+          selected={newSubjects}
+          onToggle={(subject) => setNewSubjects((prev) => toggleSubject(prev, subject))}
+        />
+
         {error && <p className={styles.error}>{error}</p>}
 
         <button type="submit" className={styles.submit}>
@@ -104,19 +158,35 @@ function StudentsPanel({ accounts, onAddStudent, onDeleteStudent }: Props) {
         <p className={styles.empty}>Учеников пока нет</p>
       ) : (
         <ul className={styles.list}>
-          {students.map((s) => (
-            <li key={s.name}>
-              <span className={styles.studentName}>{s.name}</span>
-              <span className={styles.password}>{s.password}</span>
-              <button
-                type="button"
-                className={styles.delete}
-                onClick={() => handleDelete(s.name)}
-              >
-                Удалить
-              </button>
-            </li>
-          ))}
+          {students.map((s) => {
+            const current = s.subjects ?? []
+            // показываем и предметы, которые уже назначены, даже если заданий по ним нет
+            const options = uniqueSubjects([...availableSubjects, ...current])
+
+            return (
+              <li key={s.name}>
+                <div className={styles.studentRow}>
+                  <span className={styles.studentName}>{s.name}</span>
+                  <span className={styles.password}>{s.password}</span>
+                  <button
+                    type="button"
+                    className={styles.delete}
+                    onClick={() => handleDelete(s.name)}
+                  >
+                    Удалить
+                  </button>
+                </div>
+
+                <SubjectPicker
+                  options={options}
+                  selected={current}
+                  onToggle={(subject) =>
+                    onSetSubjects(s.name, toggleSubject(current, subject))
+                  }
+                />
+              </li>
+            )
+          })}
         </ul>
       )}
     </section>

@@ -16,7 +16,7 @@
   gap: 10px;
 }
 
-.form input {
+.form input[type='text'] {
   padding: 10px 12px;
   border: 1px solid #ccc;
   border-radius: 8px;
@@ -45,6 +45,40 @@
   cursor: pointer;
 }
 
+.label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #444;
+}
+
+.hint {
+  color: #777;
+  font-size: 14px;
+}
+
+.subjects {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.subject {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid #ddd;
+  border-radius: 999px;
+  background: #fff;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.subject input {
+  accent-color: #ff8400;
+  cursor: pointer;
+}
+
 .error {
   color: #d93025;
   font-size: 14px;
@@ -68,29 +102,36 @@
 .list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   padding-left: 0;
   list-style: none;
 }
 
 .list li {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 8px;
-  padding: 8px 10px;
+  padding: 10px;
   background: #f6f1f1;
   border-radius: 8px;
 }
 
-.password {
-  font-family: ui-monospace, monospace;
-  color: #555;
+.studentRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .studentName {
   flex: 1;
   min-width: 0;
+  font-weight: 600;
   word-break: break-word;
+}
+
+.password {
+  font-family: ui-monospace, monospace;
+  color: #555;
 }
 
 .delete {

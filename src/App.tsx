@@ -52,6 +52,14 @@ function App() {
     saveAccounts(next)
   }
 
+  function handleSetSubjects(name: string, subjects: string[]) {
+    const next = accounts.map((a) =>
+      a.role === 'student' && a.name === name ? { ...a, subjects } : a
+    )
+    setAccounts(next)
+    saveAccounts(next)
+  }
+
   return (
     <Routes>
       <Route path="/" element={<AuthPage accounts={accounts} />} />
@@ -64,12 +72,15 @@ function App() {
             accounts={accounts}
             onAddStudent={handleAddStudent}
             onDeleteStudent={handleDeleteStudent}
+            onSetSubjects={handleSetSubjects}
           />
         }
       />
       <Route
         path="/assignment/:id"
-        element={<AssignmentPage items={items} onUpdate={handleUpdate} />}
+        element={
+          <AssignmentPage items={items} accounts={accounts} onUpdate={handleUpdate} />
+        }
       />
     </Routes>
   )
