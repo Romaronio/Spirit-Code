@@ -1,4 +1,4 @@
-import type { Account, Assignment, LessonFile } from "../types";
+import type { Account, Assignment, LessonFile, Homework, HomeworkFile } from "../types";
 
 const API_BASE_URL = 'http://localhost:8000/api';
 
@@ -114,6 +114,52 @@ export async function createLessonFile(file: Omit<LessonFile, 'id'>): Promise<Le
 
 export async function deleteLessonFile(id: number): Promise<void> {
   return fetchAPI<void>(`/lesson-files/${id}/`, {
+    method: 'DELETE',
+  });
+}
+
+// ============== HOMEWORK API ==============
+
+export async function getAllHomeworks(): Promise<Homework[]> {
+  const response = await fetchAPI<{ results: Homework[] }>('/homeworks/');
+  return response.results;
+}
+
+export async function getHomework(id: number): Promise<Homework> {
+  return fetchAPI<Homework>(`/homeworks/${id}/`);
+}
+
+export async function createHomework(homework: Omit<Homework, 'id'>): Promise<Homework> {
+  return fetchAPI<Homework>('/homeworks/', {
+    method: 'POST',
+    body: JSON.stringify(homework),
+  });
+}
+
+export async function updateHomework(id: number, homework: Partial<Homework>): Promise<Homework> {
+  return fetchAPI<Homework>(`/homeworks/${id}/`, {
+    method: 'PATCH',
+    body: JSON.stringify(homework),
+  });
+}
+
+export async function deleteHomework(id: number): Promise<void> {
+  return fetchAPI<void>(`/homeworks/${id}/`, {
+    method: 'DELETE',
+  });
+}
+
+// ============== HOMEWORK FILES API ==============
+
+export async function createHomeworkFile(file: Omit<HomeworkFile, 'id'>): Promise<HomeworkFile> {
+  return fetchAPI<HomeworkFile>('/homework-files/', {
+    method: 'POST',
+    body: JSON.stringify(file),
+  });
+}
+
+export async function deleteHomeworkFile(id: number): Promise<void> {
+  return fetchAPI<void>(`/homework-files/${id}/`, {
     method: 'DELETE',
   });
 }

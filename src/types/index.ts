@@ -14,10 +14,26 @@ export interface Account extends User {
 }
 
 export interface LessonFile {
-  id?: number
+  id?: number | string
   name: string
   url: string
   created_at?: string
+}
+
+export interface HomeworkFile {
+  id?: number | string
+  name: string
+  url: string
+  created_at?: string
+}
+
+export interface Homework {
+  id?: number
+  assignment?: number
+  description: string
+  files?: HomeworkFile[]
+  created_at?: string
+  updated_at?: string
 }
 
 export interface Assignment {
@@ -28,6 +44,7 @@ export interface Assignment {
   recording_url?: string
   description?: string
   files?: LessonFile[]
+  homework?: Homework
   created_at?: string
   updated_at?: string
 }

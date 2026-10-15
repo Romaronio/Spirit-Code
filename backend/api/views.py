@@ -1,8 +1,8 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from .models import Account, Assignment, LessonFile
-from .serializers import AccountSerializer, AssignmentSerializer, LessonFileSerializer
+from .models import Account, Assignment, LessonFile, Homework, HomeworkFile
+from .serializers import AccountSerializer, AssignmentSerializer, LessonFileSerializer, HomeworkSerializer, HomeworkFileSerializer
 
 
 class AccountViewSet(viewsets.ModelViewSet):
@@ -45,3 +45,15 @@ class LessonFileViewSet(viewsets.ModelViewSet):
     """API endpoint для работы с файлами уроков"""
     queryset = LessonFile.objects.all()
     serializer_class = LessonFileSerializer
+
+
+class HomeworkViewSet(viewsets.ModelViewSet):
+    """API endpoint для работы с домашними заданиями"""
+    queryset = Homework.objects.all()
+    serializer_class = HomeworkSerializer
+
+
+class HomeworkFileViewSet(viewsets.ModelViewSet):
+    """API endpoint для работы с файлами домашних заданий"""
+    queryset = HomeworkFile.objects.all()
+    serializer_class = HomeworkFileSerializer

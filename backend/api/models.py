@@ -49,7 +49,7 @@ class LessonFile(models.Model):
         on_delete=models.CASCADE
     )
     name = models.CharField(max_length=255)
-    url = models.URLField()
+    file = models.FileField(upload_to='lesson_files/')
 
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -58,3 +58,48 @@ class LessonFile(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.assignment.title})"
+
+    @property
+    def url(self):
+        """Возвращает URL файла для совместимости с frontend"""
+        return self.file.url if self.file else None
+
+
+class Homework(models.Model):
+    """Модель для домашних заданий"""
+    assignment = models.OneToOneField(
+        Assignment,
+        related_name='homework',
+        on_delete=models.CASCADE
+    )
+    description = models.TextField()
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"ДЗ: {self.assignment.title}"
+
+
+class HomeworkFile(models.Model):
+    """Модель для файлов домашнего задания"""
+    homework = models.ForeignKey(
+        Homework,
+        related_name='files',
+        on_delete=models.CASCADE
+    )
+    name = models.CharField(max_length=255)
+    file = models.FileField(upload_to='homework_files/')
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['name']
+
+    def __str__(self):
+        return f"{self.name} (ДЗ: {self.homework.assignment.title})"
+
+    @property
+    def url(self):
+        """Возвращает URL файла для совместимости с frontend"""
+        return self.file.url if self.file else None

@@ -42,10 +42,49 @@ function App() {
 
   async function handleUpdate(id: Assignment['id'], changes: Partial<Assignment>) {
     try {
-      const updated = await api.updateAssignment(id, changes)
-      setItems((prev) =>
-        prev.map((item) => (item.id === id ? updated : item))
-      )
+      if (!id) return
+
+      // Если обновляется homework, обрабатываем отдельно
+      if (changes.homework) {
+        const homeworkData = changes.homework
+        const assignment = items.find(item => item.id === id)
+
+        if (assignment?.homework?.id) {
+          // Обновляем существующее homework
+          await api.updateHomework(assignment.homework.id, {
+            description: homeworkData.description
+          })
+        } else {
+          // Создаем новое homework
+          await api.createHomework({
+            assignment: id,
+            description: homeworkData.description
+          })
+        }
+
+        // Удаляем homework из changes, чтобы не отправлять в Assignment
+        const { homework, ...assignmentChanges } = changes
+
+        // Если есть другие изменения, обновляем Assignment
+        if (Object.keys(assignmentChanges).length > 0) {
+          const updated = await api.updateAssignment(id, assignmentChanges)
+          setItems((prev) =>
+            prev.map((item) => (item.id === id ? updated : item))
+          )
+        }
+
+        // Перезагружаем задание с обновленным homework
+        const refreshed = await api.getAssignment(id)
+        setItems((prev) =>
+          prev.map((item) => (item.id === id ? refreshed : item))
+        )
+      } else {
+        // Обычное обновление Assignment
+        const updated = await api.updateAssignment(id, changes)
+        setItems((prev) =>
+          prev.map((item) => (item.id === id ? updated : item))
+        )
+      }
     } catch (error) {
       console.error('Ошибка обновления задания:', error)
       throw error

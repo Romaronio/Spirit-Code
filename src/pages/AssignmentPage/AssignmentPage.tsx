@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, Navigate, useLocation, useParams } from 'react-router-dom'
 import styles from './AssignmentPage.module.css'
-import type { Account, Assignment, LessonFile, User } from '../../types'
+import type { Account, Assignment, LessonFile, User, HomeworkFile } from '../../types'
 import { hasSubject, normalize } from '../../utils/subjects'
 
 interface PageProps {
@@ -54,6 +54,10 @@ function AssignmentDetails({ assignment, user, onUpdate }: DetailsProps) {
   const [description, setDescription] = useState(assignment.description ?? '')
   const [files, setFiles] = useState<LessonFile[]>(assignment.files ?? [])
 
+  const [isEditingHomework, setIsEditingHomework] = useState(false)
+  const [homeworkDescription, setHomeworkDescription] = useState(assignment.homework?.description ?? '')
+  const [homeworkFiles, setHomeworkFiles] = useState<HomeworkFile[]>(assignment.homework?.files ?? [])
+
   function handleFilesChange(e: React.ChangeEvent<HTMLInputElement>) {
     const picked = Array.from(e.target.files ?? []).map((file) => ({
       id: String(Date.now()) + Math.random().toString(36).slice(2),
@@ -64,8 +68,22 @@ function AssignmentDetails({ assignment, user, onUpdate }: DetailsProps) {
     e.target.value = ''
   }
 
-  function handleRemoveFile(fileId: number) {
+  function handleRemoveFile(fileId: number | string) {
     setFiles((prev) => prev.filter((f) => f.id !== fileId))
+  }
+
+  function handleHomeworkFilesChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const picked = Array.from(e.target.files ?? []).map((file) => ({
+      id: String(Date.now()) + Math.random().toString(36).slice(2),
+      name: file.name,
+      url: URL.createObjectURL(file),
+    }))
+    setHomeworkFiles((prev) => [...prev, ...picked])
+    e.target.value = ''
+  }
+
+  function handleRemoveHomeworkFile(fileId: number | string) {
+    setHomeworkFiles((prev) => prev.filter((f) => f.id !== fileId))
   }
 
   function handleSave() {
@@ -78,6 +96,22 @@ function AssignmentDetails({ assignment, user, onUpdate }: DetailsProps) {
     setDescription(assignment.description ?? '')
     setFiles(assignment.files ?? [])
     setIsEditing(false)
+  }
+
+  function handleSaveHomework() {
+    onUpdate(assignment.id!, {
+      homework: {
+        description: homeworkDescription,
+        files: homeworkFiles,
+      },
+    })
+    setIsEditingHomework(false)
+  }
+
+  function handleCancelHomework() {
+    setHomeworkDescription(assignment.homework?.description ?? '')
+    setHomeworkFiles(assignment.homework?.files ?? [])
+    setIsEditingHomework(false)
   }
 
   const hasFiles = assignment.files && assignment.files.length > 0
@@ -127,7 +161,7 @@ function AssignmentDetails({ assignment, user, onUpdate }: DetailsProps) {
                     <button
                       type="button"
                       className={styles.linkButton}
-                      onClick={() => handleRemoveFile(f.id)}
+                      onClick={() => f.id && handleRemoveFile(f.id)}
                     >
                       Удалить
                     </button>
@@ -200,6 +234,89 @@ function AssignmentDetails({ assignment, user, onUpdate }: DetailsProps) {
             )}
           </>
         )}
+
+        <div className={styles.divider} />
+
+        <section className={styles.section}>
+          <h2>Домашнее задание</h2>
+          {isEditingHomework ? (
+            <div className={styles.editor}>
+              <label className={styles.label}>
+                Описание задания
+                <textarea
+                  className={styles.textarea}
+                  rows={5}
+                  placeholder="Опишите, что нужно сделать..."
+                  value={homeworkDescription}
+                  onChange={(e) => setHomeworkDescription(e.target.value)}
+                />
+              </label>
+
+              <label className={styles.label}>
+                Файлы с заданием
+                <input type="file" multiple onChange={handleHomeworkFilesChange} />
+              </label>
+
+              {homeworkFiles.length > 0 && (
+                <ul className={styles.files}>
+                  {homeworkFiles.map((f) => (
+                    <li key={f.id}>
+                      <span>{f.name}</span>
+                      <button
+                        type="button"
+                        className={styles.linkButton}
+                        onClick={() => f.id && handleRemoveHomeworkFile(f.id)}
+                      >
+                        Удалить
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              <div className={styles.actions}>
+                <button type="button" className={styles.primary} onClick={handleSaveHomework}>
+                  Сохранить
+                </button>
+                <button type="button" className={styles.secondary} onClick={handleCancelHomework}>
+                  Отмена
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              {assignment.homework ? (
+                <>
+                  <p className={styles.homeworkDescription}>
+                    {assignment.homework.description}
+                  </p>
+                  {assignment.homework.files && assignment.homework.files.length > 0 && (
+                    <ul className={styles.files}>
+                      {assignment.homework.files.map((f) => (
+                        <li key={f.id}>
+                          <a className={styles.link} href={f.url} download={f.name}>
+                            📎 {f.name}
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </>
+              ) : (
+                <p className={styles.empty}>Домашнее задание пока не добавлено</p>
+              )}
+              {canEdit && (
+                <button
+                  type="button"
+                  className={styles.secondary}
+                  onClick={() => setIsEditingHomework(true)}
+                >
+                  {assignment.homework ? 'Редактировать задание' : 'Добавить задание'}
+                </button>
+              )}
+            </>
+          )}
+        </section>
       </div>
     </div>
   )

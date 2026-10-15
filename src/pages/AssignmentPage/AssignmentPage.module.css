@@ -137,3 +137,14 @@
   color: #d93025;
   cursor: pointer;
 }
+
+.divider {
+  height: 1px;
+  margin: 16px 0;
+  background: #e0e0e0;
+}
+
+.homeworkDescription {
+  white-space: pre-wrap;
+  line-height: 1.6;
+}
