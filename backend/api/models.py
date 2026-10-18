@@ -49,7 +49,7 @@ class LessonFile(models.Model):
         on_delete=models.CASCADE
     )
     name = models.CharField(max_length=255)
-    file = models.FileField(upload_to='lesson_files/')
+    file = models.FileField(upload_to='lesson_files/', null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -89,7 +89,7 @@ class HomeworkFile(models.Model):
         on_delete=models.CASCADE
     )
     name = models.CharField(max_length=255)
-    file = models.FileField(upload_to='homework_files/')
+    file = models.FileField(upload_to='homework_files/', null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -102,4 +102,50 @@ class HomeworkFile(models.Model):
     @property
     def url(self):
         """Возвращает URL файла для совместимости с frontend"""
+        return self.file.url if self.file else None
+
+
+class StudentHomework(models.Model):
+    """Сданная работа ученика по заданию"""
+    assignment = models.ForeignKey(
+        Assignment,
+        related_name='student_homeworks',
+        on_delete=models.CASCADE
+    )
+    student = models.ForeignKey(
+        Account,
+        related_name='student_homeworks',
+        on_delete=models.CASCADE
+    )
+    description = models.TextField(blank=True, default='')
+    submitted_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-submitted_at']
+        unique_together = ['assignment', 'student']
+
+    def __str__(self):
+        return f"{self.student.name} — {self.assignment.title}"
+
+
+class StudentHomeworkFile(models.Model):
+    """Файлы, прикреплённые учеником к сданной работе"""
+    student_homework = models.ForeignKey(
+        StudentHomework,
+        related_name='files',
+        on_delete=models.CASCADE
+    )
+    name = models.CharField(max_length=255)
+    file = models.FileField(upload_to='student_homework_files/', null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['name']
+
+    def __str__(self):
+        return f"{self.name} ({self.student_homework.student.name})"
+
+    @property
+    def url(self):
         return self.file.url if self.file else None

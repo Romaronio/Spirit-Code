@@ -36,6 +36,23 @@ export interface Homework {
   updated_at?: string
 }
 
+export interface StudentHomeworkFile {
+  id?: number | string
+  name: string
+  url?: string
+  created_at?: string
+}
+
+export interface StudentHomework {
+  id?: number
+  assignment?: number
+  student?: number
+  student_name?: string
+  description: string
+  files?: StudentHomeworkFile[]
+  submitted_at?: string
+}
+
 export interface Assignment {
   id?: number
   title: string
@@ -45,6 +62,7 @@ export interface Assignment {
   description?: string
   files?: LessonFile[]
   homework?: Homework
+  student_homeworks?: StudentHomework[]
   created_at?: string
   updated_at?: string
 }

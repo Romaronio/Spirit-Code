@@ -30,9 +30,18 @@ function App() {
     loadData()
   }, [])
 
-  async function handleAdd(assignment: Omit<Assignment, 'id'>) {
+  async function handleAdd(data: {
+    title: string
+    subject: string
+    deadline: string
+    description?: string
+    recording_url?: string
+    homework?: { description: string }
+    files?: File[]
+    homework_files?: File[]
+  }) {
     try {
-      const newAssignment = await api.createAssignment(assignment)
+      const newAssignment = await api.createAssignment(data)
       setItems((prev) => [newAssignment, ...prev])
     } catch (error) {
       console.error('Ошибка создания задания:', error)
@@ -40,14 +49,20 @@ function App() {
     }
   }
 
-  async function handleUpdate(id: Assignment['id'], changes: Partial<Assignment>) {
+  async function handleUpdate(
+    id: Assignment['id'],
+    changes: Partial<Assignment> & {
+      files?: File[]
+      homework?: { description: string; files?: File[] }
+    }
+  ) {
     try {
       if (!id) return
 
       // Если обновляется homework, обрабатываем отдельно
       if (changes.homework) {
         const homeworkData = changes.homework
-        const assignment = items.find(item => item.id === id)
+        const assignment = items.find((item) => item.id === id)
 
         if (assignment?.homework?.id) {
           // Обновляем существующее homework
@@ -65,9 +80,15 @@ function App() {
         // Удаляем homework из changes, чтобы не отправлять в Assignment
         const { homework, ...assignmentChanges } = changes
 
-        // Если есть другие изменения, обновляем Assignment
-        if (Object.keys(assignmentChanges).length > 0) {
-          const updated = await api.updateAssignment(id, assignmentChanges)
+        // Если есть изменения в description/recording_url/files — обновляем Assignment
+        if (
+          Object.keys(assignmentChanges).length > 0 ||
+          homeworkData.files?.length
+        ) {
+          const updated = await api.updateAssignment(id, {
+            ...assignmentChanges,
+            homework_files: homeworkData.files,
+          })
           setItems((prev) =>
             prev.map((item) => (item.id === id ? updated : item))
           )
@@ -79,7 +100,7 @@ function App() {
           prev.map((item) => (item.id === id ? refreshed : item))
         )
       } else {
-        // Обычное обновление Assignment
+        // Обычное обновление Assignment (с возможными файлами)
         const updated = await api.updateAssignment(id, changes)
         setItems((prev) =>
           prev.map((item) => (item.id === id ? updated : item))
@@ -136,6 +157,17 @@ function App() {
     }
   }
 
+  async function refreshStudentHomeworks(assignmentId: number) {
+    try {
+      const refreshed = await api.getAssignment(assignmentId)
+      setItems((prev) =>
+        prev.map((item) => (item.id === assignmentId ? refreshed : item))
+      )
+    } catch (error) {
+      console.error('Ошибка обновления ответов учеников:', error)
+    }
+  }
+
   if (loading) {
     return <div style={{ padding: '20px', textAlign: 'center' }}>Загрузка...</div>
   }
@@ -160,7 +192,12 @@ function App() {
       <Route
         path="/assignment/:id"
         element={
-          <AssignmentPage items={items} accounts={accounts} onUpdate={handleUpdate} />
+          <AssignmentPage
+            items={items}
+            accounts={accounts}
+            onUpdate={handleUpdate}
+            onSubmitStudentHomework={refreshStudentHomeworks}
+          />
         }
       />
     </Routes>

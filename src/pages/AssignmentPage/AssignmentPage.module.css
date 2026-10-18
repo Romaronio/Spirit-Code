@@ -148,3 +148,44 @@
   white-space: pre-wrap;
   line-height: 1.6;
 }
+
+.success {
+  color: #2e7d32;
+  font-weight: 600;
+}
+
+.studentHomeworks {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-left: 0;
+  list-style: none;
+}
+
+.studentHomeworkCard {
+  padding: 12px;
+  background: #f6f1f1;
+  border-radius: 8px;
+}
+
+.studentHomeworkHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.studentName {
+  font-weight: 600;
+}
+
+.submittedAt {
+  color: #777;
+  font-size: 12px;
+}
+
+.studentHomeworkDescription {
+  white-space: pre-wrap;
+  line-height: 1.5;
+  margin: 6px 0;
+}

@@ -1,4 +1,4 @@
-import type { Account, Assignment, LessonFile, Homework, HomeworkFile } from "../types";
+import type { Account, Assignment, LessonFile, Homework, HomeworkFile, StudentHomework, StudentHomeworkFile } from "../types";
 
 const API_BASE_URL = 'http://localhost:8000/api';
 
@@ -22,6 +22,30 @@ async function fetchAPI<T>(
   }
 
   // Если ответ пустой (204 No Content), возвращаем undefined
+  if (response.status === 204 || response.headers.get('content-length') === '0') {
+    return undefined as T;
+  }
+
+  return response.json();
+}
+
+// Запрос с multipart/form-data (для загрузки файлов)
+async function fetchAPIFormData<T>(
+  endpoint: string,
+  formData: FormData,
+  method: 'POST' | 'PATCH' | 'PUT' = 'POST'
+): Promise<T> {
+  const url = `${API_BASE_URL}${endpoint}`;
+  const response = await fetch(url, {
+    method,
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.error || `HTTP error! status: ${response.status}`);
+  }
+
   if (response.status === 204 || response.headers.get('content-length') === '0') {
     return undefined as T;
   }
@@ -79,18 +103,69 @@ export async function getAssignment(id: number): Promise<Assignment> {
   return fetchAPI<Assignment>(`/assignments/${id}/`);
 }
 
-export async function createAssignment(assignment: Omit<Assignment, 'id'>): Promise<Assignment> {
-  return fetchAPI<Assignment>('/assignments/', {
-    method: 'POST',
-    body: JSON.stringify(assignment),
-  });
+export async function createAssignment(data: {
+  title: string
+  subject: string
+  deadline: string
+  description?: string
+  recording_url?: string
+  homework?: { description: string }
+  files?: File[]
+  homework_files?: File[]
+}): Promise<Assignment> {
+  const formData = new FormData();
+  formData.append('title', data.title);
+  formData.append('subject', data.subject);
+  formData.append('deadline', data.deadline);
+  if (data.description) {
+    formData.append('description', data.description);
+  }
+  if (data.recording_url) {
+    formData.append('recording_url', data.recording_url);
+  }
+  if (data.homework && data.homework.description) {
+    formData.append('homework', JSON.stringify(data.homework));
+  }
+  if (data.files) {
+    data.files.forEach((file) => formData.append('files', file));
+  }
+  if (data.homework_files) {
+    data.homework_files.forEach((file) => formData.append('homework_files', file));
+  }
+
+  return fetchAPIFormData<Assignment>('/assignments/', formData, 'POST');
 }
 
-export async function updateAssignment(id: number, assignment: Partial<Assignment>): Promise<Assignment> {
-  return fetchAPI<Assignment>(`/assignments/${id}/`, {
-    method: 'PATCH',
-    body: JSON.stringify(assignment),
-  });
+export async function updateAssignment(
+  id: number,
+  data: {
+    title?: string
+    subject?: string
+    deadline?: string
+    description?: string
+    recording_url?: string
+    homework?: { description: string }
+    files?: File[]
+    homework_files?: File[]
+  }
+): Promise<Assignment> {
+  const formData = new FormData();
+  if (data.title !== undefined) formData.append('title', data.title);
+  if (data.subject !== undefined) formData.append('subject', data.subject);
+  if (data.deadline !== undefined) formData.append('deadline', data.deadline);
+  if (data.description !== undefined) formData.append('description', data.description || '');
+  if (data.recording_url !== undefined) formData.append('recording_url', data.recording_url || '');
+  if (data.homework) {
+    formData.append('homework', JSON.stringify(data.homework));
+  }
+  if (data.files) {
+    data.files.forEach((file) => formData.append('files', file));
+  }
+  if (data.homework_files) {
+    data.homework_files.forEach((file) => formData.append('homework_files', file));
+  }
+
+  return fetchAPIFormData<Assignment>(`/assignments/${id}/`, formData, 'PATCH');
 }
 
 export async function deleteAssignment(id: number): Promise<void> {
@@ -162,4 +237,31 @@ export async function deleteHomeworkFile(id: number): Promise<void> {
   return fetchAPI<void>(`/homework-files/${id}/`, {
     method: 'DELETE',
   });
+}
+
+// ============== STUDENT HOMEWORK API ==============
+
+export async function submitStudentHomework(data: {
+  assignmentId: number
+  studentId: number
+  description: string
+  files?: File[]
+}): Promise<StudentHomework> {
+  const formData = new FormData();
+  formData.append('student_id', String(data.studentId));
+  formData.append('description', data.description);
+  if (data.files) {
+    data.files.forEach((file) => formData.append('files', file));
+  }
+
+  return fetchAPIFormData<StudentHomework>(
+    `/assignments/${data.assignmentId}/submit/`,
+    formData,
+    'POST'
+  );
+}
+
+export async function getAllStudentHomeworks(): Promise<StudentHomework[]> {
+  const response = await fetchAPI<{ results: StudentHomework[] }>('/student-homeworks/');
+  return response.results;
 }

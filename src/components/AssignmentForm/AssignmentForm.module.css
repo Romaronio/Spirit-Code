@@ -29,6 +29,9 @@
   font-weight: 600;
   font-size: 14px;
   color: #333;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .subjectOptions {
@@ -77,4 +80,32 @@
   font-size: 16px;
   font-weight: 600;
   cursor: pointer;
+}
+
+.divider {
+  height: 1px;
+  margin: 8px 0;
+  background: #e0e0e0;
+}
+
+.files {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-left: 0;
+  list-style: none;
+}
+
+.files li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.linkButton {
+  border: none;
+  background: none;
+  color: #d93025;
+  cursor: pointer;
+  font-size: 14px;
 }
