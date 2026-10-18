@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { Link, Navigate, useLocation, useParams } from 'react-router-dom'
 import styles from './AssignmentPage.module.css'
-import type { Account, Assignment, User } from '../../types'
 import * as api from '../../services/api'
 import { hasSubject, normalize } from '../../utils/subjects'
 import { loadUser } from '../../utils/session'

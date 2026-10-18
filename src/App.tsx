@@ -73,7 +73,7 @@ function App() {
         }
 
         // Удаляем homework из changes, чтобы не отправлять в Assignment
-        const { homework, ...assignmentChanges } = changes
+        const { homework: _, ...assignmentChanges } = changes
 
         // Если есть изменения в description/recording_url/files — обновляем Assignment
         if (

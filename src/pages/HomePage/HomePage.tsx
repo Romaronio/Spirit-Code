@@ -7,14 +7,26 @@ import StudentsPanel from '../../components/StudentsPanel/StudentsPanel'
 import { hasSubject, normalize, subjectsOf } from '../../utils/subjects'
 import { loadUser } from '../../utils/session'
 
+// В HomePage.tsx
 interface Props {
-  items: Assignment[]
-  onAdd: (assignment: Omit<Assignment, 'id'>) => void
-  onDelete: (id: number) => void
-  accounts: Account[]
-  onAddStudent: (student: Omit<Account, 'id'>) => void
-  onDeleteStudent: (id: number) => void
-  onSetSubjects: (id: number, subjects: string[]) => void
+  items: Assignment[];
+  accounts: Account[];
+  onDelete: (id: number) => void;
+  onAddStudent: (student: Omit<Account, 'id'>) => void;
+  onDeleteStudent: (id: number) => void;
+  onSetSubjects: (id: number, subjects: string[]) => void;
+  
+  // Вот эту строчку нужно сделать ТАКОЙ ЖЕ, как в App.tsx:
+  onAdd: (data: {
+    title: string
+    subject: string
+    deadline: string
+    description?: string
+    recording_url?: string
+    homework?: { description: string }
+    files?: File[]
+    homework_files?: File[]
+  }) => Promise<void>; // Обязательно добавь Promise<void>, так как handleAdd — асинхронная!
 }
 
 function HomePage({

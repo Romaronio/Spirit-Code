@@ -1,4 +1,4 @@
-import type { Account, Assignment, LessonFile, Homework, HomeworkFile, StudentHomework, StudentHomeworkFile } from "../types";
+import type { Account, Assignment, LessonFile, Homework, HomeworkFile, StudentHomework } from "../types";
 
 const API_BASE_URL = 'http://localhost:8000/api';
 

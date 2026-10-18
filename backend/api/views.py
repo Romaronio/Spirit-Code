@@ -73,6 +73,22 @@ class AssignmentViewSet(viewsets.ModelViewSet):
                 )
                 homework_serializer.is_valid(raise_exception=True)
                 homework_serializer.save()
+                # Сохраняем файлы, прикреплённые именно к домашнему заданию
+                homework_files = request.FILES.getlist('homework_files')
+
+                if homework_data and isinstance(homework_data, dict):
+                    homework = Homework.objects.filter(
+                        assignment=assignment
+                    ).first()
+
+                    if homework:
+                        for f in homework_files:
+                            HomeworkFile.objects.create(
+                                homework=homework,
+                                name=f.name,
+                                file=f,
+                            )
+
 
         files = request.data.getlist('files') if hasattr(request.data, 'getlist') else []
         for f in files:
