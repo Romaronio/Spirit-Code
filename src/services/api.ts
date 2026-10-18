@@ -246,10 +246,14 @@ export async function submitStudentHomework(data: {
   studentId: number
   description: string
   files?: File[]
+  deleteFileIds?: Array<number | string>
 }): Promise<StudentHomework> {
   const formData = new FormData();
   formData.append('student_id', String(data.studentId));
   formData.append('description', data.description);
+  if (data.deleteFileIds) {
+    formData.append('delete_file_ids', JSON.stringify(data.deleteFileIds));
+  }
   if (data.files) {
     data.files.forEach((file) => formData.append('files', file));
   }

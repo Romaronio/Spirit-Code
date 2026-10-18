@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { Link, Navigate, useLocation, useParams } from 'react-router-dom'
 import styles from './AssignmentPage.module.css'
-import type { Account, Assignment, User, StudentHomework } from '../../types'
+import type { Account, Assignment, User } from '../../types'
 import * as api from '../../services/api'
 import { hasSubject, normalize } from '../../utils/subjects'
+import { loadUser } from '../../utils/session'
+import type { Account, Assignment, AssignmentChanges, User } from '../../types'
 
 interface FileEntry {
   id: string
@@ -14,14 +16,14 @@ interface FileEntry {
 interface PageProps {
   items: Assignment[]
   accounts: Account[]
-  onUpdate: (id: Assignment['id'], changes: Partial<Assignment>) => void
+    onUpdate: (id: Assignment['id'], changes: AssignmentChanges) => void
   onSubmitStudentHomework?: (assignmentId: number) => Promise<void> | void
 }
 
 function AssignmentPage({ items, accounts, onUpdate, onSubmitStudentHomework }: PageProps) {
   const { id } = useParams()
   const location = useLocation()
-  const user = location.state as User | null
+  const user = (location.state as User | null) ?? loadUser()
 
   if (!user) {
     return <Navigate to="/" replace />
@@ -45,20 +47,26 @@ function AssignmentPage({ items, accounts, onUpdate, onSubmitStudentHomework }: 
     )
   }
 
-  return <AssignmentDetails assignment={assignment} user={user} onUpdate={onUpdate} />
+  return (
+    <AssignmentDetails
+      assignment={assignment}
+      user={user}
+      studentId={account?.id}
+      onUpdate={onUpdate}
+      onSubmitStudentHomework={onSubmitStudentHomework}
+    />
+  )
 }
 
 interface DetailsProps {
   assignment: Assignment
   user: User
-  onUpdate: (id: Assignment['id'], changes: Partial<Assignment> & {
-    files?: File[]
-    homework?: { description: string; files?: File[] }
-  }) => void
+  studentId?: number
+  onUpdate: (id: Assignment['id'], changes: AssignmentChanges) => void
   onSubmitStudentHomework?: (assignmentId: number) => Promise<void> | void
 }
 
-function AssignmentDetails({ assignment, user, onUpdate, onSubmitStudentHomework }: DetailsProps) {
+function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStudentHomework }: DetailsProps) {
   const canEdit = user.role === 'teacher'
 
   const [isEditing, setIsEditing] = useState(false)
@@ -72,10 +80,17 @@ function AssignmentDetails({ assignment, user, onUpdate, onSubmitStudentHomework
 
   // Форма отправки ответа учеником
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [studentDescription, setStudentDescription] = useState('')
+  const myAnswer = assignment.student_homeworks?.find((sh) => sh.student === studentId)
+  const [studentDescription, setStudentDescription] = useState(myAnswer?.description ?? '')
   const [studentFiles, setStudentFiles] = useState<FileEntry[]>([])
+  const [deletedSavedFileIds, setDeletedSavedFileIds] = useState<Array<number | string>>([])
   const [submitError, setSubmitError] = useState('')
   const [submitSuccess, setSubmitSuccess] = useState(false)
+
+  // Сохранённые файлы ответа без тех, что ученик пометил на удаление
+  const savedFiles = (myAnswer?.files ?? []).filter(
+    (f) => f.id === undefined || !deletedSavedFileIds.includes(f.id)
+  )
 
   function handleFilesChange(e: React.ChangeEvent<HTMLInputElement>) {
     const picked = Array.from(e.target.files ?? []).map((file) => ({
@@ -119,13 +134,14 @@ function AssignmentDetails({ assignment, user, onUpdate, onSubmitStudentHomework
     setStudentFiles((prev) => prev.filter((f) => f.id !== id))
   }
 
+  function handleRemoveSavedFile(id: number | string | undefined) {
+    if (id === undefined) return
+    setDeletedSavedFileIds((prev) => [...prev, id])
+  }
+
   async function handleSubmitAnswer() {
     if (!assignment.id) return
-    if (!user) return
-
-    // Находим аккаунт ученика по имени
-    const account = accounts.find((a) => normalize(a.name) === normalize(user.name))
-    if (!account?.id) {
+    if (!studentId) {
       setSubmitError('Аккаунт ученика не найден')
       return
     }
@@ -137,17 +153,18 @@ function AssignmentDetails({ assignment, user, onUpdate, onSubmitStudentHomework
     try {
       await api.submitStudentHomework({
         assignmentId: assignment.id,
-        studentId: account.id,
+        studentId,
         description: studentDescription,
         files: studentFiles.map((f) => f.file),
+        deleteFileIds: deletedSavedFileIds,
       })
-      setStudentDescription('')
-      setStudentFiles([])
-      setSubmitSuccess(true)
-      // Перезагружаем данные задания, чтобы ответы отображались
+      // Перезагружаем задание, чтобы сохранённый ответ подтянулся с сервера
       if (onSubmitStudentHomework) {
         await onSubmitStudentHomework(assignment.id)
       }
+      setStudentFiles([])
+      setDeletedSavedFileIds([])
+      setSubmitSuccess(true)
       setTimeout(() => setSubmitSuccess(false), 3000)
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : 'Ошибка при отправке ответа')
@@ -431,11 +448,11 @@ function AssignmentDetails({ assignment, user, onUpdate, onSubmitStudentHomework
           </section>
         )}
 
-        {/* Секция "Отправить ответ ученику" — только для учеников */}
+        {/* Секция "Отправить ответ" — только для учеников */}
         {user.role === 'student' && (
           <section className={styles.section}>
             <h2>Отправить ответ</h2>
-            {submitSuccess && <p className={styles.success}>Ответ успешно отправлен!</p>}
+            {submitSuccess && <p className={styles.success}>Ответ сохранён!</p>}
             {submitError && <p className={styles.error}>{submitError}</p>}
             <label className={styles.label}>
               Описание проделанной работы
@@ -451,6 +468,24 @@ function AssignmentDetails({ assignment, user, onUpdate, onSubmitStudentHomework
               Файлы с ответом
               <input type="file" multiple onChange={handleStudentFilesChange} />
             </label>
+            {savedFiles.length > 0 && (
+              <ul className={styles.files}>
+                {savedFiles.map((f) => (
+                  <li key={f.id}>
+                    <a className={styles.link} href={f.url} download={f.name}>
+                      📎 {f.name}
+                    </a>
+                    <button
+                      type="button"
+                      className={styles.linkButton}
+                      onClick={() => handleRemoveSavedFile(f.id)}
+                    >
+                      Удалить
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
             {studentFiles.length > 0 && (
               <ul className={styles.files}>
                 {studentFiles.map((f) => (

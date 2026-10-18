@@ -66,3 +66,8 @@ export interface Assignment {
   created_at?: string
   updated_at?: string
 }
+
+export type AssignmentChanges = Omit<Partial<Assignment>, 'files' | 'homework'> & {
+  files?: File[]
+  homework?: { description: string; files?: File[] }
+}

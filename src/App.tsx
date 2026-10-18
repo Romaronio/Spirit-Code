@@ -3,8 +3,9 @@ import { Routes, Route } from 'react-router-dom'
 import AuthPage from './pages/AuthPage/AuthPage'
 import HomePage from './pages/HomePage/HomePage'
 import AssignmentPage from './pages/AssignmentPage/AssignmentPage'
-import type { Account, Assignment } from './types'
+import type { Account, Assignment, AssignmentChanges } from './types'
 import * as api from './services/api'
+
 
 function App() {
   const [items, setItems] = useState<Assignment[]>([])
@@ -48,14 +49,8 @@ function App() {
       throw error
     }
   }
-
-  async function handleUpdate(
-    id: Assignment['id'],
-    changes: Partial<Assignment> & {
-      files?: File[]
-      homework?: { description: string; files?: File[] }
-    }
-  ) {
+  async function handleUpdate(id: Assignment['id'], changes: AssignmentChanges)
+  {
     try {
       if (!id) return
 

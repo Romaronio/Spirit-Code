@@ -2,6 +2,7 @@ import styles from './LoginForm.module.css'
 import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { User } from '../../types'
+import { saveUser } from '../../utils/session'
 import * as api from '../../services/api'
 
 function LoginForm() {
@@ -26,8 +27,9 @@ function LoginForm() {
     try {
       const account = await api.login(trimmedName, password)
       const user: User = { name: account.name, role: account.role }
+      saveUser(user)
       navigate('/home', { state: user })
-    } catch (err) {
+    } catch {
       setError('Неверное имя или пароль')
     } finally {
       setLoading(false)

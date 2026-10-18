@@ -166,6 +166,19 @@ class AssignmentViewSet(viewsets.ModelViewSet):
             defaults={'description': description}
         )
 
+        delete_file_ids = request.data.get('delete_file_ids')
+        if delete_file_ids:
+            if isinstance(delete_file_ids, str):
+                import json
+                try:
+                    delete_file_ids = json.loads(delete_file_ids)
+                except (ValueError, TypeError):
+                    delete_file_ids = None
+            if isinstance(delete_file_ids, list):
+                StudentHomeworkFile.objects.filter(
+                    id__in=delete_file_ids, student_homework=sh
+                ).delete()
+
         files = request.data.getlist('files') if hasattr(request.data, 'getlist') else []
         for f in files:
             StudentHomeworkFile.objects.create(

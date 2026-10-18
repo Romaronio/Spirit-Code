@@ -5,6 +5,7 @@ import AssignmentCard from '../../components/AssignmentCard/AssignmentCard'
 import AssignmentForm from '../../components/AssignmentForm/AssignmentForm'
 import StudentsPanel from '../../components/StudentsPanel/StudentsPanel'
 import { hasSubject, normalize, subjectsOf } from '../../utils/subjects'
+import { loadUser } from '../../utils/session'
 
 interface Props {
   items: Assignment[]
@@ -26,7 +27,7 @@ function HomePage({
   onSetSubjects,
 }: Props) {
   const location = useLocation()
-  const user = location.state as User | null
+  const user = (location.state as User | null) ?? loadUser()
 
   if (!user) {
     return <Navigate to="/" replace />
