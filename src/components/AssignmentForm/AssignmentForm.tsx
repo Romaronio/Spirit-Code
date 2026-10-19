@@ -1,6 +1,5 @@
 import { useState, type FormEvent, type ChangeEvent } from 'react'
 import styles from './AssignmentForm.module.css'
-import type { Assignment } from '../../types'
 
 interface AssignmentFormProps {
   onAdd: (data: {

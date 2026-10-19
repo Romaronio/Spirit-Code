@@ -153,6 +153,10 @@
   color: #2e7d32;
   font-weight: 600;
 }
+.error {
+  color: #d93025;
+  font-weight: 600;
+}
 
 .studentHomeworks {
   display: flex;

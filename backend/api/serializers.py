@@ -118,7 +118,7 @@ class StudentHomeworkCreateSerializer(serializers.ModelSerializer):
 class AssignmentSerializer(serializers.ModelSerializer):
     """Сериализатор для Assignment с вложенными файлами и домашним заданием"""
     files = LessonFileSerializer(many=True, read_only=True)
-    homework = HomeworkCreateSerializer(read_only=True, required=False)
+    homework = HomeworkSerializer(read_only=True, required=False)
     student_homeworks = StudentHomeworkSerializer(many=True, read_only=True)
 
     class Meta:

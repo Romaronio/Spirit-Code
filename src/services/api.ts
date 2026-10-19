@@ -1,6 +1,9 @@
 import type { Account, Assignment, LessonFile, Homework, HomeworkFile, StudentHomework } from "../types";
 
-const API_BASE_URL = 'http://localhost:8000/api';
+// Адрес API. По умолчанию относительный путь: и локально (через прокси Vite),
+// и на сервере (через nginx) запросы идут на тот же адрес, с которого открыт сайт.
+// При необходимости можно переопределить переменной VITE_API_URL в файле .env.
+const API_BASE_URL: string = import.meta.env.VITE_API_URL || '/api';
 
 // Вспомогательная функция для HTTP запросов
 async function fetchAPI<T>(

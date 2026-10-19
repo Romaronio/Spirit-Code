@@ -1,3 +1,6 @@
+import json
+
+from django.db import transaction
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -9,7 +12,6 @@ from .serializers import (
     LessonFileSerializer,
     HomeworkSerializer,
     HomeworkFileSerializer,
-    HomeworkCreateSerializer,
     StudentHomeworkSerializer,
     StudentHomeworkCreateSerializer,
 )
@@ -51,114 +53,77 @@ class AssignmentViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(subject=subject)
         return queryset
 
+    @staticmethod
+    def _parse_homework(raw):
+        """Поле homework приходит из multipart как JSON-строка, из JSON-запроса — как dict"""
+        if isinstance(raw, str):
+            try:
+                raw = json.loads(raw)
+            except (ValueError, TypeError):
+                return None
+        return raw if isinstance(raw, dict) else None
+
+    def _save_homework(self, request, assignment):
+        """Создаёт или обновляет ДЗ и прикрепляет к нему загруженные файлы.
+
+        Одинаково работает при создании и при редактировании. ДЗ создаётся,
+        если пришло описание или хотя бы один файл (файлы без описания не теряются).
+        """
+        homework_data = self._parse_homework(request.data.get('homework'))
+        homework_files = request.FILES.getlist('homework_files')
+
+        description = homework_data.get('description') if homework_data else None
+        if description is None and not homework_files:
+            return  # про ДЗ в запросе ничего нет — не трогаем
+
+        homework, _ = Homework.objects.get_or_create(
+            assignment=assignment,
+            defaults={'description': description or ''},
+        )
+        if description is not None and homework.description != description:
+            homework.description = description
+            homework.save()
+
+        for f in homework_files:
+            HomeworkFile.objects.create(homework=homework, name=f.name, file=f)
+
+    def _save_lesson_files(self, request, assignment):
+        """Прикрепляет к уроку загруженные файлы урока"""
+        for f in request.FILES.getlist('files'):
+            LessonFile.objects.create(assignment=assignment, name=f.name, file=f)
+
+    @transaction.atomic
     def create(self, request, *args, **kwargs):
         """Создание урока с возможным домашним заданием"""
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         assignment = serializer.save()
 
-        homework_data = request.data.get('homework')
-        if homework_data:
-            if isinstance(homework_data, str):
-                import json
-                try:
-                    homework_data = json.loads(homework_data)
-                except (ValueError, TypeError):
-                    homework_data = None
+        self._save_homework(request, assignment)
+        self._save_lesson_files(request, assignment)
 
-            if homework_data and isinstance(homework_data, dict):
-                description = homework_data.get('description', '')
-                homework_serializer = HomeworkCreateSerializer(
-                    data={'assignment': assignment.id, 'description': description}
-                )
-                homework_serializer.is_valid(raise_exception=True)
-                homework_serializer.save()
-                # Сохраняем файлы, прикреплённые именно к домашнему заданию
-                homework_files = request.FILES.getlist('homework_files')
-
-                if homework_data and isinstance(homework_data, dict):
-                    homework = Homework.objects.filter(
-                        assignment=assignment
-                    ).first()
-
-                    if homework:
-                        for f in homework_files:
-                            HomeworkFile.objects.create(
-                                homework=homework,
-                                name=f.name,
-                                file=f,
-                            )
-
-
-        files = request.data.getlist('files') if hasattr(request.data, 'getlist') else []
-        for f in files:
-            LessonFile.objects.create(
-                assignment=assignment,
-                name=f.name,
-                file=f,
-            )
-
-        assignment.refresh_from_db()
+        # Перечитываем из БД, чтобы в ответе были свежие homework и files
+        assignment = Assignment.objects.get(pk=assignment.pk)
         response_serializer = self.get_serializer(assignment)
         return Response(response_serializer.data, status=status.HTTP_201_CREATED)
 
+    @transaction.atomic
     def update(self, request, *args, **kwargs):
         """Обновление урока с возможным домашним заданием"""
         partial = kwargs.pop('partial', False)
         instance = self.get_object()
 
-        homework_data = request.data.get('homework')
-        if homework_data is not None:
-            if isinstance(homework_data, str):
-                import json
-                try:
-                    homework_data = json.loads(homework_data)
-                except (ValueError, TypeError):
-                    homework_data = None
-
-        data = request.data.copy() if hasattr(request.data, 'copy') else request.data
-        if 'homework' in data:
-            data.pop('homework')
-
-        serializer = self.get_serializer(instance, data=data, partial=partial)
+        # request.data не копируем: в нём лежат загруженные файлы, а их копирование
+        # может падать на больших файлах. Поля homework и files в сериализаторе
+        # read-only, поэтому он их и так игнорирует.
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
         assignment = serializer.save()
 
-        if homework_data and isinstance(homework_data, dict):
-            try:
-                homework = Homework.objects.get(assignment=assignment)
-            except Homework.DoesNotExist:
-                homework = None
+        self._save_homework(request, assignment)
+        self._save_lesson_files(request, assignment)
 
-            description = homework_data.get('description', '')
-            if homework:
-                homework.description = description
-                homework.save()
-            else:
-                Homework.objects.create(assignment=assignment, description=description)
-
-        files = request.data.getlist('files') if hasattr(request.data, 'getlist') else []
-        for f in files:
-            LessonFile.objects.create(
-                assignment=assignment,
-                name=f.name,
-                file=f,
-            )
-
-        homework_files = request.data.getlist('homework_files') if hasattr(request.data, 'getlist') else []
-        for f in homework_files:
-            try:
-                homework = Homework.objects.get(assignment=assignment)
-            except Homework.DoesNotExist:
-                homework = None
-            if homework:
-                HomeworkFile.objects.create(
-                    homework=homework,
-                    name=f.name,
-                    file=f,
-                )
-
-        assignment.refresh_from_db()
+        assignment = Assignment.objects.get(pk=assignment.pk)
         response_serializer = self.get_serializer(assignment)
         return Response(response_serializer.data)
 

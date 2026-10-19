@@ -15,7 +15,7 @@ interface FileEntry {
 interface PageProps {
   items: Assignment[]
   accounts: Account[]
-    onUpdate: (id: Assignment['id'], changes: AssignmentChanges) => void
+  onUpdate: (id: Assignment['id'], changes: AssignmentChanges) => Promise<void>
   onSubmitStudentHomework?: (assignmentId: number) => Promise<void> | void
 }
 
@@ -61,7 +61,7 @@ interface DetailsProps {
   assignment: Assignment
   user: User
   studentId?: number
-  onUpdate: (id: Assignment['id'], changes: AssignmentChanges) => void
+  onUpdate: (id: Assignment['id'], changes: AssignmentChanges) => Promise<void>
   onSubmitStudentHomework?: (assignmentId: number) => Promise<void> | void
 }
 
@@ -76,6 +76,12 @@ function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStud
   const [isEditingHomework, setIsEditingHomework] = useState(false)
   const [homeworkDescription, setHomeworkDescription] = useState(assignment.homework?.description ?? '')
   const [homeworkFiles, setHomeworkFiles] = useState<FileEntry[]>([])
+
+  // Сохранение правок учителем: редактор закрываем только после успеха,
+  // а при ошибке оставляем выбранные файлы и показываем сообщение
+  const [isSaving, setIsSaving] = useState(false)
+  const [editError, setEditError] = useState('')
+  const [homeworkError, setHomeworkError] = useState('')
 
   // Форма отправки ответа учеником
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -172,37 +178,55 @@ function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStud
     }
   }
 
-  function handleSave() {
-    onUpdate(assignment.id!, {
-      recording_url: recordingUrl,
-      description,
-      files: files.map((f) => f.file),
-    })
-    setFiles([])
-    setIsEditing(false)
+  async function handleSave() {
+    setIsSaving(true)
+    setEditError('')
+    try {
+      await onUpdate(assignment.id!, {
+        recording_url: recordingUrl,
+        description,
+        files: files.map((f) => f.file),
+      })
+      setFiles([])
+      setIsEditing(false)
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : 'Не удалось сохранить изменения')
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   function handleCancel() {
     setRecordingUrl(assignment.recording_url ?? '')
     setDescription(assignment.description ?? '')
     setFiles([])
+    setEditError('')
     setIsEditing(false)
   }
 
-  function handleSaveHomework() {
-    onUpdate(assignment.id!, {
-      homework: {
-        description: homeworkDescription,
-        files: homeworkFiles.map((f) => f.file),
-      },
-    })
-    setHomeworkFiles([])
-    setIsEditingHomework(false)
+  async function handleSaveHomework() {
+    setIsSaving(true)
+    setHomeworkError('')
+    try {
+      await onUpdate(assignment.id!, {
+        homework: {
+          description: homeworkDescription,
+          files: homeworkFiles.map((f) => f.file),
+        },
+      })
+      setHomeworkFiles([])
+      setIsEditingHomework(false)
+    } catch (err) {
+      setHomeworkError(err instanceof Error ? err.message : 'Не удалось сохранить домашнее задание')
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   function handleCancelHomework() {
     setHomeworkDescription(assignment.homework?.description ?? '')
     setHomeworkFiles([])
+    setHomeworkError('')
     setIsEditingHomework(false)
   }
 
@@ -262,11 +286,23 @@ function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStud
               </ul>
             )}
 
+            {editError && <p className={styles.error}>{editError}</p>}
+
             <div className={styles.actions}>
-              <button type="button" className={styles.primary} onClick={handleSave}>
-                Сохранить
+              <button
+                type="button"
+                className={styles.primary}
+                onClick={handleSave}
+                disabled={isSaving}
+              >
+                {isSaving ? 'Сохранение...' : 'Сохранить'}
               </button>
-              <button type="button" className={styles.secondary} onClick={handleCancel}>
+              <button
+                type="button"
+                className={styles.secondary}
+                onClick={handleCancel}
+                disabled={isSaving}
+              >
                 Отмена
               </button>
             </div>
@@ -366,11 +402,23 @@ function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStud
                 </ul>
               )}
 
+              {homeworkError && <p className={styles.error}>{homeworkError}</p>}
+
               <div className={styles.actions}>
-                <button type="button" className={styles.primary} onClick={handleSaveHomework}>
-                  Сохранить
+                <button
+                  type="button"
+                  className={styles.primary}
+                  onClick={handleSaveHomework}
+                  disabled={isSaving}
+                >
+                  {isSaving ? 'Сохранение...' : 'Сохранить'}
                 </button>
-                <button type="button" className={styles.secondary} onClick={handleCancelHomework}>
+                <button
+                  type="button"
+                  className={styles.secondary}
+                  onClick={handleCancelHomework}
+                  disabled={isSaving}
+                >
                   Отмена
                 </button>
               </div>
