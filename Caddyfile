@@ -1,0 +1,31 @@
+spiritcode.duckdns.org {
+    encode gzip
+
+    request_body {
+        max_size 50MB
+    }
+
+    handle /api/* {
+        reverse_proxy backend:8000
+    }
+
+    handle /admin/* {
+        reverse_proxy backend:8000
+    }
+
+    handle_path /static/* {
+        root * /staticfiles
+        file_server
+    }
+
+    handle_path /media/* {
+        root * /media
+        file_server
+    }
+
+    handle {
+        root * /srv
+        try_files {path} /index.html
+        file_server
+    }
+}

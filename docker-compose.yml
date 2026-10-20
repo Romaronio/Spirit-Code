@@ -25,9 +25,14 @@ services:
       - backend
     ports:
       - "80:80"
+      - "443:443"
     volumes:
       - ./data/media:/media:ro
       - static:/staticfiles:ro
+      - caddy_data:/data
+      - caddy_config:/config
 
 volumes:
   static:
+  caddy_data:
+  caddy_config:
