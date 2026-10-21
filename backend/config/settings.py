@@ -156,6 +156,7 @@ if os.environ.get("DJANGO_HTTPS", "0") == "1":
 # --- REST Framework ---------------------------------------------------------
 
 REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.AllowAny',
     ],
