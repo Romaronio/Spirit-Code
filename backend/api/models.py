@@ -171,6 +171,12 @@ class HomeworkFile(models.Model):
 
 class StudentHomework(models.Model):
     """Сданная работа ученика по заданию"""
+    STATUS_CHOICES = [
+        ('pending', 'На проверке'),
+        ('accepted', 'Сдано'),
+        ('rejected', 'Не сдано'),
+    ]
+
     assignment = models.ForeignKey(
         Assignment,
         related_name='student_homeworks',
@@ -183,6 +189,9 @@ class StudentHomework(models.Model):
     )
     description = models.TextField(blank=True, default='')
     submitted_at = models.DateTimeField(auto_now_add=True)
+    # Отметка учителя после проверки
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
+    checked_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ['-submitted_at']

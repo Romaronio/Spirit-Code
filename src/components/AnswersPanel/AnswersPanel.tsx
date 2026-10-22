@@ -1,13 +1,15 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import styles from './AnswersPanel.module.css'
-import type { Account, Assignment, StudentHomework } from '../../types'
+import type { Account, Assignment, ReviewStatus, StudentHomework } from '../../types'
+import { ReviewButtons, StatusBadge } from '../AnswerStatus/AnswerStatus'
 import { hasSubject } from '../../utils/subjects'
 
 interface Props {
   items: Assignment[]
   accounts: Account[]
   onRefresh: () => Promise<void>
+  onReview: (assignmentId: number, answerId: number, status: ReviewStatus) => Promise<void>
 }
 
 interface Answer {
@@ -19,7 +21,7 @@ function formatDate(value?: string) {
   return value ? new Date(value).toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'short' }) : ''
 }
 
-function AnswersPanel({ items, accounts, onRefresh }: Props) {
+function AnswersPanel({ items, accounts, onRefresh, onReview }: Props) {
   const [isOpen, setIsOpen] = useState(true)
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [isRefreshing, setIsRefreshing] = useState(false)
@@ -50,6 +52,8 @@ function AnswersPanel({ items, accounts, onRefresh }: Props) {
 
   const answers = selected ? answersByStudent.get(selected.id!) ?? [] : []
   const answeredIds = new Set(answers.map((a) => a.assignment.id))
+  const acceptedCount = answers.filter((a) => a.answer.status === 'accepted').length
+  const pendingCount = answers.filter((a) => (a.answer.status ?? 'pending') === 'pending').length
   const notSubmitted = selected
     ? items.filter((a) => hasSubject(selected.subjects, a.subject) && !answeredIds.has(a.id))
     : []
@@ -113,7 +117,8 @@ function AnswersPanel({ items, accounts, onRefresh }: Props) {
             {selected && (
               <>
                 <p className={styles.summary}>
-                  Сдано {answers.length} из {answers.length + notSubmitted.length}
+                  Прислано {answers.length} из {answers.length + notSubmitted.length} · сдано{' '}
+                  {acceptedCount} · ждут проверки {pendingCount}
                 </p>
 
                 {answers.length === 0 ? (
@@ -128,7 +133,10 @@ function AnswersPanel({ items, accounts, onRefresh }: Props) {
                           </Link>
                           <span className={styles.date}>{formatDate(answer.submitted_at)}</span>
                         </div>
-                        <span className={styles.subject}>{assignment.subject}</span>
+                        <div className={styles.meta}>
+                          <span className={styles.subject}>{assignment.subject}</span>
+                          <StatusBadge status={answer.status} />
+                        </div>
 
                         {answer.description ? (
                           <p className={styles.description}>{answer.description}</p>
@@ -147,6 +155,11 @@ function AnswersPanel({ items, accounts, onRefresh }: Props) {
                             ))}
                           </ul>
                         )}
+
+                        <ReviewButtons
+                          status={answer.status}
+                          onChange={(value) => onReview(assignment.id!, answer.id!, value)}
+                        />
                       </li>
                     ))}
                   </ul>
@@ -154,7 +167,7 @@ function AnswersPanel({ items, accounts, onRefresh }: Props) {
 
                 {notSubmitted.length > 0 && (
                   <div className={styles.pending}>
-                    <p className={styles.label}>Ещё не сдано:</p>
+                    <p className={styles.label}>Ещё не прислано:</p>
                     <ul className={styles.pendingList}>
                       {notSubmitted.map((a) => (
                         <li key={a.id}>

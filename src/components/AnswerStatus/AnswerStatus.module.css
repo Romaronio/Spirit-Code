@@ -1,0 +1,57 @@
+.badge {
+  align-self: flex-start;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.pending {
+  background: #f0e6e6;
+  color: #555;
+}
+
+.accepted {
+  border-color: #1e8e3e;
+  background: #e6f4ea;
+  color: #137333;
+}
+
+.rejected {
+  border-color: #d93025;
+  background: #fce8e6;
+  color: #c5221f;
+}
+
+.review {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.button {
+  padding: 4px 10px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  background: #fff;
+  color: #140f0f;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.button:hover {
+  border-color: #999;
+}
+
+.button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.error {
+  color: #d93025;
+  font-size: 13px;
+}

@@ -1,6 +1,6 @@
 import { Navigate } from 'react-router-dom'
 import styles from './HomePage.module.css'
-import type { Account, Assignment, User } from '../../types'
+import type { Account, Assignment, ReviewStatus, User } from '../../types'
 import AssignmentCard from '../../components/AssignmentCard/AssignmentCard'
 import AssignmentForm from '../../components/AssignmentForm/AssignmentForm'
 import StudentsPanel from '../../components/StudentsPanel/StudentsPanel'
@@ -17,6 +17,7 @@ interface Props {
   onDeleteStudent: (id: number) => void;
   onSetSubjects: (id: number, subjects: string[]) => void;
   onRefresh: () => Promise<void>;
+  onReview: (assignmentId: number, answerId: number, status: ReviewStatus) => Promise<void>;
   onAdd: (data: {
     title: string
     subject: string
@@ -40,6 +41,7 @@ function HomePage({
   onDeleteStudent,
   onSetSubjects,
   onRefresh,
+  onReview,
 }: Props) {
   if (!user) {
     return <Navigate to="/" replace />
@@ -95,7 +97,7 @@ function HomePage({
         <div className={styles.tools}>
           <AssignmentForm onAdd={onAdd} />
           <div className={styles.sideColumn}>
-            <AnswersPanel items={items} accounts={accounts} onRefresh={onRefresh} />
+            <AnswersPanel items={items} accounts={accounts} onRefresh={onRefresh} onReview={onReview} />
             <StudentsPanel
               accounts={accounts}
               availableSubjects={subjectsOf(items)}

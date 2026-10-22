@@ -342,3 +342,45 @@ class UniqueCredentialsTests(AuthTestCase):
             f'/api/accounts/{self.anna.id}/', {'password': 'anna-password'}, format='json'
         )
         self.assertEqual(response.status_code, 200)
+
+
+class ReviewTests(AuthTestCase):
+    def setUp(self):
+        super().setUp()
+        self.answer = StudentHomework.objects.create(assignment=self.bio, student=self.anna, description='ответ')
+
+    def review(self, value):
+        return self.client.post(f'/api/student-homeworks/{self.answer.id}/review/', {'status': value}, format='json')
+
+    def test_teacher_marks_answer(self):
+        self.login_as(self.teacher)
+        response = self.review('accepted')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['status'], 'accepted')
+        self.assertIsNotNone(response.data['checked_at'])
+
+        response = self.review('pending')
+        self.assertEqual(response.data['status'], 'pending')
+        self.assertIsNone(response.data['checked_at'])
+
+    def test_unknown_status_rejected(self):
+        self.login_as(self.teacher)
+        self.assertEqual(self.review('excellent').status_code, 400)
+
+    def test_student_cannot_review(self):
+        self.login_as(self.anna)
+        self.assertEqual(self.review('accepted').status_code, 403)
+
+    def test_student_sees_status(self):
+        self.answer.status = 'rejected'
+        self.answer.save()
+        self.login_as(self.anna)
+        answers = self.client.get(f'/api/assignments/{self.bio.id}/').data['student_homeworks']
+        self.assertEqual(answers[0]['status'], 'rejected')
+
+    def test_resubmit_resets_status(self):
+        self.answer.status = 'rejected'
+        self.answer.save()
+        self.login_as(self.anna)
+        response = self.client.post(f'/api/assignments/{self.bio.id}/submit/', {'description': 'исправила'})
+        self.assertEqual(response.data['status'], 'pending')

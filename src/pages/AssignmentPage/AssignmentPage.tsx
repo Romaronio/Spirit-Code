@@ -3,7 +3,8 @@ import { Link, Navigate, useParams } from 'react-router-dom'
 import styles from './AssignmentPage.module.css'
 import * as api from '../../services/api'
 import { hasSubject, normalize } from '../../utils/subjects'
-import type { Account, Assignment, AssignmentChanges, User } from '../../types'
+import type { Account, Assignment, AssignmentChanges, ReviewStatus, User } from '../../types'
+import { ReviewButtons, StatusBadge } from '../../components/AnswerStatus/AnswerStatus'
 import { ACCEPT, MAX_FILE_SIZE_MB, pickFiles, type FileEntry } from '../../utils/uploads'
 
 interface PageProps {
@@ -12,10 +13,11 @@ interface PageProps {
   accounts: Account[]
   onUpdate: (id: Assignment['id'], changes: AssignmentChanges) => Promise<void>
   onSubmitStudentHomework?: (assignmentId: number) => Promise<void> | void
+  onReview?: (assignmentId: number, answerId: number, status: ReviewStatus) => Promise<void>
   onOpen?: (assignmentId: number) => Promise<void> | void
 }
 
-function AssignmentPage({ user, items, accounts, onUpdate, onSubmitStudentHomework, onOpen }: PageProps) {
+function AssignmentPage({ user, items, accounts, onUpdate, onSubmitStudentHomework, onReview, onOpen }: PageProps) {
   const { id } = useParams()
 
   // При открытии подгружаем задание заново, чтобы ссылки на файлы были свежими
@@ -52,6 +54,7 @@ function AssignmentPage({ user, items, accounts, onUpdate, onSubmitStudentHomewo
       studentId={account?.id}
       onUpdate={onUpdate}
       onSubmitStudentHomework={onSubmitStudentHomework}
+      onReview={onReview}
     />
   )
 }
@@ -62,9 +65,10 @@ interface DetailsProps {
   studentId?: number
   onUpdate: (id: Assignment['id'], changes: AssignmentChanges) => Promise<void>
   onSubmitStudentHomework?: (assignmentId: number) => Promise<void> | void
+  onReview?: (assignmentId: number, answerId: number, status: ReviewStatus) => Promise<void>
 }
 
-function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStudentHomework }: DetailsProps) {
+function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStudentHomework, onReview }: DetailsProps) {
   const canEdit = user.role === 'teacher'
 
   const [isEditing, setIsEditing] = useState(false)
@@ -456,7 +460,9 @@ function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStud
                 {assignment.student_homeworks.map((sh) => (
                   <li key={sh.id} className={styles.studentHomeworkCard}>
                     <div className={styles.studentHomeworkHeader}>
-                      <span className={styles.studentName}>{sh.student_name}</span>
+                      <span className={styles.studentName}>
+                        {sh.student_name} <StatusBadge status={sh.status} />
+                      </span>
                       <span className={styles.submittedAt}>
                         {sh.submitted_at ? new Date(sh.submitted_at).toLocaleString('ru-RU') : ''}
                       </span>
@@ -475,6 +481,12 @@ function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStud
                         ))}
                       </ul>
                     )}
+                    {onReview && (
+                      <ReviewButtons
+                        status={sh.status}
+                        onChange={(value) => onReview(assignment.id!, sh.id!, value)}
+                      />
+                    )}
                   </li>
                 ))}
               </ul>
@@ -488,6 +500,12 @@ function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStud
         {user.role === 'student' && (
           <section className={styles.section}>
             <h2>Отправить ответ</h2>
+            {myAnswer && (
+              <p className={styles.reviewStatus}>
+                Статус: <StatusBadge status={myAnswer.status} />
+                {myAnswer.status === 'rejected' && ' — исправьте ответ и отправьте снова'}
+              </p>
+            )}
             {submitSuccess && <p className={styles.success}>Ответ сохранён!</p>}
             {submitError && <p className={styles.error}>{submitError}</p>}
             <label className={styles.label}>

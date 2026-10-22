@@ -129,7 +129,11 @@ class StudentHomeworkSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = StudentHomework
-        fields = ['id', 'assignment', 'student', 'student_name', 'description', 'files', 'submitted_at']
+        fields = [
+            'id', 'assignment', 'student', 'student_name', 'description', 'files',
+            'submitted_at', 'status', 'checked_at',
+        ]
+        read_only_fields = ['status', 'checked_at']
 
 
 class StudentHomeworkCreateSerializer(serializers.ModelSerializer):

@@ -203,3 +203,10 @@
   padding-left: 0;
   list-style: none;
 }
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}

@@ -3,7 +3,7 @@ import { Routes, Route, useNavigate } from 'react-router-dom'
 import AuthPage from './pages/AuthPage/AuthPage'
 import HomePage from './pages/HomePage/HomePage'
 import AssignmentPage from './pages/AssignmentPage/AssignmentPage'
-import type { Account, Assignment, AssignmentChanges, User } from './types'
+import type { Account, Assignment, AssignmentChanges, ReviewStatus, User } from './types'
 import * as api from './services/api'
 import { clearSession, loadUser } from './utils/session'
 
@@ -146,6 +146,21 @@ function App() {
     }
   }
 
+  // Отметка учителя по ответу ученика: меняем только этот ответ в списке
+  async function handleReview(assignmentId: number, answerId: number, status: ReviewStatus) {
+    const updated = await api.reviewStudentHomework(answerId, status)
+    setItems((prev) =>
+      prev.map((item) =>
+        item.id !== assignmentId
+          ? item
+          : {
+              ...item,
+              student_homeworks: item.student_homeworks?.map((sh) => (sh.id === answerId ? updated : sh)),
+            }
+      )
+    )
+  }
+
   // Перечитывает все задания: новые ответы учеников и свежие ссылки на файлы
   const refreshAssignments = useCallback(async () => {
     try {
@@ -189,6 +204,7 @@ function App() {
             onDeleteStudent={handleDeleteStudent}
             onSetSubjects={handleSetSubjects}
             onRefresh={refreshAssignments}
+            onReview={handleReview}
           />
         }
       />
@@ -201,6 +217,7 @@ function App() {
             accounts={accounts}
             onUpdate={handleUpdate}
             onOpen={refreshAssignment}
+            onReview={handleReview}
             onSubmitStudentHomework={refreshAssignment}
           />
         }

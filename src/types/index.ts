@@ -44,6 +44,8 @@ export interface StudentHomeworkFile {
   created_at?: string
 }
 
+export type ReviewStatus = 'pending' | 'accepted' | 'rejected'
+
 export interface StudentHomework {
   id?: number
   assignment?: number
@@ -52,6 +54,8 @@ export interface StudentHomework {
   description: string
   files?: StudentHomeworkFile[]
   submitted_at?: string
+  status?: ReviewStatus // отметка учителя после проверки
+  checked_at?: string | null
 }
 
 export interface Assignment {

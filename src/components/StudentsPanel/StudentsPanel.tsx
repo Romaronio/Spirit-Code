@@ -63,7 +63,7 @@ function StudentsPanel({
   const [error, setError] = useState('')
   // Сервер хранит только хэш, поэтому пароль показываем один раз — сразу после добавления
   const [created, setCreated] = useState<{ name: string; password: string } | null>(null)
-  const [isOpen, setIsOpen] = useState(true)
+  const [isOpen, setIsOpen] = useState(false) // по умолчанию свёрнута
   const [isSaving, setIsSaving] = useState(false)
 
   const students = accounts.filter((a) => a.role === 'student')

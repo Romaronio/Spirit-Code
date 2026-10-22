@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import type { Assignment, User } from '../../types'
 import styles from './Assingment.module.css'
+import { StatusBadge } from '../AnswerStatus/AnswerStatus'
 
 interface Props {
   assignment: Assignment
@@ -8,8 +9,16 @@ interface Props {
   onDelete?: (id: number) => void
 }
 
+// '2026-10-25' → '25.10.2026'
+function formatDeadline(value: string) {
+  const [year, month, day] = value.split('-')
+  return day && month && year ? `${day}.${month}.${year}` : value
+}
+
 function AssignmentCard({ assignment, user, onDelete }: Props) {
   const isTeacher = user.role === 'teacher'
+  // Ученику сервер присылает только его собственный ответ
+  const myAnswer = isTeacher ? undefined : assignment.student_homeworks?.[0]
 
   function handleDelete(e: React.MouseEvent) {
     e.preventDefault()
@@ -27,10 +36,23 @@ function AssignmentCard({ assignment, user, onDelete }: Props) {
         state={user}
         className={`${styles.card} ${styles.cardLink}`}
       >
-        <span className={styles.subject}>{assignment.subject}</span>
-        <h3 className={styles.title}>{assignment.title}</h3>
-        <p className={styles.deadline}>Сдать до: {assignment.deadline}</p>
-        <span className={styles.open}>Открыть →</span>
+        <div className={`${styles.top} ${isTeacher && onDelete ? styles.withDelete : ''}`}>
+          <span className={styles.subject} title={assignment.subject}>{assignment.subject}</span>
+          {!isTeacher &&
+            (myAnswer ? (
+              <StatusBadge status={myAnswer.status} />
+            ) : (
+              <span className={styles.notSent}>Не отправлено</span>
+            ))}
+        </div>
+
+        {/* Заголовок всегда занимает ровно две строки, длинный обрезается */}
+        <h3 className={styles.title} title={assignment.title}>{assignment.title}</h3>
+
+        <div className={styles.footer}>
+          <span className={styles.deadline}>до {formatDeadline(assignment.deadline)}</span>
+          <span className={styles.open}>Открыть →</span>
+        </div>
       </Link>
       {isTeacher && onDelete && (
         <button

@@ -193,3 +193,10 @@
   line-height: 1.5;
   margin: 6px 0;
 }
+.reviewStatus {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 8px;
+}

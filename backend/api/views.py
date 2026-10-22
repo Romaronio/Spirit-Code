@@ -5,6 +5,7 @@ from operator import or_
 from django.contrib.auth.hashers import make_password
 from django.db import transaction
 from django.db.models import Q
+from django.utils import timezone
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -231,7 +232,8 @@ class AssignmentViewSet(viewsets.ModelViewSet):
         sh, created = StudentHomework.objects.update_or_create(
             assignment=assignment,
             student=request.user,
-            defaults={'description': description}
+            # Ответ изменился — учителю нужно проверить его заново
+            defaults={'description': description, 'status': 'pending', 'checked_at': None}
         )
         StudentHomeworkFile.objects.filter(id__in=delete_ids).delete()
 
@@ -277,3 +279,18 @@ class StudentHomeworkViewSet(viewsets.ModelViewSet):
     serializer_class = StudentHomeworkSerializer
     parser_classes = [MultiPartParser, FormParser, JSONParser]
     permission_classes = [IsTeacher]
+
+    @action(detail=True, methods=['post'])
+    def review(self, request, pk=None):
+        """Отметка учителя: сдано (accepted), не сдано (rejected) или снять отметку (pending)"""
+        sh = self.get_object()
+        new_status = request.data.get('status')
+        if new_status not in dict(StudentHomework.STATUS_CHOICES):
+            return Response(
+                {'error': 'Неизвестный статус проверки'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        sh.status = new_status
+        sh.checked_at = None if new_status == 'pending' else timezone.now()
+        sh.save(update_fields=['status', 'checked_at'])
+        return Response(self.get_serializer(sh).data)

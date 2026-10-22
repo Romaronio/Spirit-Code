@@ -1,4 +1,4 @@
-import type { Account, Assignment, LessonFile, Homework, HomeworkFile, StudentHomework } from "../types";
+import type { Account, Assignment, LessonFile, Homework, HomeworkFile, ReviewStatus, StudentHomework } from "../types";
 import { clearSession, loadToken } from "../utils/session";
 
 // Адрес API. По умолчанию относительный путь: и локально (через прокси Vite),
@@ -291,6 +291,14 @@ export async function submitStudentHomework(data: {
     formData,
     'POST'
   );
+}
+
+// Отметка учителя: сдано / не сдано / снять отметку
+export async function reviewStudentHomework(id: number, status: ReviewStatus): Promise<StudentHomework> {
+  return fetchAPI<StudentHomework>(`/student-homeworks/${id}/review/`, {
+    method: 'POST',
+    body: JSON.stringify({ status }),
+  });
 }
 
 export async function getAllStudentHomeworks(): Promise<StudentHomework[]> {
