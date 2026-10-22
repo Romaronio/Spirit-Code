@@ -64,6 +64,7 @@ function StudentsPanel({
   // Сервер хранит только хэш, поэтому пароль показываем один раз — сразу после добавления
   const [created, setCreated] = useState<{ name: string; password: string } | null>(null)
   const [isOpen, setIsOpen] = useState(true)
+  const [isSaving, setIsSaving] = useState(false)
 
   const students = accounts.filter((a) => a.role === 'student')
 
@@ -83,10 +84,11 @@ function StudentsPanel({
       (a) => a.name.toLowerCase() === trimmedName.toLowerCase()
     )
     if (taken) {
-      setError('Пользователь с таким именем уже существует')
+      setError('Пользователь с таким именем уже существует, придумайте другое имя')
       return
     }
 
+    setIsSaving(true)
     try {
       await onAddStudent({
         name: trimmedName,
@@ -97,6 +99,8 @@ function StudentsPanel({
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Не удалось добавить ученика')
       return
+    } finally {
+      setIsSaving(false)
     }
     setCreated({ name: trimmedName, password })
     setName('')
@@ -178,8 +182,8 @@ function StudentsPanel({
               </p>
             )}
 
-            <button type="submit" className={styles.submit}>
-              Добавить ученика
+            <button type="submit" className={styles.submit} disabled={isSaving}>
+              {isSaving ? 'Добавление...' : 'Добавить ученика'}
             </button>
           </form>
 

@@ -43,3 +43,27 @@
 .logout:hover {
   background: rgba(20, 15, 15, 0.08);
 }
+
+.sideColumn {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Колонки с формой и панелями не растягиваются шире самих панелей (420px),
+   всё свободное место получает колонка с заданиями */
+.tools > form,
+.tools > .sideColumn {
+  flex: 0 1 420px;
+}
+
+.tools > .assignmentsColumn {
+  flex: 1 1 340px;
+  margin-left: 32px; /* + 16px общего gap = 48px между ответами и заданиями */
+}
+
+@media (max-width: 1100px) {
+  /* колонки переносятся друг под друга — боковой отступ не нужен */
+  .tools > .assignmentsColumn {
+    margin-left: 0;
+  }
+}

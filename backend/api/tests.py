@@ -278,3 +278,67 @@ class UploadLimitTests(AuthTestCase):
         with self.captureOnCommitCallbacks(execute=True):
             self.bio.delete()
         self.assertFalse(os.path.exists(path))
+
+
+class CaseInsensitiveLoginTests(AuthTestCase):
+    def test_login_any_case(self):
+        for name in ['ROMAN', 'Roman', '  roman  ']:
+            response = self.client.post(
+                '/api/accounts/login/', {'name': name, 'password': 'roman-password'}, format='json'
+            )
+            self.assertEqual(response.status_code, 200, name)
+            self.assertEqual(response.data['account']['name'], 'roman')
+
+    def test_cyrillic_name_any_case(self):
+        self.make_account('Иван', 'student')
+        response = self.client.post(
+            '/api/accounts/login/', {'name': 'иВАН', 'password': 'Иван-password'}, format='json'
+        )
+        self.assertEqual(response.status_code, 200)
+
+    def test_wrong_password_still_rejected(self):
+        response = self.client.post(
+            '/api/accounts/login/', {'name': 'ROMAN', 'password': 'wrong'}, format='json'
+        )
+        self.assertEqual(response.status_code, 401)
+
+    def test_cannot_create_name_differing_only_in_case(self):
+        self.login_as(self.teacher)
+        response = self.client.post(
+            '/api/accounts/', {'name': 'ANNA', 'password': '12345678', 'role': 'student'}, format='json'
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('уже существует', response.data['name'][0])
+
+    def test_rename_to_own_name_in_other_case_is_ok(self):
+        self.login_as(self.teacher)
+        response = self.client.patch(f'/api/accounts/{self.anna.id}/', {'name': 'Anna'}, format='json')
+        self.assertEqual(response.status_code, 200)
+
+
+class UniqueCredentialsTests(AuthTestCase):
+    def create(self, name, password):
+        return self.client.post(
+            '/api/accounts/', {'name': name, 'password': password, 'role': 'student'}, format='json'
+        )
+
+    def test_same_password_is_allowed(self):
+        self.login_as(self.teacher)
+        self.assertEqual(self.create('petya', 'anna-password').status_code, 201)
+
+    def test_same_name_rejected(self):
+        self.login_as(self.teacher)
+        response = self.create('Anna', 'unique-pass-1')
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('придумайте другое имя', response.data['name'][0])
+
+    def test_unique_name_and_password_ok(self):
+        self.login_as(self.teacher)
+        self.assertEqual(self.create('petya', 'unique-pass-1').status_code, 201)
+
+    def test_keeping_own_password_on_update_is_ok(self):
+        self.login_as(self.teacher)
+        response = self.client.patch(
+            f'/api/accounts/{self.anna.id}/', {'password': 'anna-password'}, format='json'
+        )
+        self.assertEqual(response.status_code, 200)

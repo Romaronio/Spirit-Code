@@ -146,6 +146,15 @@ function App() {
     }
   }
 
+  // Перечитывает все задания: новые ответы учеников и свежие ссылки на файлы
+  const refreshAssignments = useCallback(async () => {
+    try {
+      setItems(await api.getAllAssignments())
+    } catch (error) {
+      console.error('Ошибка обновления заданий:', error)
+    }
+  }, [])
+
   // Перечитывает задание с сервера: свежие ответы учеников и новые
   // подписанные ссылки на файлы (старые со временем перестают работать)
   const refreshAssignment = useCallback(async (assignmentId: number) => {
@@ -179,6 +188,7 @@ function App() {
             onAddStudent={handleAddStudent}
             onDeleteStudent={handleDeleteStudent}
             onSetSubjects={handleSetSubjects}
+            onRefresh={refreshAssignments}
           />
         }
       />

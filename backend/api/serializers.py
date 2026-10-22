@@ -14,6 +14,19 @@ class AccountSerializer(serializers.ModelSerializer):
             'password': {'write_only': True}  # пароль не возвращается при GET запросах
         }
 
+    def validate_name(self, value):
+        """Имена не должны совпадать даже с точностью до регистра —
+        иначе при входе в любом регистре непонятно, чей это аккаунт"""
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError('Введите имя')
+        taken = [a for a in Account.find_by_name(value) if a.pk != getattr(self.instance, 'pk', None)]
+        if taken:
+            raise serializers.ValidationError(
+                'Пользователь с таким именем уже существует, придумайте другое имя'
+            )
+        return value
+
     def validate_password(self, value):
         if len(value) < MIN_PASSWORD_LENGTH:
             raise serializers.ValidationError(

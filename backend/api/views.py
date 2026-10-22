@@ -52,12 +52,14 @@ class AccountViewSet(viewsets.ModelViewSet):
         name = str(request.data.get('name', '')).strip()
         password = str(request.data.get('password', ''))
 
-        account = Account.objects.filter(name=name).first()
-        if account is None:
+        # Имя можно вводить в любом регистре: «Иван», «иван», «ИВАН»
+        candidates = Account.find_by_name(name) if name else []
+        account = next((a for a in candidates if a.check_password(password)), None)
+        if not candidates:
             # Тратим столько же времени, сколько на проверку пароля,
             # чтобы по скорости ответа нельзя было узнать, существует ли имя
             make_password(password)
-        elif account.check_password(password):
+        elif account is not None:
             # Заодно чистим просроченные токены этого аккаунта
             for old in account.tokens.all():
                 if old.is_expired:

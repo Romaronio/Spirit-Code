@@ -47,6 +47,16 @@ class Account(models.Model):
     def check_password(self, raw_password):
         return check_password(raw_password, self.password)
 
+    @classmethod
+    def find_by_name(cls, name):
+        """Аккаунты с таким именем без учёта регистра и пробелов по краям.
+
+        Сравниваем в Python: в SQLite поиск без учёта регистра (iexact)
+        работает только для латиницы, а имена бывают и на кириллице.
+        """
+        key = name.strip().casefold()
+        return [a for a in cls.objects.all() if a.name.strip().casefold() == key]
+
 
 def hash_token(key):
     return hashlib.sha256(key.encode()).hexdigest()
