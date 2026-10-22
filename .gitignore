@@ -36,3 +36,6 @@ backend/db.sqlite3
 backend/media/
 data/
 .claude/
+
+# Бэкапы с сервера (личные данные учеников) — только на этом компьютере
+/backups/
