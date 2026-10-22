@@ -384,3 +384,37 @@ class ReviewTests(AuthTestCase):
         self.login_as(self.anna)
         response = self.client.post(f'/api/assignments/{self.bio.id}/submit/', {'description': 'исправила'})
         self.assertEqual(response.data['status'], 'pending')
+
+
+class PaymentTests(AuthTestCase):
+    def set_paid(self, student, year, month, paid=True):
+        return self.client.post(
+            '/api/payments/set/',
+            {'student': student.id, 'year': year, 'month': month, 'paid': paid},
+            format='json',
+        )
+
+    def test_mark_and_unmark(self):
+        self.login_as(self.teacher)
+        self.assertTrue(self.set_paid(self.anna, 2026, 10).data['paid'])
+        self.assertTrue(self.set_paid(self.anna, 2026, 10).data['paid'])  # повтор — не ошибка
+        self.assertFalse(self.set_paid(self.anna, 2026, 10, paid=False).data['paid'])
+
+    def test_list_by_school_year(self):
+        self.login_as(self.teacher)
+        self.set_paid(self.anna, 2026, 9)   # входит в 2026/27
+        self.set_paid(self.anna, 2027, 8)   # входит в 2026/27
+        self.set_paid(self.anna, 2026, 8)   # прошлый учебный год
+        self.set_paid(self.anna, 2027, 9)   # следующий учебный год
+        data = self.client.get('/api/payments/?school_year=2026').data
+        self.assertEqual([(p['year'], p['month']) for p in data], [(2026, 9), (2027, 8)])
+
+    def test_bad_month_and_teacher_target(self):
+        self.login_as(self.teacher)
+        self.assertEqual(self.set_paid(self.anna, 2026, 13).status_code, 400)
+        self.assertEqual(self.set_paid(self.teacher, 2026, 10).status_code, 400)
+
+    def test_student_has_no_access(self):
+        self.login_as(self.anna)
+        self.assertEqual(self.client.get('/api/payments/?school_year=2026').status_code, 403)
+        self.assertEqual(self.set_paid(self.anna, 2026, 10).status_code, 403)

@@ -1,4 +1,4 @@
-import type { Account, Assignment, LessonFile, Homework, HomeworkFile, ReviewStatus, StudentHomework } from "../types";
+import type { Account, Assignment, LessonFile, Homework, HomeworkFile, Payment, ReviewStatus, StudentHomework } from "../types";
 import { clearSession, loadToken } from "../utils/session";
 
 // Адрес API. По умолчанию относительный путь: и локально (через прокси Vite),
@@ -304,4 +304,18 @@ export async function reviewStudentHomework(id: number, status: ReviewStatus): P
 export async function getAllStudentHomeworks(): Promise<StudentHomework[]> {
   const response = await fetchAPI<{ results: StudentHomework[] }>('/student-homeworks/');
   return response.results;
+}
+
+// ============== PAYMENTS API ==============
+
+// Отметки оплаты за учебный год: startYear=2026 → сентябрь 2026 — август 2027
+export async function getPayments(startYear: number): Promise<Payment[]> {
+  return fetchAPI<Payment[]>(`/payments/?school_year=${startYear}`);
+}
+
+export async function setPayment(payment: Payment, paid: boolean): Promise<Payment & { paid: boolean }> {
+  return fetchAPI<Payment & { paid: boolean }>('/payments/set/', {
+    method: 'POST',
+    body: JSON.stringify({ ...payment, paid }),
+  });
 }

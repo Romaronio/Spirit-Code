@@ -11,7 +11,7 @@ from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
-from .models import Account, Assignment, AuthToken, LessonFile, Homework, HomeworkFile, StudentHomework, StudentHomeworkFile
+from .models import Account, Assignment, AuthToken, LessonFile, Homework, HomeworkFile, Payment, StudentHomework, StudentHomeworkFile
 from .permissions import IsStudent, IsTeacher
 from .uploads import check_student_quota, check_uploads
 from .serializers import (
@@ -20,6 +20,7 @@ from .serializers import (
     LessonFileSerializer,
     HomeworkSerializer,
     HomeworkFileSerializer,
+    PaymentSerializer,
     StudentHomeworkSerializer,
 )
 
@@ -294,3 +295,43 @@ class StudentHomeworkViewSet(viewsets.ModelViewSet):
         sh.checked_at = None if new_status == 'pending' else timezone.now()
         sh.save(update_fields=['status', 'checked_at'])
         return Response(self.get_serializer(sh).data)
+
+
+class PaymentViewSet(viewsets.GenericViewSet):
+    """Оплата занятий по месяцам. Видит и меняет только учитель"""
+    serializer_class = PaymentSerializer
+    permission_classes = [IsTeacher]
+
+    def list(self, request):
+        """Отметки за учебный год: ?school_year=2026 → сентябрь 2026 — август 2027"""
+        try:
+            start = int(request.query_params.get('school_year', ''))
+        except ValueError:
+            return Response(
+                {'error': 'Укажите учебный год, например ?school_year=2026'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        payments = Payment.objects.filter(
+            Q(year=start, month__gte=9) | Q(year=start + 1, month__lte=8)
+        )
+        return Response(self.get_serializer(payments, many=True).data)
+
+    @action(detail=False, methods=['post'])
+    def set(self, request):
+        """Поставить (paid=true) или снять (paid=false) отметку об оплате"""
+        serializer = self.get_serializer(data=request.data)
+        # Уникальность пары ученик+месяц тут не проверяем: повторная отметка — не ошибка
+        serializer.validators = []
+        serializer.is_valid(raise_exception=True)
+        key = serializer.validated_data
+
+        if request.data.get('paid') in (True, 'true', '1', 1):
+            Payment.objects.get_or_create(**key)
+        else:
+            Payment.objects.filter(**key).delete()
+        return Response({
+            'student': key['student'].id,
+            'year': key['year'],
+            'month': key['month'],
+            'paid': Payment.objects.filter(**key).exists(),
+        })

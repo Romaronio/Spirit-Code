@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from .media import signed_url
-from .models import Account, Assignment, LessonFile, Homework, HomeworkFile, StudentHomework, StudentHomeworkFile
+from .models import Account, Assignment, LessonFile, Homework, HomeworkFile, Payment, StudentHomework, StudentHomeworkFile
 
 MIN_PASSWORD_LENGTH = 8
 
@@ -166,3 +166,20 @@ class AssignmentSerializer(serializers.ModelSerializer):
             user_id = getattr(user, 'id', None)
             answers = [sh for sh in answers if sh.student_id == user_id]
         return StudentHomeworkSerializer(answers, many=True, context=self.context).data
+
+
+class PaymentSerializer(serializers.ModelSerializer):
+    """Отметка оплаты за месяц"""
+    class Meta:
+        model = Payment
+        fields = ['student', 'year', 'month']
+
+    def validate_month(self, value):
+        if not 1 <= value <= 12:
+            raise serializers.ValidationError('Месяц должен быть от 1 до 12')
+        return value
+
+    def validate_student(self, value):
+        if value.role != 'student':
+            raise serializers.ValidationError('Оплату можно отмечать только ученикам')
+        return value

@@ -222,3 +222,25 @@ class StudentHomeworkFile(models.Model):
     @property
     def url(self):
         return self.file.url if self.file else None
+
+
+class Payment(models.Model):
+    """Отметка учителя «ученик оплатил занятия за месяц».
+
+    Есть запись — оплачено, нет записи — не оплачено.
+    """
+    student = models.ForeignKey(
+        Account,
+        related_name='payments',
+        on_delete=models.CASCADE
+    )
+    year = models.PositiveSmallIntegerField()
+    month = models.PositiveSmallIntegerField()  # 1–12
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['year', 'month']
+        unique_together = ['student', 'year', 'month']
+
+    def __str__(self):
+        return f"{self.student.name}: {self.month:02d}.{self.year}"

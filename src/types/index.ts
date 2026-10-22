@@ -76,3 +76,10 @@ export type AssignmentChanges = Omit<Partial<Assignment>, 'files' | 'homework'> 
   files?: File[]
   homework?: { description: string; files?: File[] }
 }
+
+// Отметка «ученик оплатил занятия за месяц»
+export interface Payment {
+  student: number
+  year: number
+  month: number // 1–12
+}

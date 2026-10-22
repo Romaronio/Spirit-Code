@@ -6,6 +6,7 @@ import AssignmentForm from '../../components/AssignmentForm/AssignmentForm'
 import StudentsPanel from '../../components/StudentsPanel/StudentsPanel'
 import AnswersPanel from '../../components/AnswersPanel/AnswersPanel'
 import ProgressDonut from '../../components/ProgressDonut/ProgressDonut'
+import PaymentsPanel from '../../components/PaymentsPanel/PaymentsPanel'
 import { hasSubject, normalize, subjectsOf } from '../../utils/subjects'
 
 interface Props {
@@ -108,6 +109,7 @@ function HomePage({
           <AssignmentForm onAdd={onAdd} />
           <div className={styles.sideColumn}>
             <AnswersPanel items={items} accounts={accounts} onRefresh={onRefresh} onReview={onReview} />
+            <PaymentsPanel accounts={accounts} />
             <StudentsPanel
               accounts={accounts}
               availableSubjects={subjectsOf(items)}
