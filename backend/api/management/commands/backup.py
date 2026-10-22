@@ -27,8 +27,8 @@ class Command(BaseCommand):
         parser.add_argument(
             '--keep',
             type=int,
-            default=5,
-            help='Сколько последних архивов хранить (по умолчанию 5)',
+            default=1,
+            help='Сколько последних архивов хранить (по умолчанию 1 — на сервере мало места)',
         )
 
     def handle(self, *args, dir=None, keep, **options):

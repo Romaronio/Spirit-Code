@@ -1,7 +1,8 @@
 ﻿# Скачивает бэкап Spirit Code с сервера в папку backups\ этого проекта.
 #
 # Что делает:
-#   1. по SSH просит сервер сделать архив (база + media), на сервере хранится 5 последних;
+#   1. по SSH просит сервер сделать архив (база + media); на сервере хранится только
+#      последний — места там мало, а media весит сотни мегабайт;
 #   2. скачивает архив в <проект>\backups\ и проверяет, что он открывается;
 #   3. оставляет здесь последние $Keep архивов, старые удаляет.
 # Результат каждого запуска пишется в backups\backup.log.
@@ -15,9 +16,9 @@
 
 param(
     # Пользователь и адрес сервера (вход должен работать по SSH-ключу, без пароля)
-    [string]$Server = 'ПОЛЬЗОВАТЕЛЬ@138.16.172.241',
+    [string]$Server = 'root@138.16.172.241',
     # Папка проекта на сервере (где лежит docker-compose.yml)
-    [string]$RemoteProject = '/ПУТЬ/К/ПРОЕКТУ',
+    [string]$RemoteProject = '/opt/spirit',
     # Сколько архивов хранить на этом компьютере
     [int]$Keep = 30
 )
@@ -29,6 +30,16 @@ $BackupDir = Join-Path $ProjectRoot 'backups'
 New-Item -ItemType Directory -Force -Path $BackupDir | Out-Null
 $LogFile = Join-Path $BackupDir 'backup.log'
 
+# Связь с сервером иногда обрывается по таймауту — пробуем несколько раз
+function Invoke-WithRetry([scriptblock]$Action, [string]$What) {
+    for ($attempt = 1; $attempt -le 4; $attempt++) {
+        $result = & $Action
+        if ($LASTEXITCODE -eq 0) { return $result }
+        if ($attempt -lt 4) { Start-Sleep -Seconds 30 }
+    }
+    throw "$What (после 4 попыток, последний код $LASTEXITCODE)"
+}
+
 function Write-Log([string]$Message) {
     $line = '{0:yyyy-MM-dd HH:mm:ss}  {1}' -f (Get-Date), $Message
     Add-Content -Path $LogFile -Value $line -Encoding UTF8
@@ -36,23 +47,19 @@ function Write-Log([string]$Message) {
 }
 
 try {
-    if ($Server -like 'ПОЛЬЗОВАТЕЛЬ@*' -or $RemoteProject -like '/ПУТЬ/*') {
-        throw 'не настроено: укажите $Server и $RemoteProject в начале скрипта'
-    }
-
     # BatchMode — не ждать ввода пароля: в Планировщике его некому вводить
     $sshOptions = @('-o', 'BatchMode=yes', '-o', 'ConnectTimeout=20')
 
     # 1. Архив на сервере
-    $output = & ssh @sshOptions $Server "cd '$RemoteProject' && docker compose exec -T backend python manage.py backup --keep 5"
-    if ($LASTEXITCODE -ne 0) { throw "сервер не создал архив (ssh вернул код $LASTEXITCODE)" }
+    $remoteCommand = "cd '$RemoteProject' && docker compose exec -T backend python manage.py backup --keep 1"
+    $output = Invoke-WithRetry { & ssh @sshOptions $Server $remoteCommand } 'сервер не создал архив'
     $name = ([string]($output | Select-Object -Last 1)).Trim()
     if ($name -notmatch '^spirit-code-[\d_-]+\.zip$') { throw "неожиданный ответ сервера: '$name'" }
 
     # 2. Скачиваем. На сервере папка контейнера /data — это <проект>/data/db
     $localFile = Join-Path $BackupDir $name
-    & scp @sshOptions -q "${Server}:$RemoteProject/data/db/backups/$name" $localFile
-    if ($LASTEXITCODE -ne 0) { throw "не удалось скачать $name (scp вернул код $LASTEXITCODE)" }
+    $remoteFile = "${Server}:$RemoteProject/data/db/backups/$name"
+    Invoke-WithRetry { & scp @sshOptions -q $remoteFile $localFile } "не удалось скачать $name" | Out-Null
 
     # Проверяем, что архив целый и в нём есть база
     Add-Type -AssemblyName System.IO.Compression.FileSystem
