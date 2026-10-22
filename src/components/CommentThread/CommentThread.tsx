@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import styles from './CommentThread.module.css'
 import type { AnswerComment } from '../../types'
+import MathText from '../MathText/MathText'
+import { hasMath } from '../../utils/math'
 
 interface Props {
   comments?: AnswerComment[]
@@ -14,6 +16,28 @@ interface Props {
   // поле ввода прижато к низу, при новых сообщениях — прокрутка вниз
   fill?: boolean
   emptyText?: string
+}
+
+// Кнопки-шаблоны для формул. caret — куда встанет курсор после вставки
+const MATH_TEMPLATES = [
+  { label: '$…$', title: 'Формула в тексте', snippet: '', caret: 0 },
+  { label: 'a/b', title: 'Дробь', snippet: '\\frac{}{}', caret: 6 },
+  { label: '√', title: 'Корень', snippet: '\\sqrt{}', caret: 6 },
+  { label: 'xⁿ', title: 'Степень', snippet: '^{}', caret: 2 },
+  { label: 'xₙ', title: 'Индекс', snippet: '_{}', caret: 2 },
+  { label: '·', title: 'Умножение', snippet: '\\cdot ', caret: 6 },
+  { label: '±', title: 'Плюс-минус', snippet: '\\pm ', caret: 4 },
+  { label: '≤', title: 'Меньше или равно', snippet: '\\le ', caret: 4 },
+  { label: '≥', title: 'Больше или равно', snippet: '\\ge ', caret: 4 },
+  { label: '≠', title: 'Не равно', snippet: '\\ne ', caret: 4 },
+  { label: 'π', title: 'Пи', snippet: '\\pi ', caret: 4 },
+  { label: '∞', title: 'Бесконечность', snippet: '\\infty ', caret: 7 },
+  { label: '°', title: 'Градус', snippet: '^\\circ', caret: 6 },
+]
+
+// Курсор внутри формулы, если перед ним нечётное число неэкранированных $
+function isInsideMath(before: string) {
+  return (before.match(/(?<!\\)\$/g)?.length ?? 0) % 2 === 1
 }
 
 // Сколько держать палец на сообщении, чтобы открылось меню (телефон)
@@ -43,6 +67,8 @@ function CommentThread({
   emptyText,
 }: Props) {
   const [text, setText] = useState('')
+  const [showMathBar, setShowMathBar] = useState(false)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
   const [isSending, setIsSending] = useState(false)
   const [error, setError] = useState('')
 
@@ -125,6 +151,24 @@ function CommentThread({
       navigator.vibrate?.(20) // лёгкая отдача на Android
       openMenu(comment, clientX, clientY, performance.now())
     }, LONG_PRESS_MS)
+  }
+
+  // Вставка шаблона формулы в позицию курсора. Если курсор не внутри $...$ —
+  // шаблон сам оборачивается в $...$
+  function insertTemplate(snippet: string, caret: number) {
+    const el = inputRef.current
+    if (!el) return
+    const start = el.selectionStart
+    const before = text.slice(0, start)
+    const after = text.slice(el.selectionEnd)
+    const wrap = !isInsideMath(before)
+    const insertion = wrap ? `$${snippet}$` : snippet
+    const position = start + caret + (wrap ? 1 : 0)
+    setText(before + insertion + after)
+    requestAnimationFrame(() => {
+      el.focus()
+      el.setSelectionRange(position, position)
+    })
   }
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
@@ -231,6 +275,12 @@ function CommentThread({
                           if (e.key === 'Escape') setEditingId(null)
                         }}
                       />
+                      {hasMath(editText) && (
+                        <div className={styles.preview}>
+                          <span className={styles.previewLabel}>Предпросмотр</span>
+                          <MathText text={editText} className={styles.text} />
+                        </div>
+                      )}
                       <div className={styles.editActions}>
                         <button
                           type="button"
@@ -251,7 +301,9 @@ function CommentThread({
                       </div>
                     </div>
                   ) : (
-                    <p className={styles.text}>{c.text}</p>
+                    <p className={styles.text}>
+                      <MathText text={c.text} />
+                    </p>
                   )}
                 </li>
               )
@@ -285,27 +337,64 @@ function CommentThread({
         </div>
       )}
 
-      <form className={styles.form} onSubmit={handleSubmit}>
-        <textarea
-          className={styles.input}
-          rows={2}
-          maxLength={2000}
-          placeholder={placeholder}
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => {
-            // Ctrl/Cmd + Enter — отправить
-            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-              e.preventDefault()
-              e.currentTarget.form?.requestSubmit()
-            }
-          }}
-        />
-        <button type="submit" className={styles.send} disabled={isSending || text.trim() === ''}>
-          {isSending ? '...' : 'Отправить'}
-        </button>
-      </form>
-      {error && <p className={styles.error}>{error}</p>}
+      <div className={styles.composer}>
+        {showMathBar && (
+          <div className={styles.mathBar} role="toolbar" aria-label="Шаблоны формул">
+            {MATH_TEMPLATES.map((t) => (
+              <button
+                key={t.label}
+                type="button"
+                className={styles.mathButton}
+                title={t.title}
+                // mousedown не забирает фокус у поля ввода — курсор остаётся на месте
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => insertTemplate(t.snippet, t.caret)}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {hasMath(text) && (
+          <div className={styles.preview}>
+            <span className={styles.previewLabel}>Предпросмотр</span>
+            <MathText text={text} className={styles.text} />
+          </div>
+        )}
+
+        <form className={styles.form} onSubmit={handleSubmit}>
+          <button
+            type="button"
+            className={`${styles.mathToggle} ${showMathBar ? styles.mathToggleActive : ''}`}
+            onClick={() => setShowMathBar((v) => !v)}
+            aria-pressed={showMathBar}
+            title="Формулы (LaTeX): $...$ — в строке, $$...$$ — отдельной строкой"
+          >
+            ∑
+          </button>
+          <textarea
+            ref={inputRef}
+            className={styles.input}
+            rows={2}
+            maxLength={2000}
+            placeholder={placeholder}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => {
+              // Ctrl/Cmd + Enter — отправить
+              if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                e.preventDefault()
+                e.currentTarget.form?.requestSubmit()
+              }
+            }}
+          />
+          <button type="submit" className={styles.send} disabled={isSending || text.trim() === ''}>
+            {isSending ? '...' : 'Отправить'}
+          </button>
+        </form>
+        {error && <p className={styles.error}>{error}</p>}
+      </div>
     </div>
   )
 }

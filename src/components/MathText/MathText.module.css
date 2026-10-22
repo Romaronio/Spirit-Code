@@ -1,0 +1,21 @@
+.inline {
+  font-size: 1.05em;
+}
+
+/* Формула отдельной строкой: по центру; широкая — прокручивается, а не вылезает */
+.display {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.display :global(.katex-display) {
+  margin: 6px 0;
+}
+
+.raw {
+  font-family: ui-monospace, monospace;
+  font-size: 0.9em;
+  color: #555;
+}

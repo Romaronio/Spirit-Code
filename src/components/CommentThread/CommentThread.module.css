@@ -184,8 +184,77 @@
   overflow-y: auto;
 }
 
-.fill .form {
+.fill .composer {
   margin-top: auto;
   padding-top: 10px;
   border-top: 1px solid #e3d6d6;
+}
+
+/* Поле ввода вместе с панелью формул и предпросмотром */
+.composer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mathToggle {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  background: #fff;
+  color: #555;
+  font-size: 17px;
+  cursor: pointer;
+}
+
+.mathToggle:hover,
+.mathToggleActive {
+  border-color: #ff8400;
+  color: #140f0f;
+}
+
+.mathToggleActive {
+  background: #fff4e5;
+}
+
+.mathBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.mathButton {
+  min-width: 34px;
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid #e3d6d6;
+  border-radius: 6px;
+  background: #fff;
+  color: #140f0f;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.mathButton:hover {
+  border-color: #ff8400;
+}
+
+.preview {
+  padding: 6px 10px;
+  border: 1px dashed #e3d6d6;
+  border-radius: 6px;
+  background: #fffdfb;
+}
+
+.previewLabel {
+  display: block;
+  margin-bottom: 2px;
+  color: #777;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
