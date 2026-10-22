@@ -1,5 +1,6 @@
 import { useState, type FormEvent, type ChangeEvent } from 'react'
 import styles from './AssignmentForm.module.css'
+import { ACCEPT, MAX_FILE_SIZE_MB, pickFiles, type FileEntry } from '../../utils/uploads'
 
 interface AssignmentFormProps {
   onAdd: (data: {
@@ -16,12 +17,6 @@ interface AssignmentFormProps {
 
 const SUBJECTS = ['Математика', 'Информатика', 'Русский язык']
 
-interface FileEntry {
-  id: string
-  name: string
-  file: File
-}
-
 function AssignmentForm({ onAdd }: AssignmentFormProps) {
   const [title, setTitle] = useState('')
   const [subject, setSubject] = useState('')
@@ -35,12 +30,9 @@ function AssignmentForm({ onAdd }: AssignmentFormProps) {
   const [homeworkFiles, setHomeworkFiles] = useState<FileEntry[]>([])
 
   function handleFilesChange(e: ChangeEvent<HTMLInputElement>) {
-    const picked = Array.from(e.target.files ?? []).map((file) => ({
-      id: String(Date.now()) + Math.random().toString(36).slice(2),
-      name: file.name,
-      file,
-    }))
-    setFiles((prev) => [...prev, ...picked])
+    const { entries, error } = pickFiles(e.target.files)
+    setFiles((prev) => [...prev, ...entries])
+    setError(error)
     e.target.value = ''
   }
 
@@ -49,12 +41,9 @@ function AssignmentForm({ onAdd }: AssignmentFormProps) {
   }
 
   function handleHomeworkFilesChange(e: ChangeEvent<HTMLInputElement>) {
-    const picked = Array.from(e.target.files ?? []).map((file) => ({
-      id: String(Date.now()) + Math.random().toString(36).slice(2),
-      name: file.name,
-      file,
-    }))
-    setHomeworkFiles((prev) => [...prev, ...picked])
+    const { entries, error } = pickFiles(e.target.files)
+    setHomeworkFiles((prev) => [...prev, ...entries])
+    setError(error)
     e.target.value = ''
   }
 
@@ -149,7 +138,7 @@ function AssignmentForm({ onAdd }: AssignmentFormProps) {
 
       <label className={styles.label}>
         Файлы с урока
-        <input type="file" multiple onChange={handleFilesChange} />
+        <input type="file" multiple accept={ACCEPT} onChange={handleFilesChange} />
       </label>
       {files.length > 0 && (
         <ul className={styles.files}>
@@ -183,7 +172,7 @@ function AssignmentForm({ onAdd }: AssignmentFormProps) {
 
       <label className={styles.label}>
         Файлы с заданием
-        <input type="file" multiple onChange={handleHomeworkFilesChange} />
+        <input type="file" multiple accept={ACCEPT} onChange={handleHomeworkFilesChange} />
       </label>
       {homeworkFiles.length > 0 && (
         <ul className={styles.files}>
@@ -202,6 +191,7 @@ function AssignmentForm({ onAdd }: AssignmentFormProps) {
         </ul>
       )}
 
+      <p className={styles.label}>Каждый файл — до {MAX_FILE_SIZE_MB} МБ</p>
       {error && <p className={styles.error}>{error}</p>}
 
       <button type="submit" className={styles.submit}>

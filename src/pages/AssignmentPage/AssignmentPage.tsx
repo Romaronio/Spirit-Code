@@ -4,12 +4,7 @@ import styles from './AssignmentPage.module.css'
 import * as api from '../../services/api'
 import { hasSubject, normalize } from '../../utils/subjects'
 import type { Account, Assignment, AssignmentChanges, User } from '../../types'
-
-interface FileEntry {
-  id: string
-  name: string
-  file: File
-}
+import { ACCEPT, MAX_FILE_SIZE_MB, pickFiles, type FileEntry } from '../../utils/uploads'
 
 interface PageProps {
   user: User | null
@@ -102,12 +97,9 @@ function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStud
   )
 
   function handleFilesChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const picked = Array.from(e.target.files ?? []).map((file) => ({
-      id: String(Date.now()) + Math.random().toString(36).slice(2),
-      name: file.name,
-      file,
-    }))
-    setFiles((prev) => [...prev, ...picked])
+    const { entries, error } = pickFiles(e.target.files)
+    setFiles((prev) => [...prev, ...entries])
+    setEditError(error)
     e.target.value = ''
   }
 
@@ -116,12 +108,9 @@ function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStud
   }
 
   function handleHomeworkFilesChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const picked = Array.from(e.target.files ?? []).map((file) => ({
-      id: String(Date.now()) + Math.random().toString(36).slice(2),
-      name: file.name,
-      file,
-    }))
-    setHomeworkFiles((prev) => [...prev, ...picked])
+    const { entries, error } = pickFiles(e.target.files)
+    setHomeworkFiles((prev) => [...prev, ...entries])
+    setHomeworkError(error)
     e.target.value = ''
   }
 
@@ -130,12 +119,9 @@ function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStud
   }
 
   function handleStudentFilesChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const picked = Array.from(e.target.files ?? []).map((file) => ({
-      id: String(Date.now()) + Math.random().toString(36).slice(2),
-      name: file.name,
-      file,
-    }))
-    setStudentFiles((prev) => [...prev, ...picked])
+    const { entries, error } = pickFiles(e.target.files)
+    setStudentFiles((prev) => [...prev, ...entries])
+    setSubmitError(error)
     e.target.value = ''
   }
 
@@ -269,7 +255,7 @@ function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStud
 
             <label className={styles.label}>
               Файлы с урока
-              <input type="file" multiple onChange={handleFilesChange} />
+              <input type="file" multiple accept={ACCEPT} onChange={handleFilesChange} />
             </label>
 
             {files.length > 0 && (
@@ -385,7 +371,7 @@ function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStud
 
               <label className={styles.label}>
                 Файлы с заданием
-                <input type="file" multiple onChange={handleHomeworkFilesChange} />
+                <input type="file" multiple accept={ACCEPT} onChange={handleHomeworkFilesChange} />
               </label>
 
               {homeworkFiles.length > 0 && (
@@ -515,8 +501,8 @@ function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStud
               />
             </label>
             <label className={styles.label}>
-              Файлы с ответом
-              <input type="file" multiple onChange={handleStudentFilesChange} />
+              Файлы с ответом (каждый — до {MAX_FILE_SIZE_MB} МБ)
+              <input type="file" multiple accept={ACCEPT} onChange={handleStudentFilesChange} />
             </label>
             {savedFiles.length > 0 && (
               <ul className={styles.files}>

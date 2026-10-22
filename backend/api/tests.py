@@ -1,3 +1,7 @@
+import json
+import os
+import shutil
+import tempfile
 from datetime import timedelta
 from urllib.parse import urlsplit
 
@@ -6,7 +10,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
 from rest_framework.test import APITestCase
 
-from .models import Account, Assignment, AuthToken, LessonFile, StudentHomework
+from .models import Account, Assignment, AuthToken, LessonFile, StudentHomework, StudentHomeworkFile
 
 
 class AuthTestCase(APITestCase):
@@ -208,3 +212,69 @@ class MediaTests(AuthTestCase):
         self.assertEqual(ok.status_code, 204)
         bad = self.client.get('/api/media-auth/', HTTP_X_FORWARDED_URI=parts.path)
         self.assertEqual(bad.status_code, 403)
+
+
+class UploadLimitTests(AuthTestCase):
+    def setUp(self):
+        super().setUp()
+        self.tmp = tempfile.mkdtemp()
+        self.media = override_settings(MEDIA_ROOT=self.tmp)
+        self.media.enable()
+
+    def tearDown(self):
+        self.media.disable()
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def submit(self, *files, **data):
+        return self.client.post(
+            f'/api/assignments/{self.bio.id}/submit/',
+            {'description': 'ответ', 'files': list(files), **data},
+        )
+
+    def test_too_big_file_rejected(self):
+        self.login_as(self.anna)
+        response = self.submit(SimpleUploadedFile('big.pdf', b'x' * (10 * 1024 * 1024 + 1)))
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('больше 10 МБ', response.data['files'][0])
+        self.assertFalse(StudentHomework.objects.exists())
+
+    def test_forbidden_type_rejected(self):
+        self.login_as(self.anna)
+        response = self.submit(SimpleUploadedFile('virus.exe', b'MZ'))
+        self.assertEqual(response.status_code, 400)
+
+    def test_teacher_upload_limits(self):
+        self.login_as(self.teacher)
+        response = self.client.patch(
+            f'/api/assignments/{self.bio.id}/',
+            {'files': [SimpleUploadedFile('script.exe', b'MZ')]},
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(LessonFile.objects.exists())
+
+    @override_settings(STUDENT_STORAGE_QUOTA=10)
+    def test_student_quota(self):
+        self.login_as(self.anna)
+        self.assertEqual(self.submit(SimpleUploadedFile('a.txt', b'12345678')).status_code, 201)
+        self.assertEqual(self.submit(SimpleUploadedFile('b.txt', b'12345')).status_code, 400)
+        # если убрать старый файл, место освобождается
+        old_id = StudentHomeworkFile.objects.get().id
+        response = self.submit(SimpleUploadedFile('b.txt', b'12345'), delete_file_ids=json.dumps([old_id]))
+        self.assertEqual(response.status_code, 200)
+
+    def test_deleted_files_removed_from_disk(self):
+        self.login_as(self.anna)
+        self.submit(SimpleUploadedFile('a.txt', b'1'))
+        path = StudentHomeworkFile.objects.get().file.path
+        self.assertTrue(os.path.exists(path))
+        with self.captureOnCommitCallbacks(execute=True):
+            self.submit(delete_file_ids=json.dumps([StudentHomeworkFile.objects.get().id]))
+        self.assertFalse(os.path.exists(path))
+
+    def test_cascade_delete_removes_files(self):
+        self.login_as(self.anna)
+        self.submit(SimpleUploadedFile('a.txt', b'1'))
+        path = StudentHomeworkFile.objects.get().file.path
+        with self.captureOnCommitCallbacks(execute=True):
+            self.bio.delete()
+        self.assertFalse(os.path.exists(path))

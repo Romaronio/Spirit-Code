@@ -12,6 +12,7 @@ from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from .models import Account, Assignment, AuthToken, LessonFile, Homework, HomeworkFile, StudentHomework, StudentHomeworkFile
 from .permissions import IsStudent, IsTeacher
+from .uploads import check_student_quota, check_uploads
 from .serializers import (
     AccountSerializer,
     AssignmentSerializer,
@@ -163,6 +164,10 @@ class AssignmentViewSet(viewsets.ModelViewSet):
         for f in request.FILES.getlist('files'):
             LessonFile.objects.create(assignment=assignment, name=f.name, file=f)
 
+    def _check_files(self, request):
+        """Размер и тип всех файлов проверяем до того, как что-то сохранить"""
+        check_uploads(request.FILES.getlist('files') + request.FILES.getlist('homework_files'))
+
     def _fresh(self, assignment):
         """Перечитываем из БД, чтобы в ответе были свежие homework и files"""
         return self.get_serializer(self.get_queryset().get(pk=assignment.pk)).data
@@ -172,6 +177,7 @@ class AssignmentViewSet(viewsets.ModelViewSet):
         """Создание урока с возможным домашним заданием"""
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        self._check_files(request)
         assignment = serializer.save()
 
         self._save_homework(request, assignment)
@@ -190,6 +196,7 @@ class AssignmentViewSet(viewsets.ModelViewSet):
         # read-only, поэтому он их и так игнорирует.
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
+        self._check_files(request)
         assignment = serializer.save()
 
         self._save_homework(request, assignment)
@@ -203,21 +210,30 @@ class AssignmentViewSet(viewsets.ModelViewSet):
         """Отправка ответа учеником по заданию (всегда от имени вошедшего ученика)"""
         assignment = self.get_object()  # чужой предмет → 404
         description = request.data.get('description', '')
+        files = request.FILES.getlist('files')
+
+        # Файлы, которые ученик убрал из ответа. Фильтр по ученику и заданию
+        # не даёт удалить чужие файлы.
+        raw_ids = _parse_json(request.data.get('delete_file_ids'))
+        delete_ids = list(
+            StudentHomeworkFile.objects.filter(
+                id__in=[i for i in raw_ids if str(i).isdigit()] if isinstance(raw_ids, list) else [],
+                student_homework__assignment=assignment,
+                student_homework__student=request.user,
+            ).values_list('id', flat=True)
+        )
+
+        check_uploads(files)
+        check_student_quota(request.user, files, deleted_ids=delete_ids)
 
         sh, created = StudentHomework.objects.update_or_create(
             assignment=assignment,
             student=request.user,
             defaults={'description': description}
         )
+        StudentHomeworkFile.objects.filter(id__in=delete_ids).delete()
 
-        delete_file_ids = _parse_json(request.data.get('delete_file_ids'))
-        if isinstance(delete_file_ids, list):
-            # Фильтр по student_homework не даёт удалить чужие файлы
-            StudentHomeworkFile.objects.filter(
-                id__in=delete_file_ids, student_homework=sh
-            ).delete()
-
-        for f in request.FILES.getlist('files'):
+        for f in files:
             StudentHomeworkFile.objects.create(
                 student_homework=sh,
                 name=f.name,

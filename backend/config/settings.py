@@ -119,6 +119,11 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'  # сюда collectstatic собирае�
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'  # сюда сохраняются файлы домашних заданий, раздаёт Caddy
 
+# Лимиты на загрузку файлов (см. api/uploads.py и src/utils/uploads.ts).
+# Общий лимит размера запроса (50 МБ) задан в Caddyfile.
+MAX_UPLOAD_FILE_SIZE = int(os.environ.get('DJANGO_MAX_UPLOAD_MB', '10')) * 1024 * 1024
+STUDENT_STORAGE_QUOTA = int(os.environ.get('DJANGO_STUDENT_QUOTA_MB', '500')) * 1024 * 1024
+
 # Сколько живёт ссылка на файл (см. api/media.py). Ссылки обновляются
 # каждый раз, когда открывается страница задания.
 MEDIA_URL_TTL_SECONDS = int(os.environ.get('DJANGO_MEDIA_URL_TTL', str(6 * 60 * 60)))

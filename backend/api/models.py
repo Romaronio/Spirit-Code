@@ -7,6 +7,8 @@ from django.contrib.auth.hashers import check_password, make_password
 from django.db import models
 from django.utils import timezone
 
+from .uploads import validate_upload
+
 
 class Account(models.Model):
     """Модель для учетных записей учителей и учеников"""
@@ -101,7 +103,7 @@ class LessonFile(models.Model):
         on_delete=models.CASCADE
     )
     name = models.CharField(max_length=255)
-    file = models.FileField(upload_to='lesson_files/', null=True, blank=True)
+    file = models.FileField(upload_to='lesson_files/', null=True, blank=True, validators=[validate_upload])
 
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -141,7 +143,7 @@ class HomeworkFile(models.Model):
         on_delete=models.CASCADE
     )
     name = models.CharField(max_length=255)
-    file = models.FileField(upload_to='homework_files/', null=True, blank=True)
+    file = models.FileField(upload_to='homework_files/', null=True, blank=True, validators=[validate_upload])
 
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -188,7 +190,7 @@ class StudentHomeworkFile(models.Model):
         on_delete=models.CASCADE
     )
     name = models.CharField(max_length=255)
-    file = models.FileField(upload_to='student_homework_files/', null=True, blank=True)
+    file = models.FileField(upload_to='student_homework_files/', null=True, blank=True, validators=[validate_upload])
 
     created_at = models.DateTimeField(auto_now_add=True)
 
