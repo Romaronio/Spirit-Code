@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from .media import signed_url
 from .models import Account, Assignment, LessonFile, Homework, HomeworkFile, StudentHomework, StudentHomeworkFile
 
 MIN_PASSWORD_LENGTH = 8
@@ -49,12 +50,7 @@ class LessonFileSerializer(serializers.ModelSerializer):
         }
 
     def get_url(self, obj):
-        if obj.file:
-            request = self.context.get('request')
-            if request:
-                return request.build_absolute_uri(obj.file.url)
-            return obj.file.url
-        return None
+        return signed_url(self.context.get('request'), obj.file) if obj.file else None
 
 
 class HomeworkFileSerializer(serializers.ModelSerializer):
@@ -69,12 +65,7 @@ class HomeworkFileSerializer(serializers.ModelSerializer):
         }
 
     def get_url(self, obj):
-        if obj.file:
-            request = self.context.get('request')
-            if request:
-                return request.build_absolute_uri(obj.file.url)
-            return obj.file.url
-        return None
+        return signed_url(self.context.get('request'), obj.file) if obj.file else None
 
 
 class HomeworkFileWriteSerializer(serializers.ModelSerializer):
@@ -115,12 +106,7 @@ class StudentHomeworkFileSerializer(serializers.ModelSerializer):
         }
 
     def get_url(self, obj):
-        if obj.file:
-            request = self.context.get('request')
-            if request:
-                return request.build_absolute_uri(obj.file.url)
-            return obj.file.url
-        return None
+        return signed_url(self.context.get('request'), obj.file) if obj.file else None
 
 
 class StudentHomeworkSerializer(serializers.ModelSerializer):

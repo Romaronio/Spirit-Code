@@ -28,11 +28,19 @@ spiritcode.duckdns.org {
 
     # Загруженные пользователями файлы: всегда скачиваются, а не открываются
     # в браузере, и не могут выполнять скрипты на нашем домене (защита от XSS)
-    handle_path /media/* {
+    # Файл отдаётся, только если ссылка подписана сервером и не устарела
+    # (проверяет Django: /api/media-auth/, см. backend/api/media.py)
+    handle /media/* {
         header Content-Disposition "attachment"
         header Content-Security-Policy "sandbox; default-src 'none'"
         root * /media
-        file_server
+        route {
+            forward_auth backend:8000 {
+                uri /api/media-auth/
+            }
+            uri strip_prefix /media
+            file_server
+        }
     }
 
     handle {

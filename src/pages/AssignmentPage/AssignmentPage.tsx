@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import styles from './AssignmentPage.module.css'
 import * as api from '../../services/api'
@@ -17,10 +17,16 @@ interface PageProps {
   accounts: Account[]
   onUpdate: (id: Assignment['id'], changes: AssignmentChanges) => Promise<void>
   onSubmitStudentHomework?: (assignmentId: number) => Promise<void> | void
+  onOpen?: (assignmentId: number) => Promise<void> | void
 }
 
-function AssignmentPage({ user, items, accounts, onUpdate, onSubmitStudentHomework }: PageProps) {
+function AssignmentPage({ user, items, accounts, onUpdate, onSubmitStudentHomework, onOpen }: PageProps) {
   const { id } = useParams()
+
+  // При открытии подгружаем задание заново, чтобы ссылки на файлы были свежими
+  useEffect(() => {
+    if (user && id) onOpen?.(Number(id))
+  }, [user, id, onOpen])
 
   if (!user) {
     return <Navigate to="/" replace />

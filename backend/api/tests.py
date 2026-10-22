@@ -1,11 +1,12 @@
 from datetime import timedelta
+from urllib.parse import urlsplit
 
 from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
 from rest_framework.test import APITestCase
 
-from .models import Account, Assignment, AuthToken, StudentHomework
+from .models import Account, Assignment, AuthToken, LessonFile, StudentHomework
 
 
 class AuthTestCase(APITestCase):
@@ -163,3 +164,47 @@ class SubmitTests(AuthTestCase):
         self.login_as(self.teacher)
         answers = self.client.get(f'/api/assignments/{self.bio.id}/').data['student_homeworks']
         self.assertEqual(len(answers), 2)
+
+
+class MediaTests(AuthTestCase):
+    def setUp(self):
+        super().setUp()
+        self.lesson_file = LessonFile.objects.create(
+            assignment=self.bio, name='урок.txt', file=SimpleUploadedFile('урок.txt', b'secret')
+        )
+
+    def tearDown(self):
+        self.lesson_file.file.delete()
+
+    def file_url(self):
+        self.login_as(self.anna)
+        url = self.client.get(f'/api/assignments/{self.bio.id}/').data['files'][0]['url']
+        self.client.credentials()  # файл качаем без токена, как браузер по ссылке
+        return urlsplit(url)
+
+    def test_signed_link_works(self):
+        parts = self.file_url()
+        response = self.client.get(f'{parts.path}?{parts.query}')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(b''.join(response.streaming_content), b'secret')
+
+    def test_unsigned_link_is_forbidden(self):
+        parts = self.file_url()
+        self.assertEqual(self.client.get(parts.path).status_code, 403)
+
+    def test_signature_is_bound_to_file(self):
+        parts = self.file_url()
+        other = parts.path.replace('lesson_files/', 'student_homework_files/')
+        self.assertEqual(self.client.get(f'{other}?{parts.query}').status_code, 403)
+
+    @override_settings(MEDIA_URL_TTL_SECONDS=-1)
+    def test_expired_link_is_forbidden(self):
+        parts = self.file_url()
+        self.assertEqual(self.client.get(f'{parts.path}?{parts.query}').status_code, 403)
+
+    def test_caddy_forward_auth(self):
+        parts = self.file_url()
+        ok = self.client.get('/api/media-auth/', HTTP_X_FORWARDED_URI=f'{parts.path}?{parts.query}')
+        self.assertEqual(ok.status_code, 204)
+        bad = self.client.get('/api/media-auth/', HTTP_X_FORWARDED_URI=parts.path)
+        self.assertEqual(bad.status_code, 403)

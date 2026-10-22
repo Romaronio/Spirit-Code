@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Routes, Route, useNavigate } from 'react-router-dom'
 import AuthPage from './pages/AuthPage/AuthPage'
 import HomePage from './pages/HomePage/HomePage'
@@ -146,16 +146,18 @@ function App() {
     }
   }
 
-  async function refreshStudentHomeworks(assignmentId: number) {
+  // Перечитывает задание с сервера: свежие ответы учеников и новые
+  // подписанные ссылки на файлы (старые со временем перестают работать)
+  const refreshAssignment = useCallback(async (assignmentId: number) => {
     try {
       const refreshed = await api.getAssignment(assignmentId)
       setItems((prev) =>
         prev.map((item) => (item.id === assignmentId ? refreshed : item))
       )
     } catch (error) {
-      console.error('Ошибка обновления ответов учеников:', error)
+      console.error('Ошибка обновления задания:', error)
     }
-  }
+  }, [])
 
   if (loading) {
     return <div style={{ padding: '20px', textAlign: 'center' }}>Загрузка...</div>
@@ -188,7 +190,8 @@ function App() {
             items={items}
             accounts={accounts}
             onUpdate={handleUpdate}
-            onSubmitStudentHomework={refreshStudentHomeworks}
+            onOpen={refreshAssignment}
+            onSubmitStudentHomework={refreshAssignment}
           />
         }
       />

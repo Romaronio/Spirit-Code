@@ -117,7 +117,11 @@ STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'  # сюда collectstatic собирает файлы, раздаёт nginx
 
 MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'  # сюда сохраняются файлы домашних заданий, раздаёт nginx
+MEDIA_ROOT = BASE_DIR / 'media'  # сюда сохраняются файлы домашних заданий, раздаёт Caddy
+
+# Сколько живёт ссылка на файл (см. api/media.py). Ссылки обновляются
+# каждый раз, когда открывается страница задания.
+MEDIA_URL_TTL_SECONDS = int(os.environ.get('DJANGO_MEDIA_URL_TTL', str(6 * 60 * 60)))
 
 
 # --- Почта ------------------------------------------------------------------

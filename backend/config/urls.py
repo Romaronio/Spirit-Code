@@ -15,15 +15,19 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
-from django.urls import path, include
+from django.urls import path, include, re_path
 from django.conf import settings
-from django.conf.urls.static import static
+
+from api.media import media_auth, protected_media
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    # Caddy спрашивает здесь, можно ли отдать файл из /media/ (forward_auth)
+    path('api/media-auth/', media_auth),
     path('api/', include('api.urls')),
 ]
 
-# Serve media files in development
-if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+# Локально файлы раздаёт Django — тоже только по подписанной ссылке.
+# На сервере /media/ отдаёт Caddy и сюда такие запросы не доходят.
+media_prefix = settings.MEDIA_URL.lstrip('/')
+urlpatterns += [re_path(rf'^{media_prefix}(?P<path>.*)$', protected_media)]
