@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from .media import signed_url
-from .models import Account, Assignment, LessonFile, Homework, HomeworkFile, Payment, StudentHomework, StudentHomeworkFile
+from .models import Account, AnswerComment, Assignment, LessonFile, Homework, HomeworkFile, Payment, StudentHomework, StudentHomeworkFile
 
 MIN_PASSWORD_LENGTH = 8
 
@@ -48,6 +48,8 @@ class AccountSerializer(serializers.ModelSerializer):
         if password is not None:
             instance.set_password(password)
         instance.save()
+        if password is not None:
+            instance.tokens.all().delete()  # со старым паролем больше не войти
         return instance
 
 
@@ -122,16 +124,34 @@ class StudentHomeworkFileSerializer(serializers.ModelSerializer):
         return signed_url(self.context.get('request'), obj.file) if obj.file else None
 
 
+class AnswerCommentSerializer(serializers.ModelSerializer):
+    """Сообщение в переписке по ответу"""
+    author_name = serializers.CharField(source='author.name', read_only=True)
+    author_role = serializers.CharField(source='author.role', read_only=True)
+
+    class Meta:
+        model = AnswerComment
+        fields = ['id', 'author', 'author_name', 'author_role', 'text', 'created_at', 'edited_at']
+        read_only_fields = ['author', 'edited_at']
+
+    def validate_text(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError('Сообщение не может быть пустым')
+        return value
+
+
 class StudentHomeworkSerializer(serializers.ModelSerializer):
     """Сериализатор для сданной работы ученика"""
     files = StudentHomeworkFileSerializer(many=True, read_only=True)
+    comments = AnswerCommentSerializer(many=True, read_only=True)
     student_name = serializers.CharField(source='student.name', read_only=True)
 
     class Meta:
         model = StudentHomework
         fields = [
             'id', 'assignment', 'student', 'student_name', 'description', 'files',
-            'submitted_at', 'status', 'checked_at',
+            'submitted_at', 'status', 'checked_at', 'comments',
         ]
         read_only_fields = ['status', 'checked_at']
 

@@ -3,7 +3,7 @@ import { Routes, Route, useNavigate } from 'react-router-dom'
 import AuthPage from './pages/AuthPage/AuthPage'
 import HomePage from './pages/HomePage/HomePage'
 import AssignmentPage from './pages/AssignmentPage/AssignmentPage'
-import type { Account, Assignment, AssignmentChanges, ReviewStatus, User } from './types'
+import type { Account, AnswerComment, Assignment, AssignmentChanges, CommentActions, ReviewStatus, User } from './types'
 import * as api from './services/api'
 import { clearSession, loadUser } from './utils/session'
 
@@ -161,6 +161,41 @@ function App() {
     )
   }
 
+  // Меняет переписку одного ответа в списке заданий
+  function updateComments(
+    assignmentId: number,
+    answerId: number,
+    change: (comments: AnswerComment[]) => AnswerComment[]
+  ) {
+    setItems((prev) =>
+      prev.map((item) =>
+        item.id !== assignmentId
+          ? item
+          : {
+              ...item,
+              student_homeworks: item.student_homeworks?.map((sh) =>
+                sh.id === answerId ? { ...sh, comments: change(sh.comments ?? []) } : sh
+              ),
+            }
+      )
+    )
+  }
+
+  const commentActions: CommentActions = {
+    async add(assignmentId, answerId, text) {
+      const comment = await api.addComment(answerId, text)
+      updateComments(assignmentId, answerId, (list) => [...list, comment])
+    },
+    async edit(assignmentId, answerId, commentId, text) {
+      const updated = await api.editComment(commentId, text)
+      updateComments(assignmentId, answerId, (list) => list.map((c) => (c.id === commentId ? updated : c)))
+    },
+    async remove(assignmentId, answerId, commentId) {
+      await api.deleteComment(commentId)
+      updateComments(assignmentId, answerId, (list) => list.filter((c) => c.id !== commentId))
+    },
+  }
+
   // Перечитывает все задания: новые ответы учеников и свежие ссылки на файлы
   const refreshAssignments = useCallback(async () => {
     try {
@@ -205,6 +240,7 @@ function App() {
             onSetSubjects={handleSetSubjects}
             onRefresh={refreshAssignments}
             onReview={handleReview}
+            commentActions={commentActions}
           />
         }
       />
@@ -218,6 +254,7 @@ function App() {
             onUpdate={handleUpdate}
             onOpen={refreshAssignment}
             onReview={handleReview}
+            commentActions={commentActions}
             onSubmitStudentHomework={refreshAssignment}
           />
         }

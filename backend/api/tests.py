@@ -418,3 +418,116 @@ class PaymentTests(AuthTestCase):
         self.login_as(self.anna)
         self.assertEqual(self.client.get('/api/payments/?school_year=2026').status_code, 403)
         self.assertEqual(self.set_paid(self.anna, 2026, 10).status_code, 403)
+
+
+class ResetPasswordTests(AuthTestCase):
+    def test_teacher_resets_student_password(self):
+        # у ученицы есть активная сессия
+        student_client = self.client_class()
+        token = self.client.post(
+            '/api/accounts/login/', {'name': 'anna', 'password': 'anna-password'}, format='json'
+        ).data['token']
+        student_client.credentials(HTTP_AUTHORIZATION=f'Token {token}')
+
+        self.login_as(self.teacher)
+        response = self.client.post(f'/api/accounts/{self.anna.id}/reset_password/')
+        self.assertEqual(response.status_code, 200)
+        new_password = response.data['password']
+        self.assertEqual(len(new_password), 10)
+
+        self.anna.refresh_from_db()
+        self.assertTrue(self.anna.check_password(new_password))
+        self.assertFalse(self.anna.check_password('anna-password'))
+        # старая сессия больше не работает
+        self.assertEqual(student_client.get('/api/accounts/me/').status_code, 401)
+
+    def test_cannot_reset_teacher(self):
+        self.login_as(self.teacher)
+        self.assertEqual(self.client.post(f'/api/accounts/{self.teacher.id}/reset_password/').status_code, 400)
+
+    def test_student_cannot_reset(self):
+        self.login_as(self.anna)
+        self.assertEqual(self.client.post(f'/api/accounts/{self.ivan.id}/reset_password/').status_code, 403)
+
+
+class CommentTests(AuthTestCase):
+    def setUp(self):
+        super().setUp()
+        self.ivan.subjects = ['Биология']
+        self.ivan.save()
+        self.answer = StudentHomework.objects.create(assignment=self.bio, student=self.anna, description='ответ')
+
+    def comment(self, text, answer=None):
+        answer = answer or self.answer
+        return self.client.post(f'/api/student-homeworks/{answer.id}/comments/', {'text': text}, format='json')
+
+    def test_teacher_and_student_talk(self):
+        self.login_as(self.teacher)
+        response = self.comment('  Перепроверь задачу 3  ')
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data['text'], 'Перепроверь задачу 3')
+        self.assertEqual(response.data['author_role'], 'teacher')
+
+        self.client.credentials()
+        self.login_as(self.anna)
+        self.assertEqual(self.comment('Исправила').status_code, 201)
+
+        answers = self.client.get(f'/api/assignments/{self.bio.id}/').data['student_homeworks']
+        self.assertEqual([c['text'] for c in answers[0]['comments']], ['Перепроверь задачу 3', 'Исправила'])
+
+    def test_student_cannot_comment_foreign_answer(self):
+        self.login_as(self.ivan)
+        self.assertEqual(self.comment('чужое').status_code, 404)
+
+    def test_empty_comment_rejected(self):
+        self.login_as(self.teacher)
+        self.assertEqual(self.comment('   ').status_code, 400)
+
+    def test_anonymous_rejected(self):
+        self.assertEqual(self.comment('привет').status_code, 401)
+
+    def test_student_still_cannot_review_or_list(self):
+        self.login_as(self.anna)
+        self.assertEqual(self.client.get('/api/student-homeworks/').status_code, 403)
+
+
+class CommentEditDeleteTests(AuthTestCase):
+    def setUp(self):
+        super().setUp()
+        from .models import AnswerComment
+        self.ivan.subjects = ['Биология']
+        self.ivan.save()
+        answer = StudentHomework.objects.create(assignment=self.bio, student=self.anna, description='ответ')
+        self.teacher_msg = AnswerComment.objects.create(student_homework=answer, author=self.teacher, text='учитель')
+        self.anna_msg = AnswerComment.objects.create(student_homework=answer, author=self.anna, text='анна')
+
+    def url(self, comment):
+        return f'/api/answer-comments/{comment.id}/'
+
+    def test_author_edits_own_message(self):
+        self.login_as(self.anna)
+        response = self.client.patch(self.url(self.anna_msg), {'text': 'исправила'}, format='json')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['text'], 'исправила')
+        self.assertIsNotNone(response.data['edited_at'])
+
+    def test_cannot_edit_foreign_message(self):
+        self.login_as(self.anna)
+        self.assertEqual(self.client.patch(self.url(self.teacher_msg), {'text': 'x'}, format='json').status_code, 403)
+        self.client.credentials()
+        self.login_as(self.teacher)
+        self.assertEqual(self.client.patch(self.url(self.anna_msg), {'text': 'x'}, format='json').status_code, 403)
+
+    def test_student_deletes_own_but_not_teachers(self):
+        self.login_as(self.anna)
+        self.assertEqual(self.client.delete(self.url(self.teacher_msg)).status_code, 403)
+        self.assertEqual(self.client.delete(self.url(self.anna_msg)).status_code, 204)
+
+    def test_teacher_deletes_any(self):
+        self.login_as(self.teacher)
+        self.assertEqual(self.client.delete(self.url(self.anna_msg)).status_code, 204)
+
+    def test_other_student_does_not_see_thread(self):
+        self.login_as(self.ivan)
+        self.assertEqual(self.client.delete(self.url(self.anna_msg)).status_code, 404)
+        self.assertEqual(self.client.patch(self.url(self.anna_msg), {'text': 'x'}, format='json').status_code, 404)

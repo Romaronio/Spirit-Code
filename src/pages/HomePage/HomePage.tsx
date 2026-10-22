@@ -1,12 +1,14 @@
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import styles from './HomePage.module.css'
-import type { Account, Assignment, ReviewStatus, User } from '../../types'
+import type { Account, Assignment, CommentActions, ReviewStatus, User } from '../../types'
 import AssignmentCard from '../../components/AssignmentCard/AssignmentCard'
 import AssignmentForm from '../../components/AssignmentForm/AssignmentForm'
 import StudentsPanel from '../../components/StudentsPanel/StudentsPanel'
 import AnswersPanel from '../../components/AnswersPanel/AnswersPanel'
 import ProgressDonut from '../../components/ProgressDonut/ProgressDonut'
 import PaymentsPanel from '../../components/PaymentsPanel/PaymentsPanel'
+import ChatWindow from '../../components/ChatWindow/ChatWindow'
 import { hasSubject, normalize, subjectsOf } from '../../utils/subjects'
 
 interface Props {
@@ -20,6 +22,7 @@ interface Props {
   onSetSubjects: (id: number, subjects: string[]) => void;
   onRefresh: () => Promise<void>;
   onReview: (assignmentId: number, answerId: number, status: ReviewStatus) => Promise<void>;
+  commentActions: CommentActions;
   onAdd: (data: {
     title: string
     subject: string
@@ -44,7 +47,24 @@ function HomePage({
   onSetSubjects,
   onRefresh,
   onReview,
+  commentActions,
 }: Props) {
+  // Открытая переписка (у учителя): показывается вместо колонки с заданиями
+  const [openChat, setOpenChat] = useState<{ assignmentId: number; answerId: number } | null>(null)
+  const closeChat = useCallback(() => setOpenChat(null), [])
+
+  // Чат по высоте равен панели «Ответы учеников» — следим за её размером
+  const answersRef = useRef<HTMLElement>(null)
+  const [answersHeight, setAnswersHeight] = useState<number>()
+  const isChatOpen = openChat !== null
+  useEffect(() => {
+    const el = answersRef.current
+    if (!el || !isChatOpen) return
+    const observer = new ResizeObserver(() => setAnswersHeight(el.offsetHeight))
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [isChatOpen])
+
   if (!user) {
     return <Navigate to="/" replace />
   }
@@ -74,6 +94,12 @@ function HomePage({
     : mySubjects.length === 0
       ? 'Учитель пока не назначил вам предметы'
       : 'Заданий по вашим предметам пока нет'
+
+  // Задание и ответ для открытого чата берём из актуального списка —
+  // так новые сообщения и отметки сразу видны в окне. Если ответ удалён, чата нет.
+  const chatAssignment = openChat ? items.find((a) => a.id === openChat.assignmentId) : undefined
+  const chatAnswer = chatAssignment?.student_homeworks?.find((sh) => sh.id === openChat?.answerId)
+  const chat = chatAssignment && chatAnswer ? { assignment: chatAssignment, answer: chatAnswer } : null
 
   const assignmentsSection = (
     <section className={styles.assignmentsColumn}>
@@ -108,7 +134,15 @@ function HomePage({
         <div className={styles.tools}>
           <AssignmentForm onAdd={onAdd} />
           <div className={styles.sideColumn}>
-            <AnswersPanel items={items} accounts={accounts} onRefresh={onRefresh} onReview={onReview} />
+            <AnswersPanel
+              ref={answersRef}
+              items={items}
+              accounts={accounts}
+              onRefresh={onRefresh}
+              onReview={onReview}
+              activeAnswerId={chat?.answer.id}
+              onOpenChat={(assignmentId, answerId) => setOpenChat({ assignmentId, answerId })}
+            />
             <PaymentsPanel accounts={accounts} />
             <StudentsPanel
               accounts={accounts}
@@ -118,7 +152,21 @@ function HomePage({
               onSetSubjects={onSetSubjects}
             />
           </div>
-          {assignmentsSection}
+          {chat ? (
+            <div className={styles.assignmentsColumn}>
+              <ChatWindow
+                key={chat.answer.id}
+                assignment={chat.assignment}
+                answer={chat.answer}
+                currentUserId={user.id}
+                commentActions={commentActions}
+                height={answersHeight}
+                onClose={closeChat}
+              />
+            </div>
+          ) : (
+            assignmentsSection
+          )}
         </div>
       ) : (
         assignmentsSection

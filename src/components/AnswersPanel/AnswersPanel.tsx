@@ -10,6 +10,9 @@ interface Props {
   accounts: Account[]
   onRefresh: () => Promise<void>
   onReview: (assignmentId: number, answerId: number, status: ReviewStatus) => Promise<void>
+  activeAnswerId?: number // ответ, переписка по которому сейчас открыта
+  ref?: React.Ref<HTMLElement> // по нему страница меряет высоту панели
+  onOpenChat: (assignmentId: number, answerId: number) => void
 }
 
 interface Answer {
@@ -21,7 +24,7 @@ function formatDate(value?: string) {
   return value ? new Date(value).toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'short' }) : ''
 }
 
-function AnswersPanel({ items, accounts, onRefresh, onReview }: Props) {
+function AnswersPanel({ items, accounts, onRefresh, onReview, activeAnswerId, onOpenChat, ref }: Props) {
   const [isOpen, setIsOpen] = useState(true)
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [isRefreshing, setIsRefreshing] = useState(false)
@@ -68,7 +71,7 @@ function AnswersPanel({ items, accounts, onRefresh, onReview }: Props) {
   }
 
   return (
-    <section className={styles.panel}>
+    <section ref={ref} className={styles.panel}>
       <div className={styles.header}>
         <h2>
           Ответы учеников <span className={styles.count}>({totalAnswers})</span>
@@ -160,6 +163,16 @@ function AnswersPanel({ items, accounts, onRefresh, onReview }: Props) {
                           status={answer.status}
                           onChange={(value) => onReview(assignment.id!, answer.id!, value)}
                         />
+
+                        <button
+                          type="button"
+                          className={`${styles.threadToggle} ${activeAnswerId === answer.id ? styles.threadActive : ''}`}
+                          onClick={() => onOpenChat(assignment.id!, answer.id!)}
+                          aria-pressed={activeAnswerId === answer.id}
+                        >
+                          💬 Переписка ({answer.comments?.length ?? 0})
+                          <span className={styles.chevron}>→</span>
+                        </button>
                       </li>
                     ))}
                   </ul>

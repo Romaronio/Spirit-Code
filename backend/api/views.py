@@ -1,4 +1,5 @@
 import json
+import secrets
 from functools import reduce
 from operator import or_
 
@@ -6,12 +7,13 @@ from django.contrib.auth.hashers import make_password
 from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
-from rest_framework import viewsets, status
+from rest_framework import mixins, viewsets, status
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
-from .models import Account, Assignment, AuthToken, LessonFile, Homework, HomeworkFile, Payment, StudentHomework, StudentHomeworkFile
+from .models import Account, AnswerComment, Assignment, AuthToken, LessonFile, Homework, HomeworkFile, Payment, StudentHomework, StudentHomeworkFile
 from .permissions import IsStudent, IsTeacher
 from .uploads import check_student_quota, check_uploads
 from .serializers import (
@@ -22,7 +24,13 @@ from .serializers import (
     HomeworkFileSerializer,
     PaymentSerializer,
     StudentHomeworkSerializer,
+    AnswerCommentSerializer,
 )
+
+
+# Без похожих символов (l/1, o/0), чтобы пароль легко было продиктовать
+PASSWORD_ALPHABET = 'abcdefghjkmnpqrstuvwxyz23456789'
+GENERATED_PASSWORD_LENGTH = 10
 
 
 def _parse_json(raw):
@@ -89,6 +97,22 @@ class AccountViewSet(viewsets.ModelViewSet):
         """Данные вошедшего пользователя"""
         return Response(self.get_serializer(request.user).data)
 
+    @action(detail=True, methods=['post'])
+    def reset_password(self, request, pk=None):
+        """Учитель сбрасывает пароль ученику: сервер придумывает новый,
+        возвращает его один раз и завершает все сессии ученика"""
+        account = self.get_object()
+        if account.role != 'student':
+            return Response(
+                {'error': 'Сбросить пароль можно только ученику'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        password = ''.join(secrets.choice(PASSWORD_ALPHABET) for _ in range(GENERATED_PASSWORD_LENGTH))
+        account.set_password(password)
+        account.save(update_fields=['password', 'updated_at'])
+        account.tokens.all().delete()
+        return Response({'password': password})
+
     def destroy(self, request, *args, **kwargs):
         if self.get_object().pk == request.user.pk:
             return Response(
@@ -122,6 +146,7 @@ class AssignmentViewSet(viewsets.ModelViewSet):
             'homework__files',
             'student_homeworks__files',
             'student_homeworks__student',
+            'student_homeworks__comments__author',
         )
         subject = self.request.query_params.get('subject', None)
         if subject:
@@ -281,6 +306,23 @@ class StudentHomeworkViewSet(viewsets.ModelViewSet):
     parser_classes = [MultiPartParser, FormParser, JSONParser]
     permission_classes = [IsTeacher]
 
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        user = self.request.user
+        # Ученику (он попадает сюда только в переписку) доступны только свои ответы
+        if not getattr(user, 'is_teacher', False):
+            queryset = queryset.filter(student=user)
+        return queryset
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
+    def comments(self, request, pk=None):
+        """Новое сообщение в переписке по ответу: от учителя или от автора ответа"""
+        sh = self.get_object()  # чужой ответ для ученика → 404
+        serializer = AnswerCommentSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save(student_homework=sh, author=request.user)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
     @action(detail=True, methods=['post'])
     def review(self, request, pk=None):
         """Отметка учителя: сдано (accepted), не сдано (rejected) или снять отметку (pending)"""
@@ -335,3 +377,32 @@ class PaymentViewSet(viewsets.GenericViewSet):
             'month': key['month'],
             'paid': Payment.objects.filter(**key).exists(),
         })
+
+
+class AnswerCommentViewSet(mixins.UpdateModelMixin, mixins.DestroyModelMixin, viewsets.GenericViewSet):
+    """Изменение и удаление сообщений в переписке.
+
+    Изменить можно только своё сообщение. Удалить — своё, а учитель может
+    удалить любое сообщение.
+    """
+    serializer_class = AnswerCommentSerializer
+    permission_classes = [IsAuthenticated]
+    http_method_names = ['patch', 'delete']
+
+    def get_queryset(self):
+        queryset = AnswerComment.objects.select_related('author')
+        user = self.request.user
+        if not getattr(user, 'is_teacher', False):
+            # ученику доступна только переписка по его собственным ответам
+            queryset = queryset.filter(student_homework__student=user)
+        return queryset
+
+    def perform_update(self, serializer):
+        if serializer.instance.author_id != self.request.user.pk:
+            raise PermissionDenied('Изменять можно только свои сообщения')
+        serializer.save(edited_at=timezone.now())
+
+    def perform_destroy(self, instance):
+        if instance.author_id != self.request.user.pk and not self.request.user.is_teacher:
+            raise PermissionDenied('Удалять можно только свои сообщения')
+        instance.delete()

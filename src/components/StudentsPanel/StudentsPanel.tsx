@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import styles from './StudentsPanel.module.css'
 import type { Account } from '../../types'
 import { hasSubject, toggleSubject, uniqueSubjects } from '../../utils/subjects'
+import * as api from '../../services/api'
 
 interface Props {
   accounts: Account[]
@@ -65,6 +66,9 @@ function StudentsPanel({
   const [created, setCreated] = useState<{ name: string; password: string } | null>(null)
   const [isOpen, setIsOpen] = useState(false) // по умолчанию свёрнута
   const [isSaving, setIsSaving] = useState(false)
+  // Сброс пароля: новый пароль тоже показываем один раз, под строкой ученика
+  const [resettingId, setResettingId] = useState<number | null>(null)
+  const [reset, setReset] = useState<{ id: number; password?: string; error?: string } | null>(null)
 
   const students = accounts.filter((a) => a.role === 'student')
 
@@ -107,6 +111,22 @@ function StudentsPanel({
     setPassword('')
     setNewSubjects([])
     setError('')
+  }
+
+  async function handleResetPassword(studentId: number, studentName: string) {
+    if (!window.confirm(`Сбросить пароль ученику «${studentName}»? Старый пароль перестанет работать.`)) {
+      return
+    }
+    setResettingId(studentId)
+    setReset(null)
+    try {
+      const { password } = await api.resetPassword(studentId)
+      setReset({ id: studentId, password })
+    } catch (err) {
+      setReset({ id: studentId, error: err instanceof Error ? err.message : 'Не удалось сбросить пароль' })
+    } finally {
+      setResettingId(null)
+    }
   }
 
   function handleDelete(studentId: number, studentName: string) {
@@ -202,12 +222,31 @@ function StudentsPanel({
                       <span className={styles.studentName}>{s.name}</span>
                       <button
                         type="button"
+                        className={styles.reset}
+                        onClick={() => handleResetPassword(s.id!, s.name)}
+                        disabled={resettingId === s.id}
+                      >
+                        {resettingId === s.id ? 'Сброс...' : 'Сбросить пароль'}
+                      </button>
+                      <button
+                        type="button"
                         className={styles.delete}
                         onClick={() => handleDelete(s.id!, s.name)}
                       >
                         Удалить
                       </button>
                     </div>
+
+                    {reset && reset.id === s.id && (
+                      reset.error ? (
+                        <p className={styles.error}>{reset.error}</p>
+                      ) : (
+                        <p className={styles.hint}>
+                          Новый пароль: <b className={styles.newPassword}>{reset.password}</b> — передайте
+                          его ученику, позже посмотреть его будет нельзя.
+                        </p>
+                      )
+                    )}
 
                     <SubjectPicker
                       options={options}

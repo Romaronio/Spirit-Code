@@ -3,8 +3,9 @@ import { Link, Navigate, useParams } from 'react-router-dom'
 import styles from './AssignmentPage.module.css'
 import * as api from '../../services/api'
 import { hasSubject, normalize } from '../../utils/subjects'
-import type { Account, Assignment, AssignmentChanges, ReviewStatus, User } from '../../types'
+import type { Account, Assignment, AssignmentChanges, CommentActions, ReviewStatus, User } from '../../types'
 import { ReviewButtons, StatusBadge } from '../../components/AnswerStatus/AnswerStatus'
+import CommentThread from '../../components/CommentThread/CommentThread'
 import { ACCEPT, MAX_FILE_SIZE_MB, pickFiles, type FileEntry } from '../../utils/uploads'
 
 interface PageProps {
@@ -14,10 +15,11 @@ interface PageProps {
   onUpdate: (id: Assignment['id'], changes: AssignmentChanges) => Promise<void>
   onSubmitStudentHomework?: (assignmentId: number) => Promise<void> | void
   onReview?: (assignmentId: number, answerId: number, status: ReviewStatus) => Promise<void>
+  commentActions?: CommentActions
   onOpen?: (assignmentId: number) => Promise<void> | void
 }
 
-function AssignmentPage({ user, items, accounts, onUpdate, onSubmitStudentHomework, onReview, onOpen }: PageProps) {
+function AssignmentPage({ user, items, accounts, onUpdate, onSubmitStudentHomework, onReview, commentActions, onOpen }: PageProps) {
   const { id } = useParams()
 
   // При открытии подгружаем задание заново, чтобы ссылки на файлы были свежими
@@ -55,6 +57,7 @@ function AssignmentPage({ user, items, accounts, onUpdate, onSubmitStudentHomewo
       onUpdate={onUpdate}
       onSubmitStudentHomework={onSubmitStudentHomework}
       onReview={onReview}
+      commentActions={commentActions}
     />
   )
 }
@@ -66,9 +69,10 @@ interface DetailsProps {
   onUpdate: (id: Assignment['id'], changes: AssignmentChanges) => Promise<void>
   onSubmitStudentHomework?: (assignmentId: number) => Promise<void> | void
   onReview?: (assignmentId: number, answerId: number, status: ReviewStatus) => Promise<void>
+  commentActions?: CommentActions
 }
 
-function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStudentHomework, onReview }: DetailsProps) {
+function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStudentHomework, onReview, commentActions }: DetailsProps) {
   const canEdit = user.role === 'teacher'
 
   const [isEditing, setIsEditing] = useState(false)
@@ -487,6 +491,17 @@ function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStud
                         onChange={(value) => onReview(assignment.id!, sh.id!, value)}
                       />
                     )}
+                    {commentActions && (
+                      <CommentThread
+                        comments={sh.comments}
+                        currentUserId={user.id}
+                        canDeleteAll
+                        placeholder="Ответить ученику..."
+                        onSend={(text) => commentActions.add(assignment.id!, sh.id!, text)}
+                        onEdit={(id, text) => commentActions.edit(assignment.id!, sh.id!, id, text)}
+                        onDelete={(id) => commentActions.remove(assignment.id!, sh.id!, id)}
+                      />
+                    )}
                   </li>
                 ))}
               </ul>
@@ -505,6 +520,19 @@ function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStud
                 Статус: <StatusBadge status={myAnswer.status} />
                 {myAnswer.status === 'rejected' && ' — исправьте ответ и отправьте снова'}
               </p>
+            )}
+            {myAnswer && commentActions && (
+              <div className={styles.conversation}>
+                <p className={styles.label}>Переписка с учителем</p>
+                <CommentThread
+                  comments={myAnswer.comments}
+                  currentUserId={user.id ?? studentId}
+                  placeholder="Написать учителю..."
+                  onSend={(text) => commentActions.add(assignment.id!, myAnswer.id!, text)}
+                  onEdit={(id, text) => commentActions.edit(assignment.id!, myAnswer.id!, id, text)}
+                  onDelete={(id) => commentActions.remove(assignment.id!, myAnswer.id!, id)}
+                />
+              </div>
             )}
             {submitSuccess && <p className={styles.success}>Ответ сохранён!</p>}
             {submitError && <p className={styles.error}>{submitError}</p>}

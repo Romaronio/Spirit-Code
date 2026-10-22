@@ -1,4 +1,4 @@
-import type { Account, Assignment, LessonFile, Homework, HomeworkFile, Payment, ReviewStatus, StudentHomework } from "../types";
+import type { Account, AnswerComment, Assignment, LessonFile, Homework, HomeworkFile, Payment, ReviewStatus, StudentHomework } from "../types";
 import { clearSession, loadToken } from "../utils/session";
 
 // Адрес API. По умолчанию относительный путь: и локально (через прокси Vite),
@@ -104,6 +104,11 @@ export async function deleteAccount(id: number): Promise<void> {
   return fetchAPI<void>(`/accounts/${id}/`, {
     method: 'DELETE',
   });
+}
+
+// Учитель сбрасывает пароль ученику; сервер возвращает новый пароль один раз
+export async function resetPassword(id: number): Promise<{ password: string }> {
+  return fetchAPI<{ password: string }>(`/accounts/${id}/reset_password/`, { method: 'POST' });
 }
 
 export async function login(name: string, password: string): Promise<{ token: string; account: Account }> {
@@ -299,6 +304,25 @@ export async function reviewStudentHomework(id: number, status: ReviewStatus): P
     method: 'POST',
     body: JSON.stringify({ status }),
   });
+}
+
+// Сообщение в переписке по ответу (пишет учитель или сам ученик)
+export async function addComment(answerId: number, text: string): Promise<AnswerComment> {
+  return fetchAPI<AnswerComment>(`/student-homeworks/${answerId}/comments/`, {
+    method: 'POST',
+    body: JSON.stringify({ text }),
+  });
+}
+
+export async function editComment(commentId: number, text: string): Promise<AnswerComment> {
+  return fetchAPI<AnswerComment>(`/answer-comments/${commentId}/`, {
+    method: 'PATCH',
+    body: JSON.stringify({ text }),
+  });
+}
+
+export async function deleteComment(commentId: number): Promise<void> {
+  return fetchAPI<void>(`/answer-comments/${commentId}/`, { method: 'DELETE' });
 }
 
 export async function getAllStudentHomeworks(): Promise<StudentHomework[]> {

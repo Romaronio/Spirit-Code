@@ -1,0 +1,95 @@
+.window {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  box-sizing: border-box;
+  margin-top: 24px;
+  padding: 16px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  scroll-margin-top: 16px;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.titles {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.name {
+  margin: 0;
+  font-size: 22px;
+  word-break: break-word;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.assignment {
+  color: #140f0f;
+  font-weight: 600;
+  text-decoration: none;
+  word-break: break-word;
+}
+
+.assignment:hover {
+  text-decoration: underline;
+}
+
+.subject {
+  color: #c25e00;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.close {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: #fff;
+  color: #555;
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.close:hover {
+  border-color: #ff8400;
+  color: #140f0f;
+}
+
+/* Сама переписка: при длинной истории прокручивается внутри окна */
+.chat {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  max-height: 70vh;
+}
+
+/* На широком экране (колонки рядом) чат ровно по высоте панели ответов,
+   шапка и ответ стоят на месте, прокручивается только переписка */
+@media (min-width: 1101px) {
+  .window {
+    height: var(--chat-height, auto);
+  }
+
+  .chat {
+    max-height: none;
+  }
+}

@@ -210,3 +210,33 @@
   align-items: center;
   gap: 6px;
 }
+
+.threadToggle {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 6px;
+  margin-top: 2px;
+  padding: 4px 10px;
+  border: 1px solid #e3d6d6;
+  border-radius: 8px;
+  background: #fff;
+  color: #140f0f;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.threadToggle:hover {
+  border-color: #ff8400;
+}
+
+.chevron {
+  color: #777;
+  font-size: 10px;
+}
+
+.threadActive {
+  border-color: #ff8400;
+  background: #fff4e5;
+}

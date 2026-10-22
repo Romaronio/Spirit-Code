@@ -244,3 +244,26 @@ class Payment(models.Model):
 
     def __str__(self):
         return f"{self.student.name}: {self.month:02d}.{self.year}"
+
+
+class AnswerComment(models.Model):
+    """Сообщение в переписке по ответу ученика (пишут учитель и сам ученик)"""
+    student_homework = models.ForeignKey(
+        StudentHomework,
+        related_name='comments',
+        on_delete=models.CASCADE
+    )
+    author = models.ForeignKey(
+        Account,
+        related_name='answer_comments',
+        on_delete=models.CASCADE
+    )
+    text = models.TextField(max_length=2000)
+    created_at = models.DateTimeField(auto_now_add=True)
+    edited_at = models.DateTimeField(null=True, blank=True)  # когда автор менял текст
+
+    class Meta:
+        ordering = ['created_at', 'id']
+
+    def __str__(self):
+        return f"{self.author.name}: {self.text[:30]}"
