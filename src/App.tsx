@@ -1,35 +1,65 @@
-﻿import { useState, useEffect } from 'react'
-import { Routes, Route } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { Routes, Route, useNavigate } from 'react-router-dom'
 import AuthPage from './pages/AuthPage/AuthPage'
 import HomePage from './pages/HomePage/HomePage'
 import AssignmentPage from './pages/AssignmentPage/AssignmentPage'
-import type { Account, Assignment, AssignmentChanges } from './types'
+import type { Account, Assignment, AssignmentChanges, User } from './types'
 import * as api from './services/api'
+import { clearSession, loadUser } from './utils/session'
 
 
 function App() {
+  const navigate = useNavigate()
+  const [user, setUser] = useState<User | null>(() => loadUser())
   const [items, setItems] = useState<Assignment[]>([])
   const [accounts, setAccounts] = useState<Account[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(() => loadUser() !== null)
 
-  // Загрузка данных при монтировании
+  // Загрузка данных после входа. Список учеников доступен только учителю,
+  // ученик получает лишь свой аккаунт (с актуальными предметами).
   useEffect(() => {
-    async function loadData() {
+    if (!user) return
+    let cancelled = false
+
+    async function loadData(role: User['role']) {
       try {
         const [accountsData, assignmentsData] = await Promise.all([
-          api.getAllAccounts(),
+          role === 'teacher' ? api.getAllAccounts() : api.getMe().then((me) => [me]),
           api.getAllAssignments(),
         ])
+        if (cancelled) return
         setAccounts(accountsData)
         setItems(assignmentsData)
       } catch (error) {
         console.error('Ошибка загрузки данных:', error)
       } finally {
-        setLoading(false)
+        if (!cancelled) setLoading(false)
       }
     }
-    loadData()
-  }, [])
+    loadData(user.role)
+
+    return () => {
+      cancelled = true
+    }
+  }, [user])
+
+  function handleLogin(loggedIn: User) {
+    setLoading(true)
+    setUser(loggedIn)
+  }
+
+  async function handleLogout() {
+    try {
+      await api.logout()
+    } catch {
+      /* токен мог уже истечь — всё равно выходим */
+    }
+    clearSession()
+    setUser(null)
+    setItems([])
+    setAccounts([])
+    navigate('/', { replace: true })
+  }
 
   async function handleAdd(data: {
     title: string
@@ -133,11 +163,13 @@ function App() {
 
   return (
     <Routes>
-      <Route path="/" element={<AuthPage />} />
+      <Route path="/" element={<AuthPage onLogin={handleLogin} />} />
       <Route
         path="/home"
         element={
           <HomePage
+            user={user}
+            onLogout={handleLogout}
             items={items}
             onAdd={handleAdd}
             onDelete={handleDelete}
@@ -152,6 +184,7 @@ function App() {
         path="/assignment/:id"
         element={
           <AssignmentPage
+            user={user}
             items={items}
             accounts={accounts}
             onUpdate={handleUpdate}

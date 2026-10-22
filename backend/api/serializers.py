@@ -1,6 +1,8 @@
 from rest_framework import serializers
 from .models import Account, Assignment, LessonFile, Homework, HomeworkFile, StudentHomework, StudentHomeworkFile
 
+MIN_PASSWORD_LENGTH = 8
+
 
 class AccountSerializer(serializers.ModelSerializer):
     """Сериализатор для Account"""
@@ -10,6 +12,29 @@ class AccountSerializer(serializers.ModelSerializer):
         extra_kwargs = {
             'password': {'write_only': True}  # пароль не возвращается при GET запросах
         }
+
+    def validate_password(self, value):
+        if len(value) < MIN_PASSWORD_LENGTH:
+            raise serializers.ValidationError(
+                f'Пароль должен быть не короче {MIN_PASSWORD_LENGTH} символов'
+            )
+        return value
+
+    def create(self, validated_data):
+        password = validated_data.pop('password')
+        account = Account(**validated_data)
+        account.set_password(password)
+        account.save()
+        return account
+
+    def update(self, instance, validated_data):
+        password = validated_data.pop('password', None)
+        for field, value in validated_data.items():
+            setattr(instance, field, value)
+        if password is not None:
+            instance.set_password(password)
+        instance.save()
+        return instance
 
 
 class LessonFileSerializer(serializers.ModelSerializer):
@@ -119,7 +144,7 @@ class AssignmentSerializer(serializers.ModelSerializer):
     """Сериализатор для Assignment с вложенными файлами и домашним заданием"""
     files = LessonFileSerializer(many=True, read_only=True)
     homework = HomeworkSerializer(read_only=True, required=False)
-    student_homeworks = StudentHomeworkSerializer(many=True, read_only=True)
+    student_homeworks = serializers.SerializerMethodField()
 
     class Meta:
         model = Assignment
@@ -128,3 +153,13 @@ class AssignmentSerializer(serializers.ModelSerializer):
             'recording_url', 'description', 'files', 'homework',
             'student_homeworks', 'created_at', 'updated_at'
         ]
+
+    def get_student_homeworks(self, obj):
+        """Учитель видит все ответы, ученик — только свой"""
+        answers = obj.student_homeworks.all()
+        request = self.context.get('request')
+        user = getattr(request, 'user', None)
+        if not getattr(user, 'is_teacher', False):
+            user_id = getattr(user, 'id', None)
+            answers = [sh for sh in answers if sh.student_id == user_id]
+        return StudentHomeworkSerializer(answers, many=True, context=self.context).data

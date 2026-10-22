@@ -1,22 +1,20 @@
-import { Navigate, useLocation } from 'react-router-dom'
+import { Navigate } from 'react-router-dom'
 import styles from './HomePage.module.css'
 import type { Account, Assignment, User } from '../../types'
 import AssignmentCard from '../../components/AssignmentCard/AssignmentCard'
 import AssignmentForm from '../../components/AssignmentForm/AssignmentForm'
 import StudentsPanel from '../../components/StudentsPanel/StudentsPanel'
 import { hasSubject, normalize, subjectsOf } from '../../utils/subjects'
-import { loadUser } from '../../utils/session'
 
-// В HomePage.tsx
 interface Props {
+  user: User | null;
+  onLogout: () => void;
   items: Assignment[];
   accounts: Account[];
   onDelete: (id: number) => void;
-  onAddStudent: (student: Omit<Account, 'id'>) => void;
+  onAddStudent: (student: Omit<Account, 'id'>) => Promise<void>;
   onDeleteStudent: (id: number) => void;
   onSetSubjects: (id: number, subjects: string[]) => void;
-  
-  // Вот эту строчку нужно сделать ТАКОЙ ЖЕ, как в App.tsx:
   onAdd: (data: {
     title: string
     subject: string
@@ -26,10 +24,12 @@ interface Props {
     homework?: { description: string }
     files?: File[]
     homework_files?: File[]
-  }) => Promise<void>; // Обязательно добавь Promise<void>, так как handleAdd — асинхронная!
+  }) => Promise<void>;
 }
 
 function HomePage({
+  user,
+  onLogout,
   items,
   onAdd,
   onDelete,
@@ -38,9 +38,6 @@ function HomePage({
   onDeleteStudent,
   onSetSubjects,
 }: Props) {
-  const location = useLocation()
-  const user = (location.state as User | null) ?? loadUser()
-
   if (!user) {
     return <Navigate to="/" replace />
   }
@@ -68,7 +65,12 @@ function HomePage({
 
   return (
     <div className={styles.page}>
-      <h1>Добро пожаловать, {user.name}</h1>
+      <div className={styles.header}>
+        <h1>Добро пожаловать, {user.name}</h1>
+        <button type="button" className={styles.logout} onClick={onLogout}>
+          Выйти
+        </button>
+      </div>
       <p>Ваша роль: {roleLabel}</p>
       {!isTeacher && mySubjects.length > 0 && (
         <p>Ваши предметы: {mySubjects.join(', ')}</p>

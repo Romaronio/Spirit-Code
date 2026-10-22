@@ -1,6 +1,14 @@
 spiritcode.duckdns.org {
     encode gzip
 
+    header {
+        Strict-Transport-Security "max-age=31536000"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        -Server
+    }
+
     request_body {
         max_size 50MB
     }
@@ -18,7 +26,11 @@ spiritcode.duckdns.org {
         file_server
     }
 
+    # Загруженные пользователями файлы: всегда скачиваются, а не открываются
+    # в браузере, и не могут выполнять скрипты на нашем домене (защита от XSS)
     handle_path /media/* {
+        header Content-Disposition "attachment"
+        header Content-Security-Policy "sandbox; default-src 'none'"
         root * /media
         file_server
     }

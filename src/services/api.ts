@@ -1,27 +1,40 @@
 import type { Account, Assignment, LessonFile, Homework, HomeworkFile, StudentHomework } from "../types";
+import { clearSession, loadToken } from "../utils/session";
 
 // Адрес API. По умолчанию относительный путь: и локально (через прокси Vite),
 // и на сервере (через nginx) запросы идут на тот же адрес, с которого открыт сайт.
 // При необходимости можно переопределить переменной VITE_API_URL в файле .env.
 const API_BASE_URL: string = import.meta.env.VITE_API_URL || '/api';
 
-// Вспомогательная функция для HTTP запросов
-async function fetchAPI<T>(
-  endpoint: string,
-  options?: RequestInit
-): Promise<T> {
-  const url = `${API_BASE_URL}${endpoint}`;
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options?.headers,
-    },
-  });
+// Заголовок с токеном вошедшего пользователя
+function authHeaders(): Record<string, string> {
+  const token = loadToken();
+  return token ? { Authorization: `Token ${token}` } : {};
+}
+
+// Текст ошибки из ответа DRF: {error}, {detail} или {поле: [сообщения]}
+function errorMessage(body: unknown, status: number): string {
+  if (body && typeof body === 'object') {
+    const data = body as Record<string, unknown>;
+    if (typeof data.error === 'string') return data.error;
+    if (typeof data.detail === 'string') return data.detail;
+    for (const value of Object.values(data)) {
+      if (Array.isArray(value) && typeof value[0] === 'string') return value[0];
+    }
+  }
+  return `HTTP error! status: ${status}`;
+}
+
+async function handleResponse<T>(response: Response, endpoint: string): Promise<T> {
+  if (response.status === 401 && endpoint !== '/accounts/login/') {
+    // Сессия истекла или токен отозван — отправляем на страницу входа
+    clearSession();
+    window.location.assign('/');
+  }
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({}));
-    throw new Error(error.error || `HTTP error! status: ${response.status}`);
+    const body = await response.json().catch(() => ({}));
+    throw new Error(errorMessage(body, response.status));
   }
 
   // Если ответ пустой (204 No Content), возвращаем undefined
@@ -32,28 +45,34 @@ async function fetchAPI<T>(
   return response.json();
 }
 
+// Вспомогательная функция для HTTP запросов
+async function fetchAPI<T>(
+  endpoint: string,
+  options?: RequestInit
+): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...authHeaders(),
+      ...options?.headers,
+    },
+  });
+  return handleResponse<T>(response, endpoint);
+}
+
 // Запрос с multipart/form-data (для загрузки файлов)
 async function fetchAPIFormData<T>(
   endpoint: string,
   formData: FormData,
   method: 'POST' | 'PATCH' | 'PUT' = 'POST'
 ): Promise<T> {
-  const url = `${API_BASE_URL}${endpoint}`;
-  const response = await fetch(url, {
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     method,
+    headers: authHeaders(),
     body: formData,
   });
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({}));
-    throw new Error(error.error || `HTTP error! status: ${response.status}`);
-  }
-
-  if (response.status === 204 || response.headers.get('content-length') === '0') {
-    return undefined as T;
-  }
-
-  return response.json();
+  return handleResponse<T>(response, endpoint);
 }
 
 // ============== ACCOUNTS API ==============
@@ -87,11 +106,19 @@ export async function deleteAccount(id: number): Promise<void> {
   });
 }
 
-export async function login(name: string, password: string): Promise<Account> {
-  return fetchAPI<Account>('/accounts/login/', {
+export async function login(name: string, password: string): Promise<{ token: string; account: Account }> {
+  return fetchAPI<{ token: string; account: Account }>('/accounts/login/', {
     method: 'POST',
     body: JSON.stringify({ name, password }),
   });
+}
+
+export async function logout(): Promise<void> {
+  return fetchAPI<void>('/accounts/logout/', { method: 'POST' });
+}
+
+export async function getMe(): Promise<Account> {
+  return fetchAPI<Account>('/accounts/me/');
 }
 
 // ============== ASSIGNMENTS API ==============
@@ -246,13 +273,11 @@ export async function deleteHomeworkFile(id: number): Promise<void> {
 
 export async function submitStudentHomework(data: {
   assignmentId: number
-  studentId: number
   description: string
   files?: File[]
   deleteFileIds?: Array<number | string>
 }): Promise<StudentHomework> {
   const formData = new FormData();
-  formData.append('student_id', String(data.studentId));
   formData.append('description', data.description);
   if (data.deleteFileIds) {
     formData.append('delete_file_ids', JSON.stringify(data.deleteFileIds));

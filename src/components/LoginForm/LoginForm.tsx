@@ -2,10 +2,14 @@ import styles from './LoginForm.module.css'
 import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { User } from '../../types'
-import { saveUser } from '../../utils/session'
+import { saveSession } from '../../utils/session'
 import * as api from '../../services/api'
 
-function LoginForm() {
+interface Props {
+  onLogin: (user: User) => void
+}
+
+function LoginForm({ onLogin }: Props) {
   const [name, setName] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -25,12 +29,13 @@ function LoginForm() {
     setError('')
 
     try {
-      const account = await api.login(trimmedName, password)
-      const user: User = { name: account.name, role: account.role }
-      saveUser(user)
-      navigate('/home', { state: user })
-    } catch {
-      setError('Неверное имя или пароль')
+      const { token, account } = await api.login(trimmedName, password)
+      const user: User = { id: account.id, name: account.name, role: account.role }
+      saveSession(token, user)
+      onLogin(user)
+      navigate('/home')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Неверное имя или пароль')
     } finally {
       setLoading(false)
     }

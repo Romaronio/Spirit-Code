@@ -6,12 +6,12 @@ import { hasSubject, toggleSubject, uniqueSubjects } from '../../utils/subjects'
 interface Props {
   accounts: Account[]
   availableSubjects: string[]
-  onAddStudent: (student: Omit<Account, 'id'>) => void
+  onAddStudent: (student: Omit<Account, 'id'>) => Promise<void>
   onDeleteStudent: (id: number) => void
   onSetSubjects: (id: number, subjects: string[]) => void
 }
 
-const MIN_PASSWORD_LENGTH = 4
+const MIN_PASSWORD_LENGTH = 8 // как на сервере (api/serializers.py)
 
 function generatePassword(length = 8) {
   const chars = 'abcdefghjkmnpqrstuvwxyz23456789'
@@ -61,11 +61,13 @@ function StudentsPanel({
   const [password, setPassword] = useState('')
   const [newSubjects, setNewSubjects] = useState<string[]>([])
   const [error, setError] = useState('')
+  // Сервер хранит только хэш, поэтому пароль показываем один раз — сразу после добавления
+  const [created, setCreated] = useState<{ name: string; password: string } | null>(null)
   const [isOpen, setIsOpen] = useState(true)
 
   const students = accounts.filter((a) => a.role === 'student')
 
-  function handleSubmit(e: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     const trimmedName = name.trim()
 
@@ -85,12 +87,18 @@ function StudentsPanel({
       return
     }
 
-    onAddStudent({
-      name: trimmedName,
-      password,
-      role: 'student',
-      subjects: newSubjects,
-    })
+    try {
+      await onAddStudent({
+        name: trimmedName,
+        password,
+        role: 'student',
+        subjects: newSubjects,
+      })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Не удалось добавить ученика')
+      return
+    }
+    setCreated({ name: trimmedName, password })
     setName('')
     setPassword('')
     setNewSubjects([])
@@ -163,6 +171,12 @@ function StudentsPanel({
             />
 
             {error && <p className={styles.error}>{error}</p>}
+            {created && (
+              <p className={styles.hint}>
+                Ученик «{created.name}» добавлен. Пароль: <b>{created.password}</b> — передайте
+                его ученику, позже посмотреть его будет нельзя.
+              </p>
+            )}
 
             <button type="submit" className={styles.submit}>
               Добавить ученика
@@ -182,7 +196,6 @@ function StudentsPanel({
                   <li key={s.id}>
                     <div className={styles.studentRow}>
                       <span className={styles.studentName}>{s.name}</span>
-                      <span className={styles.password}>{s.password}</span>
                       <button
                         type="button"
                         className={styles.delete}

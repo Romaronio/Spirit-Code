@@ -1,6 +1,7 @@
 export type Role = 'teacher' | 'student'
 
 export interface User {
+  id?: number
   name: string
   role: Role
 }

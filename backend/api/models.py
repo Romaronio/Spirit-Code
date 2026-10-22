@@ -1,4 +1,11 @@
+import hashlib
+import secrets
+from datetime import timedelta
+
+from django.conf import settings
+from django.contrib.auth.hashers import check_password, make_password
 from django.db import models
+from django.utils import timezone
 
 
 class Account(models.Model):
@@ -21,6 +28,51 @@ class Account(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.role})"
+
+    # Account используется как request.user в DRF, поэтому нужен этот флаг
+    @property
+    def is_authenticated(self):
+        return True
+
+    @property
+    def is_teacher(self):
+        return self.role == 'teacher'
+
+    def set_password(self, raw_password):
+        """Сохраняет пароль в виде хэша (PBKDF2), а не открытым текстом"""
+        self.password = make_password(raw_password)
+
+    def check_password(self, raw_password):
+        return check_password(raw_password, self.password)
+
+
+def hash_token(key):
+    return hashlib.sha256(key.encode()).hexdigest()
+
+
+class AuthToken(models.Model):
+    """Токен входа. В БД хранится только хэш: утечка базы не даёт войти"""
+    key_hash = models.CharField(max_length=64, unique=True)
+    account = models.ForeignKey(
+        Account,
+        related_name='tokens',
+        on_delete=models.CASCADE
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Токен {self.account.name} от {self.created_at:%Y-%m-%d}"
+
+    @classmethod
+    def issue(cls, account):
+        """Создаёт новый токен и возвращает его открытое значение (показывается один раз)"""
+        key = secrets.token_urlsafe(32)
+        cls.objects.create(account=account, key_hash=hash_token(key))
+        return key
+
+    @property
+    def is_expired(self):
+        return timezone.now() - self.created_at > timedelta(days=settings.AUTH_TOKEN_TTL_DAYS)
 
 
 class Assignment(models.Model):

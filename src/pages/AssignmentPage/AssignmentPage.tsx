@@ -1,9 +1,8 @@
 import { useState } from 'react'
-import { Link, Navigate, useLocation, useParams } from 'react-router-dom'
+import { Link, Navigate, useParams } from 'react-router-dom'
 import styles from './AssignmentPage.module.css'
 import * as api from '../../services/api'
 import { hasSubject, normalize } from '../../utils/subjects'
-import { loadUser } from '../../utils/session'
 import type { Account, Assignment, AssignmentChanges, User } from '../../types'
 
 interface FileEntry {
@@ -13,16 +12,15 @@ interface FileEntry {
 }
 
 interface PageProps {
+  user: User | null
   items: Assignment[]
   accounts: Account[]
   onUpdate: (id: Assignment['id'], changes: AssignmentChanges) => Promise<void>
   onSubmitStudentHomework?: (assignmentId: number) => Promise<void> | void
 }
 
-function AssignmentPage({ items, accounts, onUpdate, onSubmitStudentHomework }: PageProps) {
+function AssignmentPage({ user, items, accounts, onUpdate, onSubmitStudentHomework }: PageProps) {
   const { id } = useParams()
-  const location = useLocation()
-  const user = (location.state as User | null) ?? loadUser()
 
   if (!user) {
     return <Navigate to="/" replace />
@@ -158,7 +156,6 @@ function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStud
     try {
       await api.submitStudentHomework({
         assignmentId: assignment.id,
-        studentId,
         description: studentDescription,
         files: studentFiles.map((f) => f.file),
         deleteFileIds: deletedSavedFileIds,

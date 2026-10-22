@@ -156,10 +156,27 @@ if os.environ.get("DJANGO_HTTPS", "0") == "1":
 # --- REST Framework ---------------------------------------------------------
 
 REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': [],
-    'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.AllowAny',
+    # Вход по токену в заголовке Authorization (см. api/authentication.py).
+    # Сессии/cookie не используются, поэтому CSRF для API не нужен.
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'api.authentication.TokenAuthentication',
     ],
+    # По умолчанию всё закрыто: доступ открывается явно в каждом view
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.ScopedRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'login': os.environ.get('DJANGO_LOGIN_RATE', '10/min'),  # защита от перебора паролей
+    },
+    # Сколько прокси стоит перед Django (Caddy = 1). Нужно, чтобы лимит входа
+    # считался по настоящему IP пользователя, а не по IP прокси.
+    'NUM_PROXIES': int(os.environ['DJANGO_NUM_PROXIES']) if os.environ.get('DJANGO_NUM_PROXIES') else None,
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 100,
 }
+
+# Сколько дней живёт токен входа
+AUTH_TOKEN_TTL_DAYS = int(os.environ.get('DJANGO_TOKEN_TTL_DAYS', '30'))
