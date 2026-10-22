@@ -1,0 +1,49 @@
+.wrapper {
+  position: relative;
+  display: inline-flex;
+}
+
+/* Начинаем кольцо сверху (12 часов), а не справа */
+.ring {
+  transform: rotate(-90deg);
+}
+
+.ring circle {
+  fill: none;
+}
+
+/* Те же цвета, что у фона меток «✓ Сдано» и «✗ Не сдано» (AnswerStatus) */
+.done {
+  stroke: #8cc39d;
+}
+
+.rest {
+  stroke: #e4958e;
+}
+
+.empty {
+  stroke: #d9cccc;
+}
+
+.percent {
+  position: absolute;
+  top: 32px; /* центр кольца 64px */
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: #140f0f;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+/* Подпись вынесена под кольцо и не влияет на высоту блока —
+   поэтому соседняя кнопка выравнивается ровно по центру кольца */
+.caption {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  margin-top: 2px;
+  transform: translateX(-50%);
+  color: #555;
+  font-size: 12px;
+  white-space: nowrap;
+}

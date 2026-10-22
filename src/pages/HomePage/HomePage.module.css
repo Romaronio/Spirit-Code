@@ -67,3 +67,10 @@
     margin-left: 0;
   }
 }
+
+.headerRight {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px; /* место под подписью «сдано X из Y» */
+}

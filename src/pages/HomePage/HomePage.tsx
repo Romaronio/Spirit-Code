@@ -5,6 +5,7 @@ import AssignmentCard from '../../components/AssignmentCard/AssignmentCard'
 import AssignmentForm from '../../components/AssignmentForm/AssignmentForm'
 import StudentsPanel from '../../components/StudentsPanel/StudentsPanel'
 import AnswersPanel from '../../components/AnswersPanel/AnswersPanel'
+import ProgressDonut from '../../components/ProgressDonut/ProgressDonut'
 import { hasSubject, normalize, subjectsOf } from '../../utils/subjects'
 
 interface Props {
@@ -58,6 +59,12 @@ function HomePage({
     ? items
     : items.filter((item) => hasSubject(mySubjects, item.subject))
 
+  // Сданными считаем ДЗ, которые учитель отметил «Сдано».
+  // Ученику сервер присылает только его собственный ответ.
+  const acceptedCount = visibleItems.filter(
+    (item) => item.student_homeworks?.[0]?.status === 'accepted'
+  ).length
+
   // Сортируем по ID в обратном порядке (последние добавленные первыми)
   const sortedItems = [...visibleItems].sort((a, b) => (b.id ?? 0) - (a.id ?? 0))
 
@@ -87,9 +94,12 @@ function HomePage({
     <div className={styles.page}>
       <div className={styles.header}>
         <h1>Добро пожаловать, {user.name}</h1>
-        <button type="button" className={styles.logout} onClick={onLogout}>
-          Выйти
-        </button>
+        <div className={styles.headerRight}>
+          {!isTeacher && <ProgressDonut done={acceptedCount} total={visibleItems.length} />}
+          <button type="button" className={styles.logout} onClick={onLogout}>
+            Выйти
+          </button>
+        </div>
       </div>
 
       {isTeacher ? (
