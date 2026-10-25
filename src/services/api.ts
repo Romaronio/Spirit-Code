@@ -1,4 +1,4 @@
-import type { Account, AnswerComment, Assignment, LessonFile, Homework, HomeworkFile, Payment, ReviewStatus, StudentHomework } from "../types";
+import type { Account, AnswerComment, Assignment, LessonFile, Homework, HomeworkFile, Payment, ReviewStatus, StudentHomework, TypingModeSummary, TypingResult, TypingStats, TypingSummary } from "../types";
 import { clearSession, loadToken } from "../utils/session";
 
 // Адрес API. По умолчанию относительный путь: и локально (через прокси Vite),
@@ -342,4 +342,30 @@ export async function setPayment(payment: Payment, paid: boolean): Promise<Payme
     method: 'POST',
     body: JSON.stringify({ ...payment, paid }),
   });
+}
+
+// ============== TYPING TRAINER API ==============
+
+// Ученик сохраняет результат теста; сервер сам считает скорость и точность
+export async function saveTypingResult(stats: TypingStats): Promise<TypingResult> {
+  return fetchAPI<TypingResult>('/typing-results/', {
+    method: 'POST',
+    body: JSON.stringify(stats),
+  });
+}
+
+// Ученику — свои результаты, учителю — результаты выбранного ученика
+export async function getTypingResults(studentId?: number): Promise<TypingResult[]> {
+  const query = studentId ? `?student=${studentId}` : '';
+  const response = await fetchAPI<{ results: TypingResult[] }>(`/typing-results/${query}`);
+  return response.results;
+}
+
+export async function getTypingSummary(): Promise<TypingSummary[]> {
+  return fetchAPI<TypingSummary[]>('/typing-results/summary/');
+}
+
+// Учитель: статистика ученика по каждому из режимов тренажёра
+export async function getTypingByMode(studentId: number): Promise<TypingModeSummary[]> {
+  return fetchAPI<TypingModeSummary[]>(`/typing-results/by-mode/?student=${studentId}`);
 }

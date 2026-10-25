@@ -1,0 +1,221 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 820px;
+  padding: 24px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+.settings {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.group {
+  display: flex;
+  gap: 4px;
+}
+
+.option {
+  padding: 6px 12px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: #fff;
+  color: #140f0f;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.option:hover {
+  border-color: #ff8400;
+}
+
+.active {
+  border-color: #ff8400;
+  background: #ff8400;
+}
+
+.live {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 24px;
+  color: #555;
+  font-size: 15px;
+}
+
+.timer {
+  min-width: 64px;
+  color: #140f0f;
+  font-size: 28px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Окно ровно на три строки: текущее слово прокручивается во вторую строку */
+.words {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  height: calc(3 * 1.8em);
+  overflow: hidden;
+  font-size: 22px;
+  line-height: 1.8;
+  color: #777;
+  cursor: text;
+  user-select: none;
+  transition: opacity 0.2s;
+}
+
+.word {
+  height: 1.8em;
+  margin-right: 0.45em;
+  padding: 0 2px;
+  border-radius: 4px;
+}
+
+/* Код: моноширинный шрифт, пробелы внутри строки не схлопываются */
+.code {
+  font-family: Consolas, 'Courier New', monospace;
+}
+
+.words.code {
+  font-size: 19px;
+}
+
+.phrases .word {
+  margin-right: 0.9em;
+  white-space: pre;
+}
+
+.current {
+  background: #fff4e5;
+  color: #140f0f;
+}
+
+.done {
+  color: #1e8e3e;
+}
+
+.missed {
+  color: #d93025;
+  text-decoration: underline;
+}
+
+.charOk {
+  color: #1e8e3e;
+}
+
+.charBad {
+  background: #fde7e5;
+  color: #d93025;
+}
+
+.dimmed {
+  opacity: 0.4;
+}
+
+.inputRow {
+  display: flex;
+  gap: 8px;
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 20px;
+}
+
+.input:focus {
+  border-color: #ff8400;
+  outline: none;
+}
+
+.restart {
+  padding: 0 14px;
+  border: 1px solid #140f0f;
+  border-radius: 8px;
+  background: transparent;
+  color: #140f0f;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.restart:hover {
+  background: rgba(20, 15, 15, 0.08);
+}
+
+.result {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px;
+  border-radius: 12px;
+  background: #fff4e5;
+  color: #140f0f;
+  text-align: center;
+}
+
+.bigNumber {
+  display: flex;
+  flex-direction: column;
+  font-size: 56px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.bigNumber span {
+  margin-top: 4px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.resultDetails {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 20px;
+  color: #555;
+}
+
+.note {
+  font-size: 14px;
+}
+
+.again {
+  margin-top: 4px;
+  padding: 8px 20px;
+  border: none;
+  border-radius: 8px;
+  background: #ff8400;
+  color: #140f0f;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.again:hover {
+  background: #ff9a2e;
+}
+
+@media (max-width: 600px) {
+  .card {
+    padding: 16px;
+  }
+
+  .words {
+    font-size: 18px;
+  }
+}

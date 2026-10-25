@@ -13,7 +13,7 @@ from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
-from .models import Account, AnswerComment, Assignment, AuthToken, LessonFile, Homework, HomeworkFile, Payment, StudentHomework, StudentHomeworkFile
+from .models import Account, AnswerComment, Assignment, AuthToken, LessonFile, Homework, HomeworkFile, Payment, StudentHomework, StudentHomeworkFile, TypingResult
 from .permissions import IsStudent, IsTeacher
 from .uploads import check_student_quota, check_uploads
 from .serializers import (
@@ -25,6 +25,7 @@ from .serializers import (
     PaymentSerializer,
     StudentHomeworkSerializer,
     AnswerCommentSerializer,
+    TypingResultSerializer,
 )
 
 
@@ -406,3 +407,82 @@ class AnswerCommentViewSet(mixins.UpdateModelMixin, mixins.DestroyModelMixin, vi
         if instance.author_id != self.request.user.pk and not self.request.user.is_teacher:
             raise PermissionDenied('Удалять можно только свои сообщения')
         instance.delete()
+
+
+class TypingResultViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, viewsets.GenericViewSet):
+    """Результаты тренажёра печати.
+
+    Ученик сохраняет и видит только свои результаты. Учитель видит всех:
+    список с фильтром ?student=<id> и сводку по ученикам (summary).
+    """
+    serializer_class = TypingResultSerializer
+    permission_classes = [IsAuthenticated]
+
+    # Средние скорость и точность считаем по последним попыткам —
+    # так видно, как ученик печатает сейчас, а не год назад
+    RECENT_COUNT = 10
+
+    def get_permissions(self):
+        if self.action == 'create':
+            return [IsStudent()]
+        if self.action in ('summary', 'by_mode'):
+            return [IsTeacher()]
+        return super().get_permissions()
+
+    def get_queryset(self):
+        queryset = TypingResult.objects.select_related('student')
+        user = self.request.user
+        if not user.is_teacher:
+            return queryset.filter(student=user)
+        student = self.request.query_params.get('student')
+        if student:
+            queryset = queryset.filter(student_id=student) if student.isdigit() else queryset.none()
+        return queryset
+
+    def perform_create(self, serializer):
+        serializer.save(student=self.request.user)
+
+    def _stats(self, results):
+        """Лучший, последний и средний результат по списку попыток (от новых к старым)"""
+        recent = results[:self.RECENT_COUNT]
+        return {
+            'tests': len(results),
+            'best_wpm': max((r.wpm for r in results), default=None),
+            'last_wpm': results[0].wpm if results else None,
+            'avg_wpm': round(sum(r.wpm for r in recent) / len(recent)) if recent else None,
+            'avg_accuracy': round(sum(r.accuracy for r in recent) / len(recent), 1) if recent else None,
+            'last_at': results[0].created_at if results else None,
+        }
+
+    @action(detail=False, methods=['get'])
+    def summary(self, request):
+        """Сводка по каждому ученику: лучший, последний и средний результат"""
+        by_student = {}
+        for result in TypingResult.objects.all():  # уже от новых к старым
+            by_student.setdefault(result.student_id, []).append(result)
+
+        rows = []
+        for student in Account.objects.filter(role='student'):
+            rows.append({
+                'student': student.id,
+                'student_name': student.name,
+                **self._stats(by_student.get(student.id, [])),
+            })
+        return Response(rows)
+
+    @action(detail=False, methods=['get'], url_path='by-mode')
+    def by_mode(self, request):
+        """Статистика одного ученика по каждому режиму тренажёра: ?student=<id>.
+        Режимы без попыток тоже возвращаются — с пустыми значениями."""
+        student = request.query_params.get('student', '')
+        if not student.isdigit():
+            return Response({'error': 'Укажите ученика: ?student=<id>'}, status=status.HTTP_400_BAD_REQUEST)
+
+        by_language = {}
+        for result in TypingResult.objects.filter(student_id=student):  # от новых к старым
+            by_language.setdefault(result.language, []).append(result)
+
+        return Response([
+            {'language': language, **self._stats(by_language.get(language, []))}
+            for language, _ in TypingResult.LANGUAGE_CHOICES
+        ])

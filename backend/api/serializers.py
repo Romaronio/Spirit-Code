@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from .media import signed_url
-from .models import Account, AnswerComment, Assignment, LessonFile, Homework, HomeworkFile, Payment, StudentHomework, StudentHomeworkFile
+from .models import Account, AnswerComment, Assignment, LessonFile, Homework, HomeworkFile, Payment, StudentHomework, StudentHomeworkFile, TypingResult
 
 MIN_PASSWORD_LENGTH = 8
 
@@ -203,3 +203,47 @@ class PaymentSerializer(serializers.ModelSerializer):
         if value.role != 'student':
             raise serializers.ValidationError('Оплату можно отмечать только ученикам')
         return value
+
+
+class TypingResultSerializer(serializers.ModelSerializer):
+    """Результат теста печати. Скорость и точность вычисляются здесь, а не на клиенте"""
+    student_name = serializers.CharField(source='student.name', read_only=True)
+
+    # Быстрее этого люди не печатают — такие результаты считаем подделкой
+    MAX_CPM = 1200
+
+    class Meta:
+        model = TypingResult
+        fields = [
+            'id', 'student', 'student_name', 'language', 'duration',
+            'correct_words', 'correct_chars', 'keystrokes', 'errors',
+            'wpm', 'cpm', 'accuracy', 'created_at',
+        ]
+        read_only_fields = ['student', 'wpm', 'cpm', 'accuracy', 'created_at']
+
+    def validate_duration(self, value):
+        if value not in TypingResult.DURATIONS:
+            raise serializers.ValidationError('Недопустимая длительность теста')
+        return value
+
+    def validate(self, data):
+        minutes = data['duration'] / 60
+        if data['errors'] > data['keystrokes']:
+            raise serializers.ValidationError('Слов с ошибкой не может быть больше, чем нажатий')
+        if data['correct_chars'] > data['keystrokes']:
+            raise serializers.ValidationError('Верных знаков не может быть больше, чем нажатий')
+        if data['correct_words'] > data['correct_chars']:
+            raise serializers.ValidationError('Слов не может быть больше, чем знаков')
+        if data['correct_chars'] / minutes > self.MAX_CPM:
+            raise serializers.ValidationError('Слишком высокая скорость — результат не сохранён')
+
+        # Строки кода разной длины, поэтому для них «слово» — 5 знаков (стандарт WPM)
+        if data.get('language') in TypingResult.PHRASE_LANGUAGES:
+            data['wpm'] = round(data['correct_chars'] / 5 / minutes)
+        else:
+            data['wpm'] = round(data['correct_words'] / minutes)
+        data['cpm'] = round(data['correct_chars'] / minutes)
+        # Точность — доля верных слов среди всех отправленных пробелом
+        total_words = data['correct_words'] + data['errors']
+        data['accuracy'] = round(data['correct_words'] / total_words * 100, 1) if total_words else 0
+        return data

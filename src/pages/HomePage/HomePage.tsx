@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Navigate } from 'react-router-dom'
+import { Link, Navigate } from 'react-router-dom'
 import styles from './HomePage.module.css'
 import type { Account, Assignment, CommentActions, ReviewStatus, User } from '../../types'
 import AssignmentCard from '../../components/AssignmentCard/AssignmentCard'
@@ -123,6 +123,9 @@ function HomePage({
         <h1>Добро пожаловать, {user.name}</h1>
         <div className={styles.headerRight}>
           {!isTeacher && <ProgressDonut done={acceptedCount} total={visibleItems.length} />}
+          <Link to="/typing" className={styles.typing}>
+            ⌨ Тренажёр печати
+          </Link>
           <button type="button" className={styles.logout} onClick={onLogout}>
             Выйти
           </button>

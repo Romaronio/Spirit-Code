@@ -10,7 +10,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
 from rest_framework.test import APITestCase
 
-from .models import Account, Assignment, AuthToken, LessonFile, StudentHomework, StudentHomeworkFile
+from .models import Account, Assignment, AuthToken, LessonFile, StudentHomework, StudentHomeworkFile, TypingResult
 
 
 class AuthTestCase(APITestCase):
@@ -531,3 +531,77 @@ class CommentEditDeleteTests(AuthTestCase):
         self.login_as(self.ivan)
         self.assertEqual(self.client.delete(self.url(self.anna_msg)).status_code, 404)
         self.assertEqual(self.client.patch(self.url(self.anna_msg), {'text': 'x'}, format='json').status_code, 404)
+
+
+class TypingResultTests(AuthTestCase):
+    def send(self, **changes):
+        # 60 секунд: 40 верных слов (240 знаков) и 10 слов с ошибкой, 250 нажатий
+        data = {'language': 'ru', 'duration': 60, 'correct_words': 40,
+                'correct_chars': 240, 'keystrokes': 250, 'errors': 10, **changes}
+        return self.client.post('/api/typing-results/', data, format='json')
+
+    def test_server_computes_speed(self):
+        self.login_as(self.anna)
+        response = self.send(duration=30, wpm=999)  # присланную скорость игнорируем
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data['wpm'], 80)
+        self.assertEqual(response.data['cpm'], 480)
+        self.assertEqual(response.data['accuracy'], 80.0)  # 40 верных из 50 слов
+        self.assertEqual(response.data['student'], self.anna.id)
+
+    def test_ege_mode(self):
+        self.login_as(self.anna)
+        self.assertEqual(self.send(language='ege').data['language'], 'ege')
+        self.assertEqual(self.send(language='xx').status_code, 400)
+
+    def test_ege_hard_counts_five_chars_as_word(self):
+        self.login_as(self.anna)
+        response = self.send(language='ege_hard', correct_words=12)  # 12 строк, 240 знаков за минуту
+        self.assertEqual(response.data['wpm'], 48)
+        self.assertEqual(response.data['cpm'], 240)
+
+    def test_rejects_impossible_results(self):
+        self.login_as(self.anna)
+        self.assertEqual(self.send(duration=45).status_code, 400)
+        self.assertEqual(self.send(errors=300).status_code, 400)
+        self.assertEqual(self.send(correct_chars=300).status_code, 400)
+        self.assertEqual(self.send(correct_chars=1500, keystrokes=1500).status_code, 400)
+        self.assertFalse(TypingResult.objects.exists())
+
+    def test_student_sees_only_own_results(self):
+        self.login_as(self.ivan)
+        self.send()
+        self.login_as(self.anna)
+        self.send()
+        results = self.client.get('/api/typing-results/').data['results']
+        self.assertEqual([r['student'] for r in results], [self.anna.id])
+        self.assertEqual(self.client.get('/api/typing-results/summary/').status_code, 403)
+        self.assertEqual(self.client.get(f'/api/typing-results/by-mode/?student={self.anna.id}').status_code, 403)
+
+    def test_teacher_summary_and_filter(self):
+        self.login_as(self.anna)
+        self.send(correct_words=30)
+        self.send(correct_words=50)
+        self.login_as(self.teacher)
+        self.assertEqual(self.send().status_code, 403)  # учитель тренируется без сохранения
+
+        rows = {r['student_name']: r for r in self.client.get('/api/typing-results/summary/').data}
+        self.assertEqual(rows['anna']['tests'], 2)
+        self.assertEqual(rows['anna']['best_wpm'], 50)
+        self.assertEqual(rows['anna']['last_wpm'], 50)
+        self.assertEqual(rows['anna']['avg_wpm'], 40)
+        self.assertEqual(rows['ivan']['tests'], 0)
+        self.assertIsNone(rows['ivan']['best_wpm'])
+
+        modes = {m['language']: m for m in self.client.get(f'/api/typing-results/by-mode/?student={self.anna.id}').data}
+        self.assertEqual(list(modes), ['ru', 'en', 'ege', 'ege_hard'])
+        self.assertEqual(modes['ru']['tests'], 2)
+        self.assertEqual(modes['ru']['best_wpm'], 50)
+        self.assertEqual(modes['ege_hard']['tests'], 0)
+        self.assertIsNone(modes['ege_hard']['best_wpm'])
+        self.assertEqual(self.client.get('/api/typing-results/by-mode/').status_code, 400)
+
+        results = self.client.get(f'/api/typing-results/?student={self.ivan.id}').data['results']
+        self.assertEqual(results, [])
+        results = self.client.get(f'/api/typing-results/?student={self.anna.id}').data['results']
+        self.assertEqual(len(results), 2)

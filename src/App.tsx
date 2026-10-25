@@ -3,6 +3,7 @@ import { Routes, Route, useNavigate } from 'react-router-dom'
 import AuthPage from './pages/AuthPage/AuthPage'
 import HomePage from './pages/HomePage/HomePage'
 import AssignmentPage from './pages/AssignmentPage/AssignmentPage'
+import TypingPage from './pages/TypingPage/TypingPage'
 import type { Account, AnswerComment, Assignment, AssignmentChanges, CommentActions, ReviewStatus, User } from './types'
 import * as api from './services/api'
 import { clearSession, loadUser } from './utils/session'
@@ -259,6 +260,7 @@ function App() {
           />
         }
       />
+      <Route path="/typing" element={<TypingPage user={user} />} />
     </Routes>
   )
 }

@@ -267,3 +267,40 @@ class AnswerComment(models.Model):
 
     def __str__(self):
         return f"{self.author.name}: {self.text[:30]}"
+
+
+class TypingResult(models.Model):
+    """Результат одного теста в тренажёре печати.
+
+    Клиент присылает сырые счётчики, скорость и точность считает сервер.
+    """
+    LANGUAGE_CHOICES = [
+        ('ru', 'Русский'),
+        ('en', 'Английский'),
+        ('ege', 'ЕГЭ (Python), лёгкий'),
+        ('ege_hard', 'ЕГЭ (Python), сложный'),
+    ]
+    PHRASE_LANGUAGES = ['ege_hard']  # набираются строки кода, а не отдельные слова
+    DURATIONS = [30, 60, 120]  # длительность теста в секундах
+
+    student = models.ForeignKey(
+        Account,
+        related_name='typing_results',
+        on_delete=models.CASCADE
+    )
+    language = models.CharField(max_length=10, choices=LANGUAGE_CHOICES, default='ru')
+    duration = models.PositiveSmallIntegerField()
+    correct_words = models.PositiveIntegerField()  # слов (строк кода) набрано без ошибок
+    correct_chars = models.PositiveIntegerField()  # знаков в этих словах (с пробелами)
+    keystrokes = models.PositiveIntegerField()     # всего нажатий
+    errors = models.PositiveIntegerField()         # слов, отправленных с ошибкой
+    wpm = models.PositiveSmallIntegerField()       # слов в минуту
+    cpm = models.PositiveSmallIntegerField()       # знаков в минуту
+    accuracy = models.FloatField()                 # доля верных слов, %
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at', '-id']
+
+    def __str__(self):
+        return f"{self.student.name}: {self.wpm} сл/мин"

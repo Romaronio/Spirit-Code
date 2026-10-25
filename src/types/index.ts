@@ -102,3 +102,47 @@ export interface Payment {
   year: number
   month: number // 1–12
 }
+
+// ege — слова из Python для ЕГЭ по информатике, ege_hard — целые строки кода
+export type TypingLanguage = 'ru' | 'en' | 'ege' | 'ege_hard'
+
+// Сырые счётчики теста печати: скорость и точность считает сервер
+export interface TypingStats {
+  language: TypingLanguage
+  duration: number // секунды
+  correct_words: number
+  correct_chars: number
+  keystrokes: number
+  errors: number // слов, отправленных пробелом с ошибкой
+}
+
+export interface TypingResult extends TypingStats {
+  id: number
+  student: number
+  student_name: string
+  wpm: number // слов в минуту
+  cpm: number // знаков в минуту
+  accuracy: number // %
+  created_at: string
+}
+
+// Лучший / последний / средний результат (null — попыток ещё не было)
+export interface TypingStatsSummary {
+  tests: number
+  best_wpm: number | null
+  last_wpm: number | null
+  avg_wpm: number | null
+  avg_accuracy: number | null
+  last_at: string | null
+}
+
+// Строка сводки учителя по одному ученику
+export interface TypingSummary extends TypingStatsSummary {
+  student: number
+  student_name: string
+}
+
+// Статистика ученика в одном режиме тренажёра
+export interface TypingModeSummary extends TypingStatsSummary {
+  language: TypingLanguage
+}

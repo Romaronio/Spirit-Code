@@ -74,3 +74,17 @@
   gap: 16px;
   margin-bottom: 16px; /* место под подписью «сдано X из Y» */
 }
+
+.typing {
+  padding: 8px 16px;
+  border-radius: 8px;
+  background: #ff8400;
+  color: #140f0f;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.typing:hover {
+  background: #ff9a2e;
+}

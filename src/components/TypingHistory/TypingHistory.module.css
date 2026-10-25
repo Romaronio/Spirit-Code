@@ -1,0 +1,42 @@
+.wrap {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.table th {
+  padding: 6px 8px;
+  border-bottom: 1px solid #eee;
+  color: #777;
+  font-weight: 600;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid #f3f3f3;
+  white-space: nowrap;
+}
+
+.wpm {
+  font-weight: 700;
+}
+
+.best {
+  color: #ff8400;
+}
+
+.muted {
+  color: #777;
+}
+
+.empty {
+  margin: 0;
+  color: #777;
+  font-size: 14px;
+}
