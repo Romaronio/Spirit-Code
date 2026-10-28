@@ -17,10 +17,27 @@
   text-decoration: underline;
 }
 
+/* Карточка задания слева, открытые задания — панелью справа.
+   Поля по краям равны промежутку между ними (24px от .page + 24px здесь) */
+.layout {
+  display: flex;
+  align-items: flex-start;
+  gap: 48px;
+  padding: 0 24px;
+}
+
+@media (max-width: 1000px) {
+  .layout {
+    padding: 0;
+  }
+}
+
 .card {
   display: flex;
+  flex: 0 1 720px;
   flex-direction: column;
   gap: 12px;
+  min-width: 0;
   max-width: 720px;
   padding: 24px;
   background: #fff;
@@ -203,4 +220,72 @@
 
 .conversation {
   margin-bottom: 16px;
+}
+
+.openTasks {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 360px;
+  margin: 4px 0 8px;
+  padding: 12px 16px;
+  border: 1px solid #ff8400;
+  border-radius: 10px;
+  background: #fff7ee;
+  color: #140f0f;
+  text-align: left;
+  cursor: pointer;
+}
+
+.openTasks:hover {
+  background: #ffe9d1;
+}
+
+.openTasksActive {
+  background: #ffe9d1;
+  box-shadow: 0 0 0 2px #ff8400 inset;
+}
+
+.openTasksList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 4px 0 8px;
+}
+
+.openTasksList .openTasks {
+  margin: 0;
+}
+
+/* Выпадающий список номеров у ученика */
+.tasksIcon {
+  flex-shrink: 0;
+}
+
+.tasksMenuArrow {
+  margin-left: auto;
+  color: #ff8400;
+  font-size: 16px;
+}
+
+.tasksMenu {
+  padding-left: 16px;
+  border-left: 2px solid #ffd3a3;
+}
+
+.openTasksIcon {
+  font-size: 24px;
+}
+
+.openTasksTitle {
+  display: block;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.openTasksCount {
+  display: block;
+  color: #777;
+  font-size: 13px;
 }

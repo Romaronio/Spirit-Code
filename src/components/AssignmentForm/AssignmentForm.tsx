@@ -1,18 +1,11 @@
 import { useState, type FormEvent, type ChangeEvent } from 'react'
 import styles from './AssignmentForm.module.css'
 import { ACCEPT, MAX_FILE_SIZE_MB, pickFiles, type FileEntry } from '../../utils/uploads'
+import NumberedTasksEditor from '../NumberedTasksEditor/NumberedTasksEditor'
+import type { NewAssignment, NumberedTask } from '../../types'
 
 interface AssignmentFormProps {
-  onAdd: (data: {
-    title: string
-    subject: string
-    deadline: string
-    description?: string
-    recording_url?: string
-    homework?: { description: string }
-    files?: File[]
-    homework_files?: File[]
-  }) => Promise<void> | void
+  onAdd: (data: NewAssignment) => Promise<void> | void
 }
 
 const SUBJECTS = ['Математика', 'Информатика', 'Русский язык']
@@ -23,11 +16,12 @@ function AssignmentForm({ onAdd }: AssignmentFormProps) {
   const [description, setDescription] = useState('')
   const [deadline, setDeadline] = useState('')
   const [recordingUrl, setRecordingUrl] = useState('')
+  const [numberedTasks, setNumberedTasks] = useState<NumberedTask[]>([])
   const [error, setError] = useState('')
 
   const [files, setFiles] = useState<FileEntry[]>([])
   const [homeworkDescription, setHomeworkDescription] = useState('')
-  const [homeworkFiles, setHomeworkFiles] = useState<FileEntry[]>([])
+  const [homeworkTasks, setHomeworkTasks] = useState<NumberedTask[]>([])
 
   function handleFilesChange(e: ChangeEvent<HTMLInputElement>) {
     const { entries, error } = pickFiles(e.target.files)
@@ -38,17 +32,6 @@ function AssignmentForm({ onAdd }: AssignmentFormProps) {
 
   function handleRemoveFile(id: string) {
     setFiles((prev) => prev.filter((f) => f.id !== id))
-  }
-
-  function handleHomeworkFilesChange(e: ChangeEvent<HTMLInputElement>) {
-    const { entries, error } = pickFiles(e.target.files)
-    setHomeworkFiles((prev) => [...prev, ...entries])
-    setError(error)
-    e.target.value = ''
-  }
-
-  function handleRemoveHomeworkFile(id: string) {
-    setHomeworkFiles((prev) => prev.filter((f) => f.id !== id))
   }
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
@@ -66,9 +49,12 @@ function AssignmentForm({ onAdd }: AssignmentFormProps) {
         description: description.trim(),
         deadline,
         recording_url: recordingUrl.trim() || undefined,
-        homework: homeworkDescription.trim() ? { description: homeworkDescription.trim() } : undefined,
+        numbered_tasks: numberedTasks,
+        homework:
+          homeworkDescription.trim() || homeworkTasks.length
+            ? { description: homeworkDescription.trim(), numbered_tasks: homeworkTasks }
+            : undefined,
         files: files.map((f) => f.file),
-        homework_files: homeworkFiles.map((f) => f.file),
       })
 
       setTitle('')
@@ -76,9 +62,10 @@ function AssignmentForm({ onAdd }: AssignmentFormProps) {
       setDescription('')
       setDeadline('')
       setRecordingUrl('')
+      setNumberedTasks([])
       setFiles([])
       setHomeworkDescription('')
-      setHomeworkFiles([])
+      setHomeworkTasks([])
       setError('')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ошибка при создании задания')
@@ -136,6 +123,12 @@ function AssignmentForm({ onAdd }: AssignmentFormProps) {
         />
       </label>
 
+      <NumberedTasksEditor
+        value={numberedTasks}
+        onChange={setNumberedTasks}
+        pendingNames={files.map((f) => f.name)}
+      />
+
       <label className={styles.label}>
         Файлы с урока
         <input type="file" multiple accept={ACCEPT} onChange={handleFilesChange} />
@@ -170,26 +163,7 @@ function AssignmentForm({ onAdd }: AssignmentFormProps) {
         />
       </label>
 
-      <label className={styles.label}>
-        Файлы с заданием
-        <input type="file" multiple accept={ACCEPT} onChange={handleHomeworkFilesChange} />
-      </label>
-      {homeworkFiles.length > 0 && (
-        <ul className={styles.files}>
-          {homeworkFiles.map((f) => (
-            <li key={f.id}>
-              <span>{f.name}</span>
-              <button
-                type="button"
-                className={styles.linkButton}
-                onClick={() => handleRemoveHomeworkFile(f.id)}
-              >
-                Удалить
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+      <NumberedTasksEditor value={homeworkTasks} onChange={setHomeworkTasks} />
 
       <p className={styles.label}>Каждый файл — до {MAX_FILE_SIZE_MB} МБ</p>
       {error && <p className={styles.error}>{error}</p>}

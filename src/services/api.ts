@@ -1,4 +1,4 @@
-import type { Account, AnswerComment, Assignment, LessonFile, Homework, HomeworkFile, Payment, ReviewStatus, StudentHomework, TypingModeSummary, TypingResult, TypingStats, TypingSummary } from "../types";
+import type { Account, AnswerComment, Assignment, LessonFile, Homework, HomeworkFile, NewAssignment, NumberedTask, Payment, ReviewStatus, StudentHomework, TypingModeSummary, TypingResult, TypingStats, TypingSummary } from "../types";
 import { clearSession, loadToken } from "../utils/session";
 
 // Адрес API. По умолчанию относительный путь: и локально (через прокси Vite),
@@ -138,16 +138,7 @@ export async function getAssignment(id: number): Promise<Assignment> {
   return fetchAPI<Assignment>(`/assignments/${id}/`);
 }
 
-export async function createAssignment(data: {
-  title: string
-  subject: string
-  deadline: string
-  description?: string
-  recording_url?: string
-  homework?: { description: string }
-  files?: File[]
-  homework_files?: File[]
-}): Promise<Assignment> {
+export async function createAssignment(data: NewAssignment): Promise<Assignment> {
   const formData = new FormData();
   formData.append('title', data.title);
   formData.append('subject', data.subject);
@@ -158,7 +149,13 @@ export async function createAssignment(data: {
   if (data.recording_url) {
     formData.append('recording_url', data.recording_url);
   }
-  if (data.homework && data.homework.description) {
+  if (data.numbered_tasks?.length) {
+    formData.append('numbered_tasks', JSON.stringify(data.numbered_tasks));
+  }
+  if (data.tasks_latex) {
+    formData.append('tasks_latex', data.tasks_latex);
+  }
+  if (data.homework && (data.homework.description || data.homework.tasks_latex || data.homework.numbered_tasks?.length)) {
     formData.append('homework', JSON.stringify(data.homework));
   }
   if (data.files) {
@@ -179,7 +176,9 @@ export async function updateAssignment(
     deadline?: string
     description?: string
     recording_url?: string
-    homework?: { description: string }
+    numbered_tasks?: NumberedTask[]
+    tasks_latex?: string
+    homework?: { description: string; numbered_tasks?: NumberedTask[]; tasks_latex?: string }
     files?: File[]
     homework_files?: File[]
   }
@@ -190,6 +189,8 @@ export async function updateAssignment(
   if (data.deadline !== undefined) formData.append('deadline', data.deadline);
   if (data.description !== undefined) formData.append('description', data.description || '');
   if (data.recording_url !== undefined) formData.append('recording_url', data.recording_url || '');
+  if (data.numbered_tasks !== undefined) formData.append('numbered_tasks', JSON.stringify(data.numbered_tasks));
+  if (data.tasks_latex !== undefined) formData.append('tasks_latex', data.tasks_latex);
   if (data.homework) {
     formData.append('homework', JSON.stringify(data.homework));
   }

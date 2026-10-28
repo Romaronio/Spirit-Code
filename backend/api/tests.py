@@ -605,3 +605,86 @@ class TypingResultTests(AuthTestCase):
         self.assertEqual(results, [])
         results = self.client.get(f'/api/typing-results/?student={self.anna.id}').data['results']
         self.assertEqual(len(results), 2)
+
+
+class TasksLatexTests(AuthTestCase):
+    LATEX = r'\zadacha{1} Найдите $x$, если $x^2 = 4$.'
+
+    def patch(self, data):
+        return self.client.patch(f'/api/assignments/{self.bio.id}/', data, format='multipart')
+
+    def test_teacher_saves_classwork_and_homework_latex(self):
+        self.login_as(self.teacher)
+        response = self.patch({
+            'tasks_latex': self.LATEX,
+            'homework': json.dumps({'description': 'Решить', 'tasks_latex': r'\zadacha{1} ДЗ'}),
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['tasks_latex'], self.LATEX)
+        self.assertEqual(response.data['homework']['tasks_latex'], r'\zadacha{1} ДЗ')
+
+        self.login_as(self.anna)
+        data = self.client.get(f'/api/assignments/{self.bio.id}/').data
+        self.assertEqual(data['tasks_latex'], self.LATEX)
+        self.assertEqual(data['homework']['tasks_latex'], r'\zadacha{1} ДЗ')
+
+    def test_homework_created_from_latex_alone(self):
+        self.login_as(self.teacher)
+        response = self.patch({'homework': json.dumps({'tasks_latex': self.LATEX})})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['homework']['description'], '')
+        self.assertEqual(response.data['homework']['tasks_latex'], self.LATEX)
+
+    def test_homework_numbered_tasks(self):
+        self.login_as(self.teacher)
+        tasks = [{'number': 7, 'latex': 'семь'}, {'number': 3, 'latex': ''}]
+        response = self.patch({'homework': json.dumps({'description': '', 'numbered_tasks': tasks})})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['homework']['numbered_tasks'], [
+            {'number': 3, 'latex': ''}, {'number': 7, 'latex': 'семь'},
+        ])
+
+        bad = [{'number': 3, 'latex': ''}, {'number': 3, 'latex': ''}]
+        response = self.patch({'homework': json.dumps({'numbered_tasks': bad})})
+        self.assertEqual(response.status_code, 400)
+
+    def test_description_update_keeps_latex(self):
+        self.login_as(self.teacher)
+        self.patch({'homework': json.dumps({'description': 'a', 'tasks_latex': self.LATEX})})
+        response = self.patch({'homework': json.dumps({'description': 'b'})})
+        self.assertEqual(response.data['homework']['description'], 'b')
+        self.assertEqual(response.data['homework']['tasks_latex'], self.LATEX)
+
+    def test_too_long_latex_rejected(self):
+        self.login_as(self.teacher)
+        too_long = 'x' * 200_001
+        self.assertEqual(self.patch({'tasks_latex': too_long}).status_code, 400)
+        response = self.patch({'homework': json.dumps({'tasks_latex': too_long})})
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(Assignment.objects.get(pk=self.bio.pk).tasks_latex)
+
+    def test_student_cannot_edit_latex(self):
+        self.login_as(self.anna)
+        self.assertEqual(self.patch({'tasks_latex': self.LATEX}).status_code, 403)
+
+    def test_numbered_tasks(self):
+        self.login_as(self.teacher)
+        tasks = [{'number': 7, 'latex': r'\zadacha{1} B'}, {'number': 2, 'latex': self.LATEX}, {'number': 1}]
+        response = self.patch({'numbered_tasks': json.dumps(tasks)})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['numbered_tasks'], [
+            {'number': 1, 'latex': ''},
+            {'number': 2, 'latex': self.LATEX},
+            {'number': 7, 'latex': r'\zadacha{1} B'},
+        ])
+
+        self.login_as(self.anna)
+        data = self.client.get(f'/api/assignments/{self.bio.id}/').data
+        self.assertEqual(data['numbered_tasks'][1]['latex'], self.LATEX)
+
+        self.login_as(self.teacher)
+        for bad in ([{'number': 0}], [{'number': 2}, {'number': 2}], '5', [5], [{'number': 3, 'latex': 1}],
+                    [{'number': 3, 'latex': 'x' * 200_001}]):
+            self.assertEqual(self.patch({'numbered_tasks': json.dumps(bad)}).status_code, 400, bad)
+        response = self.patch({'numbered_tasks': json.dumps([])})
+        self.assertEqual(response.data['numbered_tasks'], [])

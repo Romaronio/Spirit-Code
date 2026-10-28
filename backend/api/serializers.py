@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from .media import signed_url
-from .models import Account, AnswerComment, Assignment, LessonFile, Homework, HomeworkFile, Payment, StudentHomework, StudentHomeworkFile, TypingResult
+from .models import MAX_LATEX_LENGTH, MAX_TOTAL_LATEX_LENGTH, Account, AnswerComment, Assignment, LessonFile, Homework, HomeworkFile, Payment, StudentHomework, StudentHomeworkFile, TypingResult
 
 MIN_PASSWORD_LENGTH = 8
 
@@ -93,20 +93,45 @@ class HomeworkFileWriteSerializer(serializers.ModelSerializer):
         }
 
 
+def clean_numbered_tasks(value):
+    """Список {number, latex}: номера от 1 до 999 без повторов, по возрастанию"""
+    if value in (None, ''):
+        return []
+    if not isinstance(value, list) or len(value) > 50:
+        raise serializers.ValidationError('Ожидается список заданий по номерам')
+    tasks = {}
+    for item in value:
+        if not isinstance(item, dict):
+            raise serializers.ValidationError('Ожидается список заданий по номерам')
+        number, latex = item.get('number'), item.get('latex', '')
+        if isinstance(number, bool) or not isinstance(number, int) or not 1 <= number <= 999:
+            raise serializers.ValidationError('Номер задания — целое число от 1 до 999')
+        if not isinstance(latex, str):
+            raise serializers.ValidationError(f'Задание {number}: LaTeX должен быть текстом')
+        if len(latex) > MAX_LATEX_LENGTH:
+            raise serializers.ValidationError(f'Задание {number}: LaTeX длиннее {MAX_LATEX_LENGTH} знаков')
+        if number in tasks:
+            raise serializers.ValidationError(f'Номер {number} указан дважды')
+        tasks[number] = latex
+    if sum(len(latex) for latex in tasks.values()) > MAX_TOTAL_LATEX_LENGTH:
+        raise serializers.ValidationError(f'Все задания вместе длиннее {MAX_TOTAL_LATEX_LENGTH} знаков')
+    return [{'number': n, 'latex': tasks[n]} for n in sorted(tasks)]
+
+
 class HomeworkSerializer(serializers.ModelSerializer):
     """Сериализатор для Homework с вложенными файлами"""
     files = HomeworkFileSerializer(many=True, read_only=True)
 
     class Meta:
         model = Homework
-        fields = ['id', 'assignment', 'description', 'files', 'created_at', 'updated_at']
+        fields = ['id', 'assignment', 'description', 'numbered_tasks', 'tasks_latex', 'files', 'created_at', 'updated_at']
 
 
 class HomeworkCreateSerializer(serializers.ModelSerializer):
     """Сериализатор для создания/обновления Homework (без вложенных файлов)"""
     class Meta:
         model = Homework
-        fields = ['id', 'assignment', 'description', 'created_at', 'updated_at']
+        fields = ['id', 'assignment', 'description', 'numbered_tasks', 'tasks_latex', 'created_at', 'updated_at']
 
 
 class StudentHomeworkFileSerializer(serializers.ModelSerializer):
@@ -173,9 +198,12 @@ class AssignmentSerializer(serializers.ModelSerializer):
         model = Assignment
         fields = [
             'id', 'title', 'subject', 'deadline',
-            'recording_url', 'description', 'files', 'homework',
+            'recording_url', 'description', 'numbered_tasks', 'tasks_latex', 'files', 'homework',
             'student_homeworks', 'created_at', 'updated_at'
         ]
+
+    def validate_numbered_tasks(self, value):
+        return clean_numbered_tasks(value)
 
     def get_student_homeworks(self, obj):
         """Учитель видит все ответы, ученик — только свой"""

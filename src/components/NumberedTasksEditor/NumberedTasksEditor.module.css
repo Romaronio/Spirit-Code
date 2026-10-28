@@ -1,0 +1,226 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.label {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.hint {
+  margin: 0;
+  color: #777;
+  font-size: 13px;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip {
+  padding: 6px 12px;
+  border: 1px solid #ff8400;
+  border-radius: 999px;
+  background: #fff5e6;
+  color: #333;
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.chipEmpty {
+  border-style: dashed;
+  background: #fff;
+  color: #999;
+}
+
+.add {
+  padding: 8px 14px;
+  border: 1px dashed #ff8400;
+  border-radius: 8px;
+  background: #fff;
+  color: #ff8400;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.window {
+  display: flex;
+  flex-direction: column;
+  width: min(1200px, 100%);
+  height: min(90vh, 100%);
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+}
+
+.windowHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 20px;
+  border-bottom: 1px solid #eee;
+}
+
+.windowHeader h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.done {
+  padding: 8px 18px;
+  border: none;
+  border-radius: 8px;
+  background: #ff8400;
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 220px;
+  flex-shrink: 0;
+  padding: 16px;
+  border-right: 1px solid #eee;
+  background: #fafafa;
+  overflow-y: auto;
+}
+
+.tab {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tab:hover {
+  background: #fff5e6;
+}
+
+.tabActive {
+  border-color: #ff8400;
+  background: #fff5e6;
+}
+
+.tabTitle {
+  font-weight: 600;
+}
+
+.tabStatus {
+  color: #777;
+  font-size: 12px;
+}
+
+.addRow {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.addRow input {
+  width: 70px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  font: inherit;
+}
+
+.content {
+  flex: 1;
+  min-width: 0;
+  padding: 16px 20px;
+  overflow-y: auto;
+}
+
+.contentHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.contentHeader h3 {
+  margin: 0;
+}
+
+.remove {
+  border: none;
+  background: none;
+  padding: 0;
+  color: #c0392b;
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.error {
+  margin: 0;
+  color: #c0392b;
+  font-size: 13px;
+}
+
+@media (max-width: 700px) {
+  .overlay {
+    padding: 0;
+  }
+
+  .window {
+    height: 100%;
+    border-radius: 0;
+  }
+
+  .body {
+    flex-direction: column;
+  }
+
+  .tabs {
+    flex-direction: row;
+    flex-wrap: wrap;
+    width: auto;
+    border-right: none;
+    border-bottom: 1px solid #eee;
+  }
+
+  .addRow {
+    margin-top: 0;
+  }
+}

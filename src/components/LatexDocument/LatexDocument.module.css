@@ -1,0 +1,172 @@
+/* Оформление как в PDF-конспектах Spirit Code: оранжевые плашки «Задача N» */
+.doc {
+  color: #140f0f;
+  font-size: 17px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.p {
+  margin: 0 0 8px;
+}
+
+.task {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 18px 0 8px;
+}
+
+.task:first-child {
+  margin-top: 0;
+}
+
+.taskBadge {
+  flex-shrink: 0;
+  padding: 3px 12px;
+  border-radius: 4px;
+  background: #ff8400;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.taskLine {
+  flex: 1;
+  height: 2px;
+  border-radius: 1px;
+  background: #ff8400;
+}
+
+.hr {
+  margin: 20px 0;
+  border: none;
+  border-top: 1px solid #140f0f;
+}
+
+.heading {
+  margin: 18px 0 8px;
+  line-height: 1.3;
+}
+
+.list {
+  margin: 0 0 8px;
+  padding-left: 28px;
+}
+
+.list li > .p {
+  margin-bottom: 4px;
+}
+
+.plainList {
+  padding-left: 0;
+  list-style: none;
+}
+
+.code {
+  margin: 0 0 10px;
+  padding: 12px 14px;
+  overflow-x: auto;
+  border-radius: 8px;
+  background: #f6f1f1;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 14px;
+  line-height: 1.45;
+  white-space: pre;
+}
+
+.tt {
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: #f6f1f1;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 0.9em;
+}
+
+.sc {
+  font-variant: small-caps;
+}
+
+.box {
+  padding: 1px 6px;
+  border: 1px solid #140f0f;
+}
+
+.img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 8px auto;
+}
+
+.missing {
+  margin: 8px 0;
+  padding: 10px 12px;
+  border: 1px dashed #ff8400;
+  border-radius: 8px;
+  color: #8a4a00;
+  font-size: 14px;
+}
+
+.tableWrap {
+  max-width: 100%;
+  margin: 0 0 10px;
+  overflow-x: auto;
+}
+
+.table {
+  margin: 0 auto;
+  border-collapse: collapse;
+}
+
+.table td {
+  padding: 4px 10px;
+  border: 1px solid #ccc;
+}
+
+.center {
+  text-align: center;
+}
+
+.left {
+  text-align: left;
+}
+
+.right {
+  text-align: right;
+}
+
+.quote {
+  margin: 0 0 10px;
+  padding-left: 14px;
+  border-left: 3px solid #ff8400;
+}
+
+.frame {
+  margin: 0 0 10px;
+  padding: 10px 14px;
+  border: 1px solid #ff8400;
+  border-radius: 8px;
+}
+
+.inlineMath {
+  font-size: 1.05em;
+}
+
+/* Формула отдельной строкой: широкая — прокручивается, а не вылезает */
+.displayMath {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.displayMath :global(.katex-display) {
+  margin: 8px 0;
+}
+
+.raw {
+  font-family: ui-monospace, monospace;
+  font-size: 0.9em;
+  color: #555;
+}

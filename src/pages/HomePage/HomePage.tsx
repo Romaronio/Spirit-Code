@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import styles from './HomePage.module.css'
-import type { Account, Assignment, CommentActions, ReviewStatus, User } from '../../types'
+import type { Account, Assignment, CommentActions, NewAssignment, ReviewStatus, User } from '../../types'
 import AssignmentCard from '../../components/AssignmentCard/AssignmentCard'
 import AssignmentForm from '../../components/AssignmentForm/AssignmentForm'
 import StudentsPanel from '../../components/StudentsPanel/StudentsPanel'
@@ -23,16 +23,7 @@ interface Props {
   onRefresh: () => Promise<void>;
   onReview: (assignmentId: number, answerId: number, status: ReviewStatus) => Promise<void>;
   commentActions: CommentActions;
-  onAdd: (data: {
-    title: string
-    subject: string
-    deadline: string
-    description?: string
-    recording_url?: string
-    homework?: { description: string }
-    files?: File[]
-    homework_files?: File[]
-  }) => Promise<void>;
+  onAdd: (data: NewAssignment) => Promise<void>;
 }
 
 function HomePage({

@@ -4,7 +4,7 @@ import AuthPage from './pages/AuthPage/AuthPage'
 import HomePage from './pages/HomePage/HomePage'
 import AssignmentPage from './pages/AssignmentPage/AssignmentPage'
 import TypingPage from './pages/TypingPage/TypingPage'
-import type { Account, AnswerComment, Assignment, AssignmentChanges, CommentActions, ReviewStatus, User } from './types'
+import type { Account, AnswerComment, Assignment, AssignmentChanges, CommentActions, NewAssignment, ReviewStatus, User } from './types'
 import * as api from './services/api'
 import { clearSession, loadUser } from './utils/session'
 
@@ -62,16 +62,7 @@ function App() {
     navigate('/', { replace: true })
   }
 
-  async function handleAdd(data: {
-    title: string
-    subject: string
-    deadline: string
-    description?: string
-    recording_url?: string
-    homework?: { description: string }
-    files?: File[]
-    homework_files?: File[]
-  }) {
+  async function handleAdd(data: NewAssignment) {
     try {
       const newAssignment = await api.createAssignment(data)
       setItems((prev) => [newAssignment, ...prev])
@@ -90,7 +81,7 @@ function App() {
       const { homework, ...assignmentChanges } = changes
       const updated = await api.updateAssignment(id, {
         ...assignmentChanges,
-        homework: homework ? { description: homework.description } : undefined,
+        homework: homework ? { description: homework.description, tasks_latex: homework.tasks_latex } : undefined,
         homework_files: homework?.files,
       })
       setItems((prev) =>

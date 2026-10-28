@@ -8,12 +8,12 @@ from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 from rest_framework import mixins, viewsets, status
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
-from .models import Account, AnswerComment, Assignment, AuthToken, LessonFile, Homework, HomeworkFile, Payment, StudentHomework, StudentHomeworkFile, TypingResult
+from .models import MAX_LATEX_LENGTH, Account, AnswerComment, Assignment, AuthToken, LessonFile, Homework, HomeworkFile, Payment, StudentHomework, StudentHomeworkFile, TypingResult
 from .permissions import IsStudent, IsTeacher
 from .uploads import check_student_quota, check_uploads
 from .serializers import (
@@ -26,6 +26,7 @@ from .serializers import (
     StudentHomeworkSerializer,
     AnswerCommentSerializer,
     TypingResultSerializer,
+    clean_numbered_tasks,
 )
 
 
@@ -167,23 +168,38 @@ class AssignmentViewSet(viewsets.ModelViewSet):
         """Создаёт или обновляет ДЗ и прикрепляет к нему загруженные файлы.
 
         Одинаково работает при создании и при редактировании. ДЗ создаётся,
-        если пришло описание или хотя бы один файл (файлы без описания не теряются).
+        если пришло описание, задания (по номерам или в LaTeX) или хотя бы один файл
+        (файлы без описания не теряются).
         """
         homework_data = _parse_json(request.data.get('homework'))
         if not isinstance(homework_data, dict):
             homework_data = None
         homework_files = request.FILES.getlist('homework_files')
 
-        description = homework_data.get('description') if homework_data else None
-        if description is None and not homework_files:
+        # Поля, которых нет в запросе, не трогаем: None — «не прислали», '' — «очистить»
+        fields = {
+            key: homework_data.get(key)
+            for key in ('description', 'tasks_latex')
+            if homework_data and isinstance(homework_data.get(key), str)
+        }
+        if len(fields.get('tasks_latex', '')) > MAX_LATEX_LENGTH:
+            raise ValidationError({'homework': f'Задания в LaTeX длиннее {MAX_LATEX_LENGTH} знаков'})
+        if homework_data and homework_data.get('numbered_tasks') is not None:
+            try:
+                fields['numbered_tasks'] = clean_numbered_tasks(homework_data['numbered_tasks'])
+            except ValidationError as e:
+                raise ValidationError({'homework': e.detail})
+        if not fields and not homework_files:
             return  # про ДЗ в запросе ничего нет — не трогаем
 
-        homework, _ = Homework.objects.get_or_create(
+        homework, created = Homework.objects.get_or_create(
             assignment=assignment,
-            defaults={'description': description or ''},
+            defaults={'description': '', **fields},
         )
-        if description is not None and homework.description != description:
-            homework.description = description
+        changed = [key for key, value in fields.items() if getattr(homework, key) != value]
+        if changed and not created:
+            for key in changed:
+                setattr(homework, key, fields[key])
             homework.save()
 
         for f in homework_files:

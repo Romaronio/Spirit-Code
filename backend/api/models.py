@@ -4,10 +4,16 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.contrib.auth.hashers import check_password, make_password
+from django.core.validators import MaxLengthValidator
 from django.db import models
 from django.utils import timezone
 
 from .uploads import validate_upload
+
+# Длинный конспект в LaTeX — десятки тысяч знаков; больше — уже явная ошибка
+MAX_LATEX_LENGTH = 200_000
+# Все задания урока по номерам вместе
+MAX_TOTAL_LATEX_LENGTH = 1_000_000
 
 
 class Account(models.Model):
@@ -94,6 +100,11 @@ class Assignment(models.Model):
     deadline = models.DateField()
     recording_url = models.URLField(blank=True, null=True)
     description = models.TextField(blank=True, null=True)
+    # Задания по номерам (например, номера заданий ЕГЭ): [{"number": 5, "latex": "..."}].
+    # У каждого номера своя кнопка и свой документ
+    numbered_tasks = models.JSONField(blank=True, default=list)
+    # Задания классной работы в LaTeX без номера — ученик открывает их прямо на сайте
+    tasks_latex = models.TextField(blank=True, default='', validators=[MaxLengthValidator(MAX_LATEX_LENGTH)])
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -137,6 +148,10 @@ class Homework(models.Model):
         on_delete=models.CASCADE
     )
     description = models.TextField()
+    # Задания ДЗ по номерам — как у классной работы: [{"number": 5, "latex": "..."}]
+    numbered_tasks = models.JSONField(blank=True, default=list)
+    # Задания ДЗ в LaTeX — ученик открывает их прямо на сайте
+    tasks_latex = models.TextField(blank=True, default='', validators=[MaxLengthValidator(MAX_LATEX_LENGTH)])
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
