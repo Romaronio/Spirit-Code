@@ -13,8 +13,10 @@ from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from rest_framework.views import APIView
 from .models import MAX_LATEX_LENGTH, Account, AnswerComment, Assignment, AuthToken, LessonFile, Homework, HomeworkFile, Payment, StudentHomework, StudentHomeworkFile, TypingResult
 from .permissions import IsStudent, IsTeacher
+from .photo_latex import PhotoLatexError, photo_to_latex
 from .uploads import check_student_quota, check_uploads
 from .serializers import (
     AccountSerializer,
@@ -502,3 +504,30 @@ class TypingResultViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, viewse
             {'language': language, **self._stats(by_language.get(language, []))}
             for language, _ in TypingResult.LANGUAGE_CHOICES
         ])
+
+
+# Картинки, которые понимает распознавание (HEIC с iPhone Pillow не открывает)
+PHOTO_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.webp', '.bmp', '.gif')
+
+
+class PhotoLatexView(APIView):
+    """Фото задания → LaTeX в стиле Spirit Code (см. api/photo_latex.py).
+    POST multipart: image — картинка, number — номер для \\zadacha (по умолчанию 1)"""
+    permission_classes = [IsTeacher]
+    parser_classes = [MultiPartParser]
+    throttle_scope = 'photo_latex'
+
+    def post(self, request):
+        image = request.FILES.get('image')
+        if not image:
+            return Response({'error': 'Прикрепите фото задания'}, status=status.HTTP_400_BAD_REQUEST)
+        if not image.name.lower().endswith(PHOTO_EXTENSIONS):
+            return Response({'error': 'Подойдут фото JPG, PNG, WEBP, BMP или GIF'}, status=status.HTTP_400_BAD_REQUEST)
+        check_uploads([image])  # общий лимит размера файла
+
+        number = request.data.get('number', '1')
+        number = int(number) if str(number).isdigit() and 0 < int(number) < 1000 else 1
+        try:
+            return Response(photo_to_latex(image, number))
+        except PhotoLatexError as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)

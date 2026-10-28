@@ -1,6 +1,6 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import AccountViewSet, AssignmentViewSet, LessonFileViewSet, HomeworkViewSet, HomeworkFileViewSet, StudentHomeworkViewSet, PaymentViewSet, AnswerCommentViewSet, TypingResultViewSet
+from .views import AccountViewSet, AssignmentViewSet, LessonFileViewSet, HomeworkViewSet, HomeworkFileViewSet, StudentHomeworkViewSet, PaymentViewSet, AnswerCommentViewSet, TypingResultViewSet, PhotoLatexView
 
 router = DefaultRouter()
 router.register(r'accounts', AccountViewSet, basename='account')
@@ -14,5 +14,6 @@ router.register(r'answer-comments', AnswerCommentViewSet, basename='answercommen
 router.register(r'typing-results', TypingResultViewSet, basename='typingresult')
 
 urlpatterns = [
+    path('photo-latex/', PhotoLatexView.as_view()),
     path('', include(router.urls)),
 ]

@@ -1,4 +1,4 @@
-import type { Account, AnswerComment, Assignment, LessonFile, Homework, HomeworkFile, NewAssignment, NumberedTask, Payment, ReviewStatus, StudentHomework, TypingModeSummary, TypingResult, TypingStats, TypingSummary } from "../types";
+import type { Account, AnswerComment, Assignment, LessonFile, Homework, HomeworkFile, NewAssignment, NumberedTask, Payment, PhotoLatexResult, ReviewStatus, StudentHomework, TypingModeSummary, TypingResult, TypingStats, TypingSummary } from "../types";
 import { clearSession, loadToken } from "../utils/session";
 
 // Адрес API. По умолчанию относительный путь: и локально (через прокси Vite),
@@ -369,4 +369,14 @@ export async function getTypingSummary(): Promise<TypingSummary[]> {
 // Учитель: статистика ученика по каждому из режимов тренажёра
 export async function getTypingByMode(studentId: number): Promise<TypingModeSummary[]> {
   return fetchAPI<TypingModeSummary[]>(`/typing-results/by-mode/?student=${studentId}`);
+}
+
+// ============== ФОТО → LATEX ==============
+
+// Учитель: фото задания → LaTeX в стиле Spirit Code (Tesseract + GigaChat на сервере)
+export async function photoToLatex(image: File, number: number): Promise<PhotoLatexResult> {
+  const formData = new FormData();
+  formData.append('image', image);
+  formData.append('number', String(number));
+  return fetchAPIFormData<PhotoLatexResult>('/photo-latex/', formData, 'POST');
 }

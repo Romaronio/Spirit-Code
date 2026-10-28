@@ -688,3 +688,121 @@ class TasksLatexTests(AuthTestCase):
             self.assertEqual(self.patch({'numbered_tasks': json.dumps(bad)}).status_code, 400, bad)
         response = self.patch({'numbered_tasks': json.dumps([])})
         self.assertEqual(response.data['numbered_tasks'], [])
+
+
+def png_bytes():
+    from io import BytesIO
+    from PIL import Image
+    out = BytesIO()
+    Image.new('RGB', (40, 20), 'white').save(out, format='PNG')
+    return out.getvalue()
+
+
+OCR_TEXT = 'Черепахе был дан алгоритм:\nПовтори 5 [Вперёд 33 Направо 135 Вперёд 33 Направо 45]\nНайдите площадь фигуры.'
+
+
+@override_settings(GIGACHAT_AUTH_KEY='test-key')
+class PhotoLatexTests(AuthTestCase):
+    """Tesseract и GigaChat подменены — проверяем свою логику, без сети"""
+
+    def setUp(self):
+        super().setUp()
+        from unittest import mock
+        from . import photo_latex
+        ocr = mock.patch.object(photo_latex.subprocess, 'run',
+                                return_value=mock.Mock(stdout=OCR_TEXT.encode()))
+        self.ocr = ocr.start()
+        self.addCleanup(ocr.stop)
+        complete = mock.patch.object(photo_latex.gigachat, 'complete')
+        self.complete = complete.start()
+        self.addCleanup(complete.stop)
+
+    def upload(self, name='task.png', **data):
+        image = SimpleUploadedFile(name, png_bytes(), content_type='image/png')
+        return self.client.post('/api/photo-latex/', {'image': image, **data}, format='multipart')
+
+    def test_only_teacher(self):
+        self.login_as(self.anna)
+        self.assertEqual(self.upload().status_code, 403)
+        self.complete.assert_not_called()
+
+    def test_returns_latex_without_warnings(self):
+        self.complete.return_value = (
+            '```latex\n\\zadacha{3}\n\\textbf{Повтори 5 [Вперёд 33 Направо 135 Вперёд 33 Направо 45]}\n```'
+        )
+        self.login_as(self.teacher)
+        response = self.upload(number='3')
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data['latex'].startswith('\\zadacha{3}'))
+        self.assertNotIn('```', response.data['latex'])
+        self.assertEqual(response.data['warnings'], [])
+        self.assertEqual(response.data['ocr_text'], OCR_TEXT)
+        prompt = self.complete.call_args.args[0]
+        self.assertIn('\\zadacha{3}', prompt)
+        self.assertIn(OCR_TEXT, prompt)
+
+    def test_warns_when_numbers_changed(self):
+        self.complete.return_value = '\\zadacha{1}\nПовтори 5 [Вперёд 33 Налево 13 Вперёд 33 Направо 45]'
+        self.login_as(self.teacher)
+        response = self.upload()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['warnings']), 1)
+        self.assertIn('пропали 135', response.data['warnings'][0])
+        self.assertIn('появились 13', response.data['warnings'][0])
+
+    def test_adds_zadacha_if_model_forgot(self):
+        self.complete.return_value = 'Повтори 5 [Вперёд 33 Направо 135 Вперёд 33 Направо 45]'
+        self.login_as(self.teacher)
+        self.assertTrue(self.upload(number='2').data['latex'].startswith('\\zadacha{2}'))
+
+    def test_rejects_non_image(self):
+        self.login_as(self.teacher)
+        response = self.upload(name='task.pdf')
+        self.assertEqual(response.status_code, 400)
+        self.ocr.assert_not_called()
+
+    def test_broken_image(self):
+        self.login_as(self.teacher)
+        image = SimpleUploadedFile('task.png', b'not an image', content_type='image/png')
+        response = self.client.post('/api/photo-latex/', {'image': image}, format='multipart')
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('картинку', response.data['error'])
+
+    def test_no_text_on_photo(self):
+        self.ocr.return_value.stdout = b'  \n '
+        self.login_as(self.teacher)
+        response = self.upload()
+        self.assertEqual(response.status_code, 400)
+        self.complete.assert_not_called()
+
+    def test_dollar_from_ocr_becomes_s(self):
+        self.ocr.return_value.stdout = 'Запись Повтори К[Команда1 ...Команда$] — из $ команд'.encode()
+        self.complete.return_value = '\\zadacha{1}\nтекст'
+        self.login_as(self.teacher)
+        self.upload()
+        prompt = self.complete.call_args.args[0]
+        self.assertIn('Команда1 ...КомандаS] — из S команд', prompt)
+
+    def test_unwraps_russian_words_from_math(self):
+        from .photo_latex import unwrap_text_math
+        self.assertEqual(
+            unwrap_text_math('Повтори $k$[$Команда1$ Команда2$ \\ldots КомандаS$] из $S$'),
+            'Повтори $k$[Команда1 Команда2 ... КомандаS] из $S$',
+        )
+        # Настоящие формулы остаются формулами, даже с русскими индексами
+        for formula in ('$x^2 = 16$', '$V_{ср}$', '$a < b$'):
+            self.assertEqual(unwrap_text_math(formula), formula)
+
+    def test_warns_about_unclosed_formula(self):
+        self.complete.return_value = '\\zadacha{1}\nПовтори 5 [Вперёд 33 Направо 135 Вперёд 33 Направо 45] $n'
+        self.login_as(self.teacher)
+        warnings = self.upload().data['warnings']
+        self.assertEqual(len(warnings), 1)
+        self.assertIn('незакрытая формула', warnings[0])
+
+    @override_settings(GIGACHAT_AUTH_KEY='')
+    def test_disabled_without_key(self):
+        self.login_as(self.teacher)
+        response = self.upload()
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('ключа GigaChat', response.data['error'])

@@ -170,3 +170,10 @@ export interface TypingSummary extends TypingStatsSummary {
 export interface TypingModeSummary extends TypingStatsSummary {
   language: TypingLanguage
 }
+
+// Ответ распознавания фото задания (POST /api/photo-latex/)
+export interface PhotoLatexResult {
+  latex: string
+  ocr_text: string // текст, который прочитал Tesseract — для сверки
+  warnings: string[]
+}

@@ -84,3 +84,24 @@
 .hiddenInput {
   display: none;
 }
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.disabled {
+  opacity: 0.5;
+  cursor: progress;
+}
+
+.photoWarnings {
+  margin: 0;
+  padding: 8px 12px 8px 28px;
+  border-left: 3px solid #ff8400;
+  border-radius: 4px;
+  background: #fff4e8;
+  color: #8a4300;
+  font-size: 13px;
+}

@@ -179,6 +179,7 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_THROTTLE_RATES': {
         'login': os.environ.get('DJANGO_LOGIN_RATE', '10/min'),  # защита от перебора паролей
+        'photo_latex': os.environ.get('DJANGO_PHOTO_LATEX_RATE', '60/hour'),  # бережём лимит GigaChat
     },
     # Сколько прокси стоит перед Django (Caddy = 1). Нужно, чтобы лимит входа
     # считался по настоящему IP пользователя, а не по IP прокси.
@@ -189,3 +190,14 @@ REST_FRAMEWORK = {
 
 # Сколько дней живёт токен входа
 AUTH_TOKEN_TTL_DAYS = int(os.environ.get('DJANGO_TOKEN_TTL_DAYS', '30'))
+
+
+# --- Фото задания → LaTeX (api/photo_latex.py) -------------------------------
+
+# Ключ авторизации из кабинета developers.sber.ru (GigaChat API). Пусто — функция выключена
+GIGACHAT_AUTH_KEY = os.environ.get('GIGACHAT_AUTH_KEY', '').strip()
+GIGACHAT_SCOPE = os.environ.get('GIGACHAT_SCOPE', 'GIGACHAT_API_PERS')
+GIGACHAT_MODEL = os.environ.get('GIGACHAT_MODEL', 'GigaChat-2-Max')
+# Корневой и промежуточный сертификаты Минцифры (с gu-st.ru) — ими подписан сертификат GigaChat
+GIGACHAT_CA_BUNDLE = BASE_DIR / 'certs' / 'russian_trusted_ca.pem'
+TESSERACT_CMD = os.environ.get('TESSERACT_CMD', 'tesseract')

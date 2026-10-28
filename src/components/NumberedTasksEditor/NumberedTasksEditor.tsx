@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import styles from './NumberedTasksEditor.module.css'
 import LatexEditor from '../LatexEditor/LatexEditor'
 import type { DocFile } from '../LatexDocument/LatexDocument'
@@ -118,8 +118,17 @@ function NumberedTasksWindow({ value, onChange, current, onSelect, onClose, file
     onSelect(rest[0]?.number ?? 0)
   }
 
-  function handleLatex(latex: string) {
-    onChange(value.map((t) => (t.number === current ? { ...t, latex } : t)))
+  // Распознавание фото возвращает текст через несколько секунд — за это время учитель
+  // мог поправить другие номера, поэтому правим свежий список, а не тот, что был при вызове
+  const latestValue = useRef(value)
+  useEffect(() => {
+    latestValue.current = value
+  }, [value])
+
+  function handleLatex(number: number, latex: string) {
+    const next = latestValue.current.map((t) => (t.number === number ? { ...t, latex } : t))
+    latestValue.current = next
+    onChange(next)
   }
 
   return (
@@ -180,7 +189,7 @@ function NumberedTasksWindow({ value, onChange, current, onSelect, onClose, file
                   key={task.number}
                   label="LaTeX задания — у ученика будет отдельная кнопка"
                   value={task.latex}
-                  onChange={handleLatex}
+                  onChange={(latex) => handleLatex(task.number, latex)}
                   files={files}
                   pendingNames={pendingNames}
                 />
