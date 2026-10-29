@@ -319,3 +319,19 @@ class TypingResult(models.Model):
 
     def __str__(self):
         return f"{self.student.name}: {self.wpm} сл/мин"
+
+
+class BankTask(models.Model):
+    """Задача из базы заданий ЕГЭ: номер задания в экзамене, условие в LaTeX и ответ"""
+    MAX_NUMBER = 27  # номера заданий ЕГЭ: от 1 до 27
+
+    number = models.PositiveSmallIntegerField()
+    latex = models.TextField(validators=[MaxLengthValidator(MAX_LATEX_LENGTH)])
+    answer = models.CharField(max_length=500, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['number', '-id']
+
+    def __str__(self):
+        return f"Задание {self.number} (#{self.id})"

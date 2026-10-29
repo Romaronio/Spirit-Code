@@ -19,6 +19,28 @@
   font-family: inherit;
 }
 
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.toggle {
+  padding: 6px 12px;
+  border: 1px solid #ff8400;
+  border-radius: 8px;
+  background: transparent;
+  color: #140f0f;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.toggle:hover {
+  background: #fff4e5;
+}
+
 .subjectSection {
   display: flex;
   flex-direction: column;

@@ -44,7 +44,7 @@ function keyOf(student: number, year: number, month: number) {
 }
 
 function PaymentsPanel({ accounts }: Props) {
-  const [isOpen, setIsOpen] = useState(true)
+  const [isOpen, setIsOpen] = useState(false) // по умолчанию свёрнута, как другие панели
   const [startYear, setStartYear] = useState(currentSchoolYear)
   const [paid, setPaid] = useState<Set<string>>(new Set())
   const [loadedYear, setLoadedYear] = useState<number | null>(null)

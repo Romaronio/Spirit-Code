@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from .media import signed_url
-from .models import MAX_LATEX_LENGTH, MAX_TOTAL_LATEX_LENGTH, Account, AnswerComment, Assignment, LessonFile, Homework, HomeworkFile, Payment, StudentHomework, StudentHomeworkFile, TypingResult
+from .models import MAX_LATEX_LENGTH, MAX_TOTAL_LATEX_LENGTH, Account, AnswerComment, Assignment, BankTask, LessonFile, Homework, HomeworkFile, Payment, StudentHomework, StudentHomeworkFile, TypingResult
 
 MIN_PASSWORD_LENGTH = 8
 
@@ -275,3 +275,24 @@ class TypingResultSerializer(serializers.ModelSerializer):
         total_words = data['correct_words'] + data['errors']
         data['accuracy'] = round(data['correct_words'] / total_words * 100, 1) if total_words else 0
         return data
+
+
+class BankTaskSerializer(serializers.ModelSerializer):
+    """Задача базы заданий ЕГЭ"""
+    class Meta:
+        model = BankTask
+        fields = ['id', 'number', 'latex', 'answer', 'created_at']
+        read_only_fields = ['created_at']
+
+    def validate_number(self, value):
+        if not 1 <= value <= BankTask.MAX_NUMBER:
+            raise serializers.ValidationError(f'Номер задания — от 1 до {BankTask.MAX_NUMBER}')
+        return value
+
+    def validate_latex(self, value):
+        if not value.strip():
+            raise serializers.ValidationError('Введите условие задачи')
+        return value
+
+    def validate_answer(self, value):
+        return value.strip()

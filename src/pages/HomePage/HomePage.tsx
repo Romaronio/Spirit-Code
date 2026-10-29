@@ -8,6 +8,7 @@ import StudentsPanel from '../../components/StudentsPanel/StudentsPanel'
 import AnswersPanel from '../../components/AnswersPanel/AnswersPanel'
 import ProgressDonut from '../../components/ProgressDonut/ProgressDonut'
 import PaymentsPanel from '../../components/PaymentsPanel/PaymentsPanel'
+import BankTaskForm from '../../components/BankTaskForm/BankTaskForm'
 import ChatWindow from '../../components/ChatWindow/ChatWindow'
 import { hasSubject, normalize, subjectsOf } from '../../utils/subjects'
 
@@ -20,7 +21,6 @@ interface Props {
   onAddStudent: (student: Omit<Account, 'id'>) => Promise<void>;
   onDeleteStudent: (id: number) => void;
   onSetSubjects: (id: number, subjects: string[]) => void;
-  onRefresh: () => Promise<void>;
   onReview: (assignmentId: number, answerId: number, status: ReviewStatus) => Promise<void>;
   commentActions: CommentActions;
   onAdd: (data: NewAssignment) => Promise<void>;
@@ -36,7 +36,6 @@ function HomePage({
   onAddStudent,
   onDeleteStudent,
   onSetSubjects,
-  onRefresh,
   onReview,
   commentActions,
 }: Props) {
@@ -113,10 +112,14 @@ function HomePage({
       <div className={styles.header}>
         <h1>Добро пожаловать, {user.name}</h1>
         <div className={styles.headerRight}>
-          {!isTeacher && <ProgressDonut done={acceptedCount} total={visibleItems.length} />}
+          <Link to="/tasks-bank" className={`${styles.typing} ${styles.withIcon}`}>
+            <BookIcon />
+            База заданий
+          </Link>
           <Link to="/typing" className={styles.typing}>
             ⌨ Тренажёр печати
           </Link>
+          {!isTeacher && <ProgressDonut done={acceptedCount} total={visibleItems.length} />}
           <button type="button" className={styles.logout} onClick={onLogout}>
             Выйти
           </button>
@@ -132,11 +135,11 @@ function HomePage({
               ref={answersRef}
               items={items}
               accounts={accounts}
-              onRefresh={onRefresh}
               onReview={onReview}
               activeAnswerId={chat?.answer.id}
               onOpenChat={(assignmentId, answerId) => setOpenChat({ assignmentId, answerId })}
             />
+            <BankTaskForm />
             <PaymentsPanel accounts={accounts} />
             <StudentsPanel
               accounts={accounts}
@@ -166,6 +169,19 @@ function HomePage({
         assignmentsSection
       )}
     </div>
+  )
+}
+
+// Иконка базы заданий: раскрытая книга в цветах платформы (белые страницы, тёмный контур)
+function BookIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+      <g stroke="#140f0f" strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round">
+        <path d="M12 6.5C10 5 7 4.5 3.5 5v13c3.5-.5 6.5 0 8.5 1.5z" fill="#fff" />
+        <path d="M12 6.5C14 5 17 4.5 20.5 5v13c-3.5-.5-6.5 0-8.5 1.5z" fill="#fff" />
+        <path d="M14.5 9.5h3.5M14.5 12.5h3.5" fill="none" />
+      </g>
+    </svg>
   )
 }
 

@@ -85,6 +85,12 @@
   white-space: nowrap;
 }
 
+.withIcon {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .typing:hover {
   background: #ff9a2e;
 }

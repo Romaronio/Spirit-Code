@@ -8,7 +8,6 @@ import { hasSubject } from '../../utils/subjects'
 interface Props {
   items: Assignment[]
   accounts: Account[]
-  onRefresh: () => Promise<void>
   onReview: (assignmentId: number, answerId: number, status: ReviewStatus) => Promise<void>
   activeAnswerId?: number // ответ, переписка по которому сейчас открыта
   ref?: React.Ref<HTMLElement> // по нему страница меряет высоту панели
@@ -24,10 +23,9 @@ function formatDate(value?: string) {
   return value ? new Date(value).toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'short' }) : ''
 }
 
-function AnswersPanel({ items, accounts, onRefresh, onReview, activeAnswerId, onOpenChat, ref }: Props) {
-  const [isOpen, setIsOpen] = useState(true)
+function AnswersPanel({ items, accounts, onReview, activeAnswerId, onOpenChat, ref }: Props) {
+  const [isOpen, setIsOpen] = useState(false) // по умолчанию свёрнута, как другие панели
   const [selectedId, setSelectedId] = useState<number | null>(null)
-  const [isRefreshing, setIsRefreshing] = useState(false)
 
   const students = accounts.filter((a) => a.role === 'student')
 
@@ -61,41 +59,20 @@ function AnswersPanel({ items, accounts, onRefresh, onReview, activeAnswerId, on
     ? items.filter((a) => hasSubject(selected.subjects, a.subject) && !answeredIds.has(a.id))
     : []
 
-  async function handleRefresh() {
-    setIsRefreshing(true)
-    try {
-      await onRefresh()
-    } finally {
-      setIsRefreshing(false)
-    }
-  }
-
   return (
     <section ref={ref} className={styles.panel}>
       <div className={styles.header}>
         <h2>
           Ответы учеников <span className={styles.count}>({totalAnswers})</span>
         </h2>
-        <div className={styles.headerButtons}>
-          {isOpen && (
-            <button
-              type="button"
-              className={styles.toggle}
-              onClick={handleRefresh}
-              disabled={isRefreshing}
-            >
-              {isRefreshing ? 'Обновление...' : 'Обновить'}
-            </button>
-          )}
-          <button
-            type="button"
-            className={styles.toggle}
-            onClick={() => setIsOpen((open) => !open)}
-            aria-expanded={isOpen}
-          >
-            {isOpen ? 'Свернуть ▲' : 'Развернуть ▼'}
-          </button>
-        </div>
+        <button
+          type="button"
+          className={styles.toggle}
+          onClick={() => setIsOpen((open) => !open)}
+          aria-expanded={isOpen}
+        >
+          {isOpen ? 'Свернуть ▲' : 'Развернуть ▼'}
+        </button>
       </div>
 
       {isOpen && (

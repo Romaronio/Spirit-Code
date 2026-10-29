@@ -10,7 +10,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
 from rest_framework.test import APITestCase
 
-from .models import Account, Assignment, AuthToken, LessonFile, StudentHomework, StudentHomeworkFile, TypingResult
+from .models import Account, Assignment, AuthToken, BankTask, LessonFile, StudentHomework, StudentHomeworkFile, TypingResult
 
 
 class AuthTestCase(APITestCase):
@@ -806,3 +806,30 @@ class PhotoLatexTests(AuthTestCase):
         response = self.upload()
         self.assertEqual(response.status_code, 400)
         self.assertIn('ключа GigaChat', response.data['error'])
+
+
+class BankTaskTests(AuthTestCase):
+    def test_teacher_adds_and_deletes(self):
+        self.login_as(self.teacher)
+        response = self.client.post('/api/bank-tasks/', {'number': 5, 'latex': 'Условие', 'answer': ' 42 '}, format='json')
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data['answer'], '42')
+        task_id = response.data['id']
+        self.assertEqual(self.client.delete(f'/api/bank-tasks/{task_id}/').status_code, 204)
+        self.assertFalse(BankTask.objects.exists())
+
+    def test_validation(self):
+        self.login_as(self.teacher)
+        self.assertEqual(self.client.post('/api/bank-tasks/', {'number': 0, 'latex': 'x'}, format='json').status_code, 400)
+        self.assertEqual(self.client.post('/api/bank-tasks/', {'number': 28, 'latex': 'x'}, format='json').status_code, 400)
+        self.assertEqual(self.client.post('/api/bank-tasks/', {'number': 3, 'latex': '  '}, format='json').status_code, 400)
+
+    def test_student_reads_but_cannot_change(self):
+        task = BankTask.objects.create(number=7, latex='Условие')
+        BankTask.objects.create(number=8, latex='Другое')
+        self.login_as(self.anna)
+        response = self.client.get('/api/bank-tasks/?number=7')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual([t['id'] for t in response.data], [task.id])
+        self.assertEqual(self.client.post('/api/bank-tasks/', {'number': 1, 'latex': 'x'}, format='json').status_code, 403)
+        self.assertEqual(self.client.delete(f'/api/bank-tasks/{task.id}/').status_code, 403)

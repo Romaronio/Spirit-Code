@@ -4,6 +4,7 @@ import AuthPage from './pages/AuthPage/AuthPage'
 import HomePage from './pages/HomePage/HomePage'
 import AssignmentPage from './pages/AssignmentPage/AssignmentPage'
 import TypingPage from './pages/TypingPage/TypingPage'
+import TasksBankPage from './pages/TasksBankPage/TasksBankPage'
 import type { Account, AnswerComment, Assignment, AssignmentChanges, CommentActions, NewAssignment, ReviewStatus, User } from './types'
 import * as api from './services/api'
 import { clearSession, loadUser } from './utils/session'
@@ -188,15 +189,6 @@ function App() {
     },
   }
 
-  // Перечитывает все задания: новые ответы учеников и свежие ссылки на файлы
-  const refreshAssignments = useCallback(async () => {
-    try {
-      setItems(await api.getAllAssignments())
-    } catch (error) {
-      console.error('Ошибка обновления заданий:', error)
-    }
-  }, [])
-
   // Перечитывает задание с сервера: свежие ответы учеников и новые
   // подписанные ссылки на файлы (старые со временем перестают работать)
   const refreshAssignment = useCallback(async (assignmentId: number) => {
@@ -230,7 +222,6 @@ function App() {
             onAddStudent={handleAddStudent}
             onDeleteStudent={handleDeleteStudent}
             onSetSubjects={handleSetSubjects}
-            onRefresh={refreshAssignments}
             onReview={handleReview}
             commentActions={commentActions}
           />
@@ -252,6 +243,7 @@ function App() {
         }
       />
       <Route path="/typing" element={<TypingPage user={user} />} />
+      <Route path="/tasks-bank" element={<TasksBankPage user={user} />} />
     </Routes>
   )
 }

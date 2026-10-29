@@ -14,13 +14,14 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.views import APIView
-from .models import MAX_LATEX_LENGTH, Account, AnswerComment, Assignment, AuthToken, LessonFile, Homework, HomeworkFile, Payment, StudentHomework, StudentHomeworkFile, TypingResult
+from .models import MAX_LATEX_LENGTH, Account, AnswerComment, Assignment, AuthToken, BankTask, LessonFile, Homework, HomeworkFile, Payment, StudentHomework, StudentHomeworkFile, TypingResult
 from .permissions import IsStudent, IsTeacher
 from .photo_latex import PhotoLatexError, photo_to_latex
 from .uploads import check_student_quota, check_uploads
 from .serializers import (
     AccountSerializer,
     AssignmentSerializer,
+    BankTaskSerializer,
     LessonFileSerializer,
     HomeworkSerializer,
     HomeworkFileSerializer,
@@ -508,6 +509,27 @@ class TypingResultViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, viewse
 
 # Картинки, которые понимает распознавание (HEIC с iPhone Pillow не открывает)
 PHOTO_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.webp', '.bmp', '.gif')
+
+
+class BankTaskViewSet(viewsets.ModelViewSet):
+    """База заданий ЕГЭ: смотрят все вошедшие, добавляет и удаляет учитель.
+
+    Фильтр по номеру: ?number=5. Отдаём без страниц — база целиком нужна для фильтра по номерам.
+    """
+    serializer_class = BankTaskSerializer
+    pagination_class = None
+
+    def get_permissions(self):
+        if self.action in ('list', 'retrieve'):
+            return [IsAuthenticated()]
+        return [IsTeacher()]
+
+    def get_queryset(self):
+        queryset = BankTask.objects.all()
+        number = self.request.query_params.get('number')
+        if number:
+            queryset = queryset.filter(number=number) if number.isdigit() else queryset.none()
+        return queryset
 
 
 class PhotoLatexView(APIView):
