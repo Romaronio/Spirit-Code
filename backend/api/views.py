@@ -596,6 +596,12 @@ class PhotoLatexView(APIView):
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
+def _calls_open_for(user):
+    """Открыты ли созвоны ученику (settings.CALLS_STUDENTS: имена или «*»)"""
+    allowed = {name.casefold() for name in settings.CALLS_STUDENTS}
+    return '*' in allowed or user.name.casefold() in allowed
+
+
 class CallViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     """Созвоны-уроки (LiveKit).
 
@@ -620,6 +626,8 @@ class CallViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retriev
         user = self.request.user
         if getattr(user, 'is_teacher', False):
             return queryset
+        if not _calls_open_for(user):
+            return queryset.none()
         # Сравниваем в Python: iexact в SQLite не понимает регистр русских букв.
         # Идущих созвонов единицы, так что это дёшево
         subjects = {str(s).strip().casefold() for s in (getattr(user, 'subjects', None) or [])}

@@ -917,7 +917,7 @@ class BankTaskTests(AuthTestCase):
         self.assertEqual(self.client.delete(f'/api/bank-tasks/{task.id}/').status_code, 403)
 
 
-@override_settings(LIVEKIT_API_KEY='testkey', LIVEKIT_API_SECRET='testsecret', LIVEKIT_URL='', LIVEKIT_API_HOST='')
+@override_settings(LIVEKIT_API_KEY='testkey', LIVEKIT_API_SECRET='testsecret', LIVEKIT_URL='', LIVEKIT_API_HOST='', CALLS_STUDENTS=['*'])
 class CallTests(AuthTestCase):
     def start_call(self, subject='Биология'):
         self.login_as(self.teacher)
@@ -966,6 +966,20 @@ class CallTests(AuthTestCase):
         call_id = self.start_call()
         Call.objects.filter(id=call_id).update(started_at=timezone.now() - Call.MAX_DURATION - timedelta(minutes=1))
         self.assertEqual(self.client.get('/api/calls/').data, [])
+
+    def test_closed_for_students_until_enabled(self):
+        call_id = self.start_call('')
+        with override_settings(CALLS_STUDENTS=[]):
+            self.login_as(self.anna)
+            self.assertEqual(self.client.get('/api/calls/').data, [])
+            self.assertEqual(self.client.post(f'/api/calls/{call_id}/join/').status_code, 404)
+            self.login_as(self.teacher)
+            self.assertEqual(len(self.client.get('/api/calls/').data), 1)
+        with override_settings(CALLS_STUDENTS=['Anna']):  # только тестовый ученик
+            self.login_as(self.anna)
+            self.assertEqual(self.client.post(f'/api/calls/{call_id}/join/').status_code, 200)
+            self.login_as(self.ivan)
+            self.assertEqual(self.client.get('/api/calls/').data, [])
 
     @override_settings(LIVEKIT_API_KEY='', LIVEKIT_API_SECRET='')
     def test_not_configured(self):

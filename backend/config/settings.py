@@ -211,3 +211,6 @@ LIVEKIT_API_KEY = os.environ.get('LIVEKIT_API_KEY', 'devkey' if DEBUG else '').s
 LIVEKIT_API_SECRET = os.environ.get('LIVEKIT_API_SECRET', 'secret' if DEBUG else '').strip()
 # Адрес livekit-server для запросов с бэкенда (закрыть комнату, когда учитель завершил урок)
 LIVEKIT_API_HOST = os.environ.get('LIVEKIT_API_HOST', 'http://localhost:7880' if DEBUG else '').strip()
+# Каким ученикам доступны созвоны: имена через запятую, «*» — всем. Пусто — только учителю
+# (режим проверки: учитель тестирует созвоны на сервере, ученики их не видят).
+CALLS_STUDENTS = env_list('CALLS_STUDENTS', '*' if DEBUG else '')
