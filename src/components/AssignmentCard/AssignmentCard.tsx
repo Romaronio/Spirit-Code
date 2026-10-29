@@ -34,7 +34,7 @@ function AssignmentCard({ assignment, user, onDelete }: Props) {
       <Link
         to={`/assignment/${assignment.id}`}
         state={user}
-        className={`${styles.card} ${styles.cardLink}`}
+        className={`${styles.card} ${styles.cardLink} ${!isTeacher && !myAnswer ? styles.needsWork : ''}`}
       >
         <div className={`${styles.top} ${isTeacher && onDelete ? styles.withDelete : ''}`}>
           <span className={styles.subject} title={assignment.subject}>{assignment.subject}</span>

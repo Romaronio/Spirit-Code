@@ -5,9 +5,10 @@
   max-width: 420px;
   padding: 16px;
   margin-top: 24px;
-  background: #fff;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  background: var(--surface);
+  border-radius: 20px;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--line-soft);
 }
 
 .header {
@@ -18,23 +19,24 @@
 }
 
 .count {
-  color: #777;
+  color: var(--muted);
   font-weight: 400;
 }
 
 .toggle {
   padding: 6px 12px;
-  border: 1px solid #ff8400;
+  border: 1px solid var(--accent);
   border-radius: 8px;
-  background: transparent;
-  color: #140f0f;
+  background: var(--accent);
+  color: var(--on-accent);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
 }
 
 .toggle:hover {
-  background: #fff4e5;
+  border-color: var(--accent-hover);
+  background: var(--accent-hover);
 }
 
 .toggle:disabled {
@@ -53,21 +55,21 @@
   align-items: center;
   gap: 6px;
   padding: 4px 10px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--line);
   border-radius: 999px;
-  background: #fff;
-  color: #140f0f;
+  background: var(--surface);
+  color: var(--text);
   font-size: 14px;
   cursor: pointer;
 }
 
 .student:hover {
-  border-color: #ff8400;
+  border-color: var(--accent);
 }
 
 .active {
-  border-color: #ff8400;
-  background: #fff4e5;
+  border-color: var(--accent);
+  background: var(--accent-soft);
   font-weight: 600;
 }
 
@@ -75,21 +77,21 @@
   min-width: 20px;
   padding: 0 6px;
   border-radius: 999px;
-  background: #f0e6e6;
-  color: #555;
+  background: var(--surface-2);
+  color: var(--muted);
   font-size: 12px;
   font-weight: 600;
   text-align: center;
 }
 
 .active .badge {
-  background: #ff8400;
-  color: #140f0f;
+  background: var(--accent);
+  color: var(--on-accent);
 }
 
 .summary {
   margin: 0;
-  color: #444;
+  color: var(--text-2);
   font-size: 14px;
   font-weight: 600;
 }
@@ -110,7 +112,7 @@
   flex-direction: column;
   gap: 4px;
   padding: 10px 12px;
-  background: #f6f1f1;
+  background: var(--surface-2);
   border-radius: 8px;
 }
 
@@ -122,7 +124,7 @@
 }
 
 .title {
-  color: #140f0f;
+  color: var(--text);
   font-weight: 600;
   text-decoration: none;
   word-break: break-word;
@@ -133,14 +135,14 @@
 }
 
 .subject {
-  color: #c25e00;
+  color: var(--amber);
   font-size: 12px;
   font-weight: 600;
 }
 
 .date {
   flex-shrink: 0;
-  color: #777;
+  color: var(--muted);
   font-size: 12px;
 }
 
@@ -161,7 +163,7 @@
 }
 
 .link {
-  color: #c25e00;
+  color: var(--amber);
   font-weight: 600;
   text-decoration: none;
   word-break: break-all;
@@ -173,7 +175,7 @@
 
 .empty {
   margin: 0;
-  color: #777;
+  color: var(--muted);
 }
 
 .pending {
@@ -184,7 +186,7 @@
 
 .label {
   margin: 0;
-  color: #444;
+  color: var(--text-2);
   font-size: 14px;
   font-weight: 600;
 }
@@ -212,25 +214,26 @@
   gap: 6px;
   margin-top: 2px;
   padding: 4px 10px;
-  border: 1px solid #e3d6d6;
+  border: 1px solid var(--accent);
   border-radius: 8px;
-  background: #fff;
-  color: #140f0f;
+  background: var(--accent);
+  color: var(--on-accent);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
 }
 
 .threadToggle:hover {
-  border-color: #ff8400;
+  border-color: var(--accent-hover);
+  background: var(--accent-hover);
 }
 
 .chevron {
-  color: #777;
+  color: var(--muted);
   font-size: 10px;
 }
 
 .threadActive {
-  border-color: #ff8400;
-  background: #fff4e5;
+  border-color: var(--accent);
+  background: var(--accent-soft);
 }

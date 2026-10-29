@@ -122,6 +122,8 @@ function renderInlines(items: Inline[], ctx: Ctx): React.ReactNode[] {
 // Названия цветов; vekorange — фирменный оранжевый
 function cssColor(color: string): string | undefined {
   if (color === 'vekorange') return '#ff8400'
+  // На тёмной теме чёрный текст не виден — оставляем обычный цвет текста
+  if (color === 'black') return undefined
   if (/^[a-zA-Z]+$/.test(color)) return color
   return undefined
 }

@@ -7,9 +7,10 @@
   flex-direction: column;
   min-width: 0;
   max-height: calc(100vh - 48px);
-  border-radius: 12px;
-  background: #fff;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  border-radius: 20px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  border: 1px solid var(--line-soft);
 }
 
 .header {
@@ -19,7 +20,7 @@
   align-items: flex-start;
   gap: 12px;
   padding: 18px 24px 14px;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid var(--line);
 }
 
 .title {
@@ -29,7 +30,7 @@
 
 .subtitle {
   margin-top: 2px;
-  color: #777;
+  color: var(--muted);
   font-size: 14px;
 }
 
@@ -39,14 +40,14 @@
   height: 36px;
   border: none;
   border-radius: 50%;
-  background: #f6f1f1;
-  color: #140f0f;
+  background: var(--surface-2);
+  color: var(--text);
   font-size: 16px;
   cursor: pointer;
 }
 
 .close:hover {
-  background: #ffe2c4;
+  background: var(--accent-soft-strong);
 }
 
 .body {
@@ -77,19 +78,19 @@
   margin: 0 0 16px;
   padding: 10px 14px;
   border-radius: 8px;
-  background: #fff4e5;
-  color: #140f0f;
+  background: var(--accent-soft);
+  color: var(--text);
 }
 
 .answerNote {
-  color: #777;
+  color: var(--muted);
   font-size: 13px;
 }
 
 .attachments {
   margin-bottom: 20px;
   padding: 12px 14px;
-  border: 1px solid #ff8400;
+  border: 1px solid var(--accent);
   border-radius: 8px;
 }
 
@@ -108,7 +109,7 @@
 }
 
 .attachments a {
-  color: #140f0f;
+  color: var(--text);
 }
 
 /* «Следующее задание» — в конце задания, справа */
@@ -118,13 +119,14 @@
   padding: 10px 16px;
   border: none;
   border-radius: 8px;
-  background: #ff8400;
-  color: #140f0f;
+  background: var(--accent);
+  color: var(--on-accent);
   font-size: 15px;
   font-weight: 600;
   cursor: pointer;
 }
 
 .next:hover {
-  background: #ff9a2e;
+  background: var(--accent-hover);
+  color: var(--on-accent);
 }

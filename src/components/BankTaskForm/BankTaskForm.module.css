@@ -5,9 +5,10 @@
   max-width: 420px;
   padding: 16px;
   margin-top: 24px;
-  background: #fff;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  background: var(--surface);
+  border-radius: 20px;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--line-soft);
 }
 
 .header {
@@ -19,17 +20,18 @@
 
 .toggle {
   padding: 6px 12px;
-  border: 1px solid #ff8400;
+  border: 1px solid var(--accent);
   border-radius: 8px;
-  background: transparent;
-  color: #140f0f;
+  background: var(--accent);
+  color: var(--on-accent);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
 }
 
 .toggle:hover {
-  background: #fff4e5;
+  border-color: var(--accent-hover);
+  background: var(--accent-hover);
 }
 
 .form {
@@ -44,27 +46,27 @@
   gap: 6px;
   font-size: 14px;
   font-weight: 600;
-  color: #444;
+  color: var(--text-2);
 }
 
 .label input,
 .label select {
   padding: 10px 12px;
-  border: 1px solid #ccc;
+  border: 1px solid var(--line);
   border-radius: 8px;
   font-size: 16px;
   font-weight: 400;
   font-family: inherit;
-  color: #140f0f;
+  color: var(--text);
 }
 
 .hint {
-  color: #2e7d32;
+  color: var(--success);
   font-size: 14px;
 }
 
 .error {
-  color: #d93025;
+  color: var(--danger);
   font-size: 14px;
 }
 
@@ -72,8 +74,8 @@
   height: 42px;
   border: none;
   border-radius: 8px;
-  background: #ff8400;
-  color: #140f0f;
+  background: var(--accent);
+  color: var(--on-accent);
   font-size: 16px;
   font-weight: 600;
   cursor: pointer;
@@ -86,7 +88,7 @@
 
 .link {
   align-self: flex-start;
-  color: #c25e00;
+  color: var(--amber);
   font-size: 14px;
   font-weight: 600;
   text-decoration: none;

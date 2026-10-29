@@ -8,8 +8,8 @@
 .buttons button {
   width: 200px;
   height: 30px;
-  color: #140f0f;
-  background: #ff8400;
+  color: var(--on-accent);
+  background: var(--accent);
   border: none;
   cursor: pointer;
 }

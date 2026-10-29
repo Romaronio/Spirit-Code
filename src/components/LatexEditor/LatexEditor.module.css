@@ -23,10 +23,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 2px dashed #ff8400;
+  border: 2px dashed var(--accent);
   border-radius: 8px;
-  background: rgba(255, 250, 245, 0.92);
-  color: #c25e00;
+  background: rgba(251, 246, 238, 0.95);
+  color: var(--amber);
   font-size: 15px;
   font-weight: 600;
   pointer-events: none;
@@ -36,9 +36,9 @@
 .editor .textarea {
   min-height: 160px;
   padding: 10px 12px;
-  border: 1px solid #ccc;
+  border: 1px solid var(--line);
   border-radius: 8px;
-  font-family: ui-monospace, Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: 14px;
   font-weight: 400;
   line-height: 1.45;
@@ -47,38 +47,43 @@
 
 .hint,
 .summary {
-  color: #777;
+  color: var(--muted);
   font-size: 13px;
 }
 
 .hint code {
-  font-family: ui-monospace, Consolas, monospace;
+  font-family: var(--font-mono);
 }
 
 .warning {
-  color: #c25e00;
+  color: var(--amber);
   font-weight: 600;
 }
 
 .toggle {
   align-self: flex-start;
   padding: 6px 12px;
-  border: 1px solid #ff8400;
+  border: 1px solid var(--accent);
   border-radius: 8px;
-  background: transparent;
-  color: #140f0f;
+  background: var(--accent);
+  color: var(--on-accent);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
+}
+
+.toggle:hover {
+  border-color: var(--accent-hover);
+  background: var(--accent-hover);
 }
 
 .preview {
   max-height: 520px;
   padding: 16px;
   overflow-y: auto;
-  border: 1px solid #eee;
+  border: 1px solid var(--line);
   border-radius: 8px;
-  background: #fffaf5;
+  background: var(--inset);
 }
 
 .hiddenInput {
@@ -99,9 +104,9 @@
 .photoWarnings {
   margin: 0;
   padding: 8px 12px 8px 28px;
-  border-left: 3px solid #ff8400;
+  border-left: 3px solid var(--accent);
   border-radius: 4px;
-  background: #fff4e8;
-  color: #8a4300;
+  background: var(--accent-soft);
+  color: var(--amber);
   font-size: 13px;
 }

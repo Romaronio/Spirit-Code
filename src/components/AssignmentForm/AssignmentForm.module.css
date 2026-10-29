@@ -5,15 +5,16 @@
   max-width: 420px;
   padding: 16px;
   margin-top: 24px;
-  background: #fff;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  background: var(--surface);
+  border-radius: 20px;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--line-soft);
 }
 
 .form input,
 .form textarea {
   padding: 10px 12px;
-  border: 1px solid #ccc;
+  border: 1px solid var(--line);
   border-radius: 8px;
   font-size: 16px;
   font-family: inherit;
@@ -28,17 +29,18 @@
 
 .toggle {
   padding: 6px 12px;
-  border: 1px solid #ff8400;
+  border: 1px solid var(--accent);
   border-radius: 8px;
-  background: transparent;
-  color: #140f0f;
+  background: var(--accent);
+  color: var(--on-accent);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
 }
 
 .toggle:hover {
-  background: #fff4e5;
+  border-color: var(--accent-hover);
+  background: var(--accent-hover);
 }
 
 .subjectSection {
@@ -50,7 +52,7 @@
 .label {
   font-weight: 600;
   font-size: 14px;
-  color: #333;
+  color: var(--text-2);
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -67,15 +69,15 @@
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
-  border: 2px solid #ddd;
+  border: 2px solid var(--line);
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .radioLabel:hover {
-  border-color: #ff8400;
-  background: #fff5e6;
+  border-color: var(--accent);
+  background: var(--accent-soft);
 }
 
 .radioLabel input[type="radio"] {
@@ -85,11 +87,11 @@
 }
 
 .radioLabel input[type="radio"]:checked {
-  accent-color: #ff8400;
+  accent-color: var(--accent);
 }
 
 .error {
-  color: #d93025;
+  color: var(--danger);
   font-size: 14px;
 }
 
@@ -97,8 +99,8 @@
   height: 42px;
   border: none;
   border-radius: 8px;
-  background: #ff8400;
-  color: #140f0f;
+  background: var(--accent);
+  color: var(--on-accent);
   font-size: 16px;
   font-weight: 600;
   cursor: pointer;
@@ -107,7 +109,7 @@
 .divider {
   height: 1px;
   margin: 8px 0;
-  background: #e0e0e0;
+  background: var(--line);
 }
 
 .files {
@@ -127,7 +129,7 @@
 .linkButton {
   border: none;
   background: none;
-  color: #d93025;
+  color: var(--danger);
   cursor: pointer;
   font-size: 14px;
 }

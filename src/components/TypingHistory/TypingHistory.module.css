@@ -10,8 +10,8 @@
 
 .table th {
   padding: 6px 8px;
-  border-bottom: 1px solid #eee;
-  color: #777;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
   font-weight: 600;
   text-align: left;
   white-space: nowrap;
@@ -19,7 +19,7 @@
 
 .table td {
   padding: 6px 8px;
-  border-bottom: 1px solid #f3f3f3;
+  border-bottom: 1px solid var(--line);
   white-space: nowrap;
 }
 
@@ -28,15 +28,15 @@
 }
 
 .best {
-  color: #ff8400;
+  color: var(--accent-text);
 }
 
 .muted {
-  color: #777;
+  color: var(--muted);
 }
 
 .empty {
   margin: 0;
-  color: #777;
+  color: var(--muted);
   font-size: 14px;
 }

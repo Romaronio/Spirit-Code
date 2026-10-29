@@ -4,9 +4,10 @@
   gap: 12px;
   max-width: 820px;
   padding: 24px;
-  background: #fff;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  background: var(--surface);
+  border-radius: 20px;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--line-soft);
 }
 
 .header {
@@ -19,28 +20,29 @@
 
 .refresh {
   padding: 6px 12px;
-  border: 1px solid #ff8400;
+  border: 1px solid var(--accent);
   border-radius: 8px;
-  background: transparent;
-  color: #140f0f;
+  background: var(--accent);
+  color: var(--on-accent);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
 }
 
 .refresh:hover {
-  background: #fff4e5;
+  border-color: var(--accent-hover);
+  background: var(--accent-hover);
 }
 
 .hint {
   margin: 0;
-  color: #777;
+  color: var(--muted);
   font-size: 13px;
 }
 
 .error {
   margin: 0;
-  color: #d93025;
+  color: var(--danger);
   font-size: 14px;
 }
 
@@ -61,8 +63,8 @@
 
 .table th {
   padding: 4px 8px;
-  border-bottom: 1px solid #eee;
-  color: #777;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
   font-weight: 600;
   text-align: left;
   white-space: nowrap;
@@ -78,12 +80,12 @@
 }
 
 .sortButton:hover {
-  color: #140f0f;
+  color: var(--text);
 }
 
 .table td {
   padding: 8px;
-  border-bottom: 1px solid #f3f3f3;
+  border-bottom: 1px solid var(--line);
   white-space: nowrap;
 }
 
@@ -93,7 +95,7 @@
 
 .row:hover,
 .open {
-  background: #fff4e5;
+  background: var(--accent-soft);
 }
 
 .name {
@@ -105,7 +107,7 @@
 }
 
 .muted {
-  color: #777;
+  color: var(--muted);
 }
 
 .modesTable {
@@ -115,19 +117,19 @@
 
 .modesTable th {
   padding: 4px 8px;
-  border-bottom: 1px solid #f0e2d0;
+  border-bottom: 1px solid var(--line);
 }
 
 .modesTable td {
   padding: 6px 8px;
-  border-bottom: 1px solid #f6ece0;
+  border-bottom: 1px solid var(--line);
 }
 
 .noTests td {
-  color: #aaa;
+  color: var(--faint);
 }
 
 .historyCell {
   padding: 8px 8px 16px 24px !important;
-  background: #fffaf3;
+  background: var(--surface-2);
 }

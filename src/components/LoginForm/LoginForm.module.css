@@ -4,8 +4,11 @@
   gap: 12px;
   width: 300px;
   padding: 24px;
-  background: #1f1717;
-  border-radius: 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: 20px;
+  background: var(--surface);
+  backdrop-filter: blur(16px);
+  box-shadow: var(--shadow);
 }
 
 .title {
@@ -16,10 +19,10 @@
 .form input {
   height: 40px;
   padding: 0 12px;
-  border: 1px solid #4a3a3a;
+  border: 1px solid var(--line);
   border-radius: 8px;
-  background: #140f0f;
-  color: #fff;
+  background: var(--bg);
+  color: var(--text);
   font-size: 16px;
 }
 
@@ -31,22 +34,22 @@
 .role {
   flex: 1;
   height: 40px;
-  border: 1px solid #4a3a3a;
+  border: 1px solid var(--line);
   border-radius: 8px;
   background: transparent;
-  color: #fff;
+  color: var(--text);
   cursor: pointer;
 }
 
 .active {
-  background: #ff8400;
-  border-color: #ff8400;
-  color: #140f0f;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
   font-weight: 600;
 }
 
 .error {
-  color: #ff6b6b;
+  color: var(--danger);
   font-size: 14px;
 }
 
@@ -54,8 +57,8 @@
   height: 42px;
   border: none;
   border-radius: 8px;
-  background: #ff8400;
-  color: #140f0f;
+  background: var(--accent);
+  color: var(--on-accent);
   font-size: 16px;
   font-weight: 600;
   cursor: pointer;

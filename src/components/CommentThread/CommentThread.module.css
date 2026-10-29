@@ -4,7 +4,7 @@
   gap: 8px;
   margin-top: 4px;
   padding-top: 8px;
-  border-top: 1px solid #e3d6d6;
+  border-top: 1px solid var(--line);
 }
 
 .messages {
@@ -18,15 +18,15 @@
 
 .message {
   padding: 6px 10px;
-  border-left: 3px solid #ccc;
+  border-left: 3px solid var(--line);
   border-radius: 6px;
-  background: #fff;
+  background: var(--surface);
 }
 
 /* Сообщения учителя выделены */
 .teacher {
-  border-left-color: #ff8400;
-  background: #fff4e5;
+  border-left-color: var(--accent);
+  background: var(--accent-soft);
 }
 
 .meta {
@@ -42,7 +42,7 @@
 
 .time {
   flex-shrink: 0;
-  color: #777;
+  color: var(--muted);
 }
 
 .text {
@@ -62,7 +62,7 @@
   flex: 1;
   min-width: 0;
   padding: 6px 10px;
-  border: 1px solid #ccc;
+  border: 1px solid var(--line);
   border-radius: 8px;
   font-family: inherit;
   font-size: 14px;
@@ -74,8 +74,8 @@
   padding: 0 12px;
   border: none;
   border-radius: 8px;
-  background: #ff8400;
-  color: #140f0f;
+  background: var(--accent);
+  color: var(--on-accent);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -88,7 +88,7 @@
 
 .error {
   margin: 0;
-  color: #d93025;
+  color: var(--danger);
   font-size: 13px;
 }
 
@@ -101,7 +101,7 @@
 }
 
 .selected {
-  outline: 2px solid #ff8400;
+  outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
 
@@ -124,12 +124,17 @@
 .cancel {
   height: 34px;
   padding: 0 12px;
-  border: 1px solid #ccc;
+  border: 1px solid var(--accent);
   border-radius: 8px;
-  background: #fff;
-  color: #140f0f;
+  background: var(--accent);
+  color: var(--on-accent);
   font-size: 14px;
   cursor: pointer;
+}
+
+.cancel:hover {
+  border-color: var(--accent-hover);
+  background: var(--accent-hover);
 }
 
 .menu {
@@ -139,9 +144,9 @@
   flex-direction: column;
   min-width: 160px;
   padding: 4px;
-  background: #fff;
+  background: var(--surface);
   border-radius: 10px;
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 6px 24px rgba(42, 28, 18, 0.14);
 }
 
 .menu button {
@@ -149,23 +154,23 @@
   border: none;
   border-radius: 6px;
   background: none;
-  color: #140f0f;
+  color: var(--text);
   font-size: 15px;
   text-align: left;
   cursor: pointer;
 }
 
 .menu button:hover {
-  background: #f6f1f1;
+  background: var(--surface-2);
 }
 
 .menu .danger {
-  color: #d93025;
+  color: var(--danger);
 }
 
 .emptyText {
   margin: 0;
-  color: #777;
+  color: var(--muted);
   font-size: 14px;
 }
 
@@ -187,7 +192,7 @@
 .fill .composer {
   margin-top: auto;
   padding-top: 10px;
-  border-top: 1px solid #e3d6d6;
+  border-top: 1px solid var(--line);
 }
 
 /* Поле ввода вместе с панелью формул и предпросмотром */
@@ -202,22 +207,22 @@
   width: 34px;
   height: 34px;
   padding: 0;
-  border: 1px solid #ccc;
+  border: 1px solid var(--line);
   border-radius: 8px;
-  background: #fff;
-  color: #555;
+  background: var(--surface);
+  color: var(--muted);
   font-size: 17px;
   cursor: pointer;
 }
 
 .mathToggle:hover,
 .mathToggleActive {
-  border-color: #ff8400;
-  color: #140f0f;
+  border-color: var(--accent);
+  color: var(--text);
 }
 
 .mathToggleActive {
-  background: #fff4e5;
+  background: var(--accent-soft);
 }
 
 .mathBar {
@@ -230,29 +235,29 @@
   min-width: 34px;
   height: 30px;
   padding: 0 8px;
-  border: 1px solid #e3d6d6;
+  border: 1px solid var(--line);
   border-radius: 6px;
-  background: #fff;
-  color: #140f0f;
+  background: var(--surface);
+  color: var(--text);
   font-size: 14px;
   cursor: pointer;
 }
 
 .mathButton:hover {
-  border-color: #ff8400;
+  border-color: var(--accent);
 }
 
 .preview {
   padding: 6px 10px;
-  border: 1px dashed #e3d6d6;
+  border: 1px dashed var(--line);
   border-radius: 6px;
-  background: #fffdfb;
+  background: var(--surface-2);
 }
 
 .previewLabel {
   display: block;
   margin-bottom: 2px;
-  color: #777;
+  color: var(--muted);
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;

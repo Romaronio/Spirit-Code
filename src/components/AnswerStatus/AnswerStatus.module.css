@@ -1,27 +1,29 @@
 .badge {
   align-self: flex-start;
-  padding: 2px 10px;
-  border-radius: 999px;
+  padding: 3px 10px;
+  border-radius: 8px;
   font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
 }
 
+/* Цвета статусов как в дизайне: на проверке — янтарный, принято — оранжевый,
+   на доработке — коралловый */
 .pending {
-  background: #f0e6e6;
-  color: #555;
+  background: #fff0c2;
+  color: var(--amber);
 }
 
 .accepted {
-  border-color: #1e8e3e;
-  background: #e6f4ea;
-  color: #137333;
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-text);
 }
 
 .rejected {
-  border-color: #d93025;
-  background: #fce8e6;
-  color: #c5221f;
+  border-color: var(--danger);
+  background: var(--danger-soft);
+  color: var(--danger);
 }
 
 .review {
@@ -33,17 +35,18 @@
 
 .button {
   padding: 4px 10px;
-  border: 1px solid #ccc;
+  border: 1px solid var(--accent);
   border-radius: 8px;
-  background: #fff;
-  color: #140f0f;
+  background: var(--accent);
+  color: var(--on-accent);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
 }
 
 .button:hover {
-  border-color: #999;
+  border-color: var(--accent-hover);
+  background: var(--accent-hover);
 }
 
 .button:disabled {
@@ -52,6 +55,6 @@
 }
 
 .error {
-  color: #d93025;
+  color: var(--danger);
   font-size: 13px;
 }

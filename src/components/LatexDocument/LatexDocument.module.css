@@ -1,6 +1,6 @@
 /* Оформление как в PDF-конспектах Spirit Code: оранжевые плашки «Задача N» */
 .doc {
-  color: #140f0f;
+  color: var(--text);
   font-size: 17px;
   line-height: 1.6;
   overflow-wrap: anywhere;
@@ -25,8 +25,8 @@
   flex-shrink: 0;
   padding: 3px 12px;
   border-radius: 4px;
-  background: #ff8400;
-  color: #fff;
+  background: var(--accent);
+  color: var(--on-accent);
   font-size: 14px;
   font-weight: 700;
 }
@@ -35,13 +35,14 @@
   flex: 1;
   height: 2px;
   border-radius: 1px;
-  background: #ff8400;
+  background: var(--accent);
+  color: var(--on-accent);
 }
 
 .hr {
   margin: 20px 0;
   border: none;
-  border-top: 1px solid #140f0f;
+  border-top: 1px solid var(--line);
 }
 
 .heading {
@@ -68,8 +69,8 @@
   padding: 12px 14px;
   overflow-x: auto;
   border-radius: 8px;
-  background: #f6f1f1;
-  font-family: ui-monospace, Consolas, monospace;
+  background: var(--surface-2);
+  font-family: var(--font-mono);
   font-size: 14px;
   line-height: 1.45;
   white-space: pre;
@@ -78,8 +79,8 @@
 .tt {
   padding: 1px 4px;
   border-radius: 4px;
-  background: #f6f1f1;
-  font-family: ui-monospace, Consolas, monospace;
+  background: var(--surface-2);
+  font-family: var(--font-mono);
   font-size: 0.9em;
 }
 
@@ -89,7 +90,7 @@
 
 .box {
   padding: 1px 6px;
-  border: 1px solid #140f0f;
+  border: 1px solid var(--line);
 }
 
 .img {
@@ -97,14 +98,18 @@
   max-width: 100%;
   height: auto;
   margin: 8px auto;
+  /* рисунки обычно чёрные на прозрачном — на тёмном фоне нужна светлая подложка */
+  padding: 6px;
+  border-radius: 8px;
+  background: #fff;
 }
 
 .missing {
   margin: 8px 0;
   padding: 10px 12px;
-  border: 1px dashed #ff8400;
+  border: 1px dashed var(--accent);
   border-radius: 8px;
-  color: #8a4a00;
+  color: var(--amber);
   font-size: 14px;
 }
 
@@ -121,7 +126,7 @@
 
 .table td {
   padding: 4px 10px;
-  border: 1px solid #ccc;
+  border: 1px solid var(--line);
 }
 
 .center {
@@ -139,13 +144,13 @@
 .quote {
   margin: 0 0 10px;
   padding-left: 14px;
-  border-left: 3px solid #ff8400;
+  border-left: 3px solid var(--accent);
 }
 
 .frame {
   margin: 0 0 10px;
   padding: 10px 14px;
-  border: 1px solid #ff8400;
+  border: 1px solid var(--accent);
   border-radius: 8px;
 }
 
@@ -166,7 +171,7 @@
 }
 
 .raw {
-  font-family: ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 0.9em;
-  color: #555;
+  color: var(--muted);
 }

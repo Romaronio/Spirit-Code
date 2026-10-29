@@ -9,9 +9,9 @@ const SIZE = 64
 const STROKE = 8
 const RADIUS = (SIZE - STROKE) / 2
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS
-const GAP = 2 // зазор между зелёной и красной частью
+const GAP = 2 // зазор между сданной частью и остальной
 
-// Кольцо прогресса: зелёным — доля сданных ДЗ, красным — остальное
+// Кольцо прогресса: оранжевым — доля сданных ДЗ, тёмной дорожкой — остальное
 function ProgressDonut({ done, total }: Props) {
   const percent = total > 0 ? Math.round((done / total) * 100) : 0
   const doneLength = total > 0 ? (done / total) * CIRCUMFERENCE : 0
@@ -53,9 +53,6 @@ function ProgressDonut({ done, total }: Props) {
         )}
       </svg>
       <span className={styles.percent}>{total > 0 ? `${percent}%` : '—'}</span>
-      <span className={styles.caption}>
-        сдано {done} из {total}
-      </span>
     </div>
   )
 }

@@ -15,7 +15,7 @@
 }
 
 .raw {
-  font-family: ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 0.9em;
-  color: #555;
+  color: var(--muted);
 }
