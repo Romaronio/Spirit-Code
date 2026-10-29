@@ -203,12 +203,14 @@ export interface Call {
   id: number
   title: string
   subject: string // пусто — для всех учеников
+  student: number | null // личный урок с одним учеником
+  student_name: string | null
   started_by_name: string
   started_at: string
   ended_at: string | null
 }
 
-export type NewCall = Pick<Call, 'title' | 'subject'>
+export type NewCall = Pick<Call, 'title' | 'subject' | 'student'>
 
 // Пропуск в комнату: токен LiveKit и адрес сервера (пусто — этот же сайт, путь /livekit)
 export interface CallJoin {

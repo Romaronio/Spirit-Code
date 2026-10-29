@@ -323,10 +323,14 @@ class BankTaskSerializer(serializers.ModelSerializer):
 class CallSerializer(serializers.ModelSerializer):
     """Созвон-урок: кто начал, по какому предмету, идёт ли ещё"""
     started_by_name = serializers.CharField(source='started_by.name', read_only=True)
+    student_name = serializers.CharField(source='student.name', read_only=True, default=None)
+    student = serializers.PrimaryKeyRelatedField(
+        queryset=Account.objects.filter(role='student'), required=False, allow_null=True,
+    )
 
     class Meta:
         model = Call
-        fields = ['id', 'title', 'subject', 'started_by_name', 'started_at', 'ended_at']
+        fields = ['id', 'title', 'subject', 'student', 'student_name', 'started_by_name', 'started_at', 'ended_at']
         read_only_fields = ['started_at', 'ended_at']
 
     def validate_title(self, value):
@@ -334,3 +338,8 @@ class CallSerializer(serializers.ModelSerializer):
 
     def validate_subject(self, value):
         return value.strip()
+
+    def validate(self, attrs):
+        if attrs.get('student'):
+            attrs['subject'] = ''  # личный урок — предмет не нужен
+        return attrs

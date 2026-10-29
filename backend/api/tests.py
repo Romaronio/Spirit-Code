@@ -981,6 +981,26 @@ class CallTests(AuthTestCase):
             self.login_as(self.ivan)
             self.assertEqual(self.client.get('/api/calls/').data, [])
 
+    def test_personal_call(self):
+        self.login_as(self.teacher)
+        response = self.client.post('/api/calls/', {'student': self.anna.id, 'subject': 'Биология'}, format='json')
+        self.assertEqual(response.status_code, 201)
+        call_id = response.data['id']
+        self.assertEqual(response.data['student_name'], 'anna')
+        self.assertEqual(response.data['subject'], '')
+        self.login_as(self.ivan)
+        self.assertEqual(self.client.get('/api/calls/').data, [])
+        self.assertEqual(self.client.post(f'/api/calls/{call_id}/join/').status_code, 404)
+        with override_settings(CALLS_STUDENTS=[]):  # личный урок виден, даже пока созвоны закрыты
+            self.login_as(self.anna)
+            self.assertEqual([c['id'] for c in self.client.get('/api/calls/').data], [call_id])
+            self.assertEqual(self.client.post(f'/api/calls/{call_id}/join/').status_code, 200)
+
+    def test_personal_call_only_for_student(self):
+        self.login_as(self.teacher)
+        response = self.client.post('/api/calls/', {'student': self.teacher.id}, format='json')
+        self.assertEqual(response.status_code, 400)
+
     @override_settings(LIVEKIT_API_KEY='', LIVEKIT_API_SECRET='')
     def test_not_configured(self):
         call_id = self.start_call()

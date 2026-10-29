@@ -605,8 +605,8 @@ def _calls_open_for(user):
 class CallViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     """Созвоны-уроки (LiveKit).
 
-    GET /calls/ — идущие созвоны: учителю все, ученику — по его предметам (и общие, без предмета).
-    POST /calls/ — учитель начинает созвон {subject, title}.
+    GET /calls/ — идущие созвоны: учителю все, ученику — личные с ним и по его предметам (и общие, без предмета).
+    POST /calls/ — учитель начинает созвон {subject, title} или личный {student, title}.
     POST /calls/{id}/join/ — токен LiveKit для входа в комнату.
     POST /calls/{id}/end/ — учитель завершает созвон для всех.
     """
@@ -619,19 +619,24 @@ class CallViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retriev
         return [IsAuthenticated()]
 
     def get_queryset(self):
-        queryset = Call.objects.select_related('started_by').filter(
+        queryset = Call.objects.select_related('started_by', 'student').filter(
             ended_at__isnull=True,
             started_at__gte=timezone.now() - Call.MAX_DURATION,
         )
         user = self.request.user
         if getattr(user, 'is_teacher', False):
             return queryset
+        # Личный урок учитель начал сам для этого ученика — он виден и при закрытых CALLS_STUDENTS
+        personal = queryset.filter(student=user)
         if not _calls_open_for(user):
-            return queryset.none()
+            return personal
         # Сравниваем в Python: iexact в SQLite не понимает регистр русских букв.
         # Идущих созвонов единицы, так что это дёшево
         subjects = {str(s).strip().casefold() for s in (getattr(user, 'subjects', None) or [])}
-        ids = [c.id for c in queryset if not c.subject or c.subject.casefold() in subjects]
+        ids = [
+            c.id for c in queryset
+            if c.student_id == user.id or (not c.student_id and (not c.subject or c.subject.casefold() in subjects))
+        ]
         return queryset.filter(id__in=ids)
 
     def perform_create(self, serializer):

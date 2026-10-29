@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import styles from './CallsBar.module.css'
 import * as api from '../../services/api'
-import type { Call } from '../../types'
+import type { Account, Call } from '../../types'
 import { callName } from '../../utils/calls'
 
 const POLL_INTERVAL_MS = 15_000 // как часто проверяем, не начался ли урок
@@ -10,14 +10,17 @@ const POLL_INTERVAL_MS = 15_000 // как часто проверяем, не н
 interface Props {
   isTeacher: boolean
   subjects: string[] // предметы для выбора у учителя
+  students: Account[] // ученики для личного урока
 }
+
+const STUDENT_PREFIX = 'student:' // значение в списке «Для кого»: предмет или student:<id>
 
 // Созвоны на главной: учитель начинает урок и видит идущие,
 // ученик видит плашку «Идёт урок — подключиться» (если урока нет — ничего)
-function CallsBar({ isTeacher, subjects }: Props) {
+function CallsBar({ isTeacher, subjects, students }: Props) {
   const navigate = useNavigate()
   const [calls, setCalls] = useState<Call[]>([])
-  const [subject, setSubject] = useState('')
+  const [audience, setAudience] = useState('') // '' — все, предмет или student:<id>
   const [title, setTitle] = useState('')
   const [error, setError] = useState('')
   const [isStarting, setIsStarting] = useState(false)
@@ -55,7 +58,8 @@ function CallsBar({ isTeacher, subjects }: Props) {
     setError('')
     setIsStarting(true)
     try {
-      const call = await api.startCall({ subject, title: title.trim() })
+      const student = audience.startsWith(STUDENT_PREFIX) ? Number(audience.slice(STUDENT_PREFIX.length)) : null
+      const call = await api.startCall({ subject: student ? '' : audience, student, title: title.trim() })
       navigate(`/call/${call.id}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Не удалось начать урок')
@@ -102,13 +106,26 @@ function CallsBar({ isTeacher, subjects }: Props) {
           <span className={styles.startLabel}>Онлайн-урок</span>
           <label className={styles.field}>
             <span className={styles.visuallyHidden}>Для кого</span>
-            <select value={subject} onChange={(e) => setSubject(e.target.value)}>
+            <select value={audience} onChange={(e) => setAudience(e.target.value)}>
               <option value="">Все ученики</option>
-              {subjects.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
+              {subjects.length > 0 && (
+                <optgroup label="По предмету">
+                  {subjects.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              {students.length > 0 && (
+                <optgroup label="Лично с учеником">
+                  {students.map((s) => (
+                    <option key={s.id} value={`${STUDENT_PREFIX}${s.id}`}>
+                      {s.name}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
             </select>
           </label>
           <label className={styles.field}>

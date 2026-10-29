@@ -346,11 +346,19 @@ class Call(models.Model):
     """Созвон-урок в LiveKit. Идёт, пока учитель не завершит его (или не истечёт MAX_DURATION).
 
     Подключиться могут учитель и ученики с предметом созвона; пустой предмет — все ученики.
+    Если выбран student — это личный урок: из учеников его видит только он.
     """
     MAX_DURATION = timedelta(hours=6)  # забытый незавершённый созвон дольше не показываем
 
     title = models.CharField(max_length=255, blank=True, default='')
     subject = models.CharField(max_length=100, blank=True, default='')
+    student = models.ForeignKey(
+        Account,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='personal_calls',
+    )
     started_by = models.ForeignKey(
         Account,
         on_delete=models.CASCADE,
@@ -363,7 +371,7 @@ class Call(models.Model):
         ordering = ['-started_at']
 
     def __str__(self):
-        return f"Созвон #{self.id} {self.subject or 'все'}"
+        return f"Созвон #{self.id} {self.student or self.subject or 'все'}"
 
     @property
     def room_name(self):
