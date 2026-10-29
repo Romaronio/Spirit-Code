@@ -59,7 +59,7 @@ class LessonFileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = LessonFile
-        fields = ['id', 'name', 'url', 'file', 'assignment']
+        fields = ['id', 'name', 'url', 'file', 'assignment', 'task_number']
         extra_kwargs = {
             'file': {'write_only': True}
         }
@@ -74,7 +74,7 @@ class HomeworkFileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = HomeworkFile
-        fields = ['id', 'name', 'url', 'file', 'homework', 'created_at']
+        fields = ['id', 'name', 'url', 'file', 'homework', 'task_number', 'created_at']
         extra_kwargs = {
             'file': {'write_only': True}
         }
@@ -93,8 +93,12 @@ class HomeworkFileWriteSerializer(serializers.ModelSerializer):
         }
 
 
+MAX_TASK_ANSWER_LENGTH = 500
+
+
 def clean_numbered_tasks(value):
-    """Список {number, latex}: номера от 1 до 999 без повторов, по возрастанию"""
+    """Список {number, latex, answer}: номера от 1 до 999 без повторов, по возрастанию.
+    Ответ необязателен — пустой не сохраняем"""
     if value in (None, ''):
         return []
     if not isinstance(value, list) or len(value) > 50:
@@ -103,19 +107,28 @@ def clean_numbered_tasks(value):
     for item in value:
         if not isinstance(item, dict):
             raise serializers.ValidationError('Ожидается список заданий по номерам')
-        number, latex = item.get('number'), item.get('latex', '')
+        number, latex, answer = item.get('number'), item.get('latex', ''), item.get('answer', '')
         if isinstance(number, bool) or not isinstance(number, int) or not 1 <= number <= 999:
             raise serializers.ValidationError('Номер задания — целое число от 1 до 999')
         if not isinstance(latex, str):
             raise serializers.ValidationError(f'Задание {number}: LaTeX должен быть текстом')
         if len(latex) > MAX_LATEX_LENGTH:
             raise serializers.ValidationError(f'Задание {number}: LaTeX длиннее {MAX_LATEX_LENGTH} знаков')
+        if not isinstance(answer, str) or len(answer.strip()) > MAX_TASK_ANSWER_LENGTH:
+            raise serializers.ValidationError(f'Задание {number}: ответ — текст до {MAX_TASK_ANSWER_LENGTH} знаков')
         if number in tasks:
             raise serializers.ValidationError(f'Номер {number} указан дважды')
-        tasks[number] = latex
-    if sum(len(latex) for latex in tasks.values()) > MAX_TOTAL_LATEX_LENGTH:
+        tasks[number] = {'number': number, 'latex': latex}
+        if answer.strip():
+            tasks[number]['answer'] = answer.strip()
+    if sum(len(t['latex']) for t in tasks.values()) > MAX_TOTAL_LATEX_LENGTH:
         raise serializers.ValidationError(f'Все задания вместе длиннее {MAX_TOTAL_LATEX_LENGTH} знаков')
-    return [{'number': n, 'latex': tasks[n]} for n in sorted(tasks)]
+    return [tasks[n] for n in sorted(tasks)]
+
+
+def without_answers(tasks):
+    """Номера заданий для ученика: ответы к ним видит только учитель"""
+    return [{k: v for k, v in t.items() if k != 'answer'} for t in tasks or []]
 
 
 class HomeworkSerializer(serializers.ModelSerializer):
@@ -204,6 +217,15 @@ class AssignmentSerializer(serializers.ModelSerializer):
 
     def validate_numbered_tasks(self, value):
         return clean_numbered_tasks(value)
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        user = getattr(self.context.get('request'), 'user', None)
+        if not getattr(user, 'is_teacher', False):
+            data['numbered_tasks'] = without_answers(data.get('numbered_tasks'))
+            if data.get('homework'):
+                data['homework']['numbered_tasks'] = without_answers(data['homework'].get('numbered_tasks'))
+        return data
 
     def get_student_homeworks(self, obj):
         """Учитель видит все ответы, ученик — только свой"""

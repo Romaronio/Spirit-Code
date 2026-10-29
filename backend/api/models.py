@@ -100,7 +100,8 @@ class Assignment(models.Model):
     deadline = models.DateField()
     recording_url = models.URLField(blank=True, null=True)
     description = models.TextField(blank=True, null=True)
-    # Задания по номерам (например, номера заданий ЕГЭ): [{"number": 5, "latex": "..."}].
+    # Задания по номерам (например, номера заданий ЕГЭ): [{"number": 5, "latex": "...", "answer": "..."}].
+    # Ответ видит только учитель.
     # У каждого номера своя кнопка и свой документ
     numbered_tasks = models.JSONField(blank=True, default=list)
     # Задания классной работы в LaTeX без номера — ученик открывает их прямо на сайте
@@ -125,6 +126,8 @@ class LessonFile(models.Model):
     )
     name = models.CharField(max_length=255)
     file = models.FileField(upload_to='lesson_files/', null=True, blank=True, validators=[validate_upload])
+    # Файл к конкретному номеру задания (например, 24.txt); None — общий файл урока
+    task_number = models.PositiveSmallIntegerField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -169,6 +172,8 @@ class HomeworkFile(models.Model):
     )
     name = models.CharField(max_length=255)
     file = models.FileField(upload_to='homework_files/', null=True, blank=True, validators=[validate_upload])
+    # Файл к конкретному номеру задания ДЗ; None — общий файл ДЗ
+    task_number = models.PositiveSmallIntegerField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
 

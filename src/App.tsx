@@ -82,7 +82,13 @@ function App() {
       const { homework, ...assignmentChanges } = changes
       const updated = await api.updateAssignment(id, {
         ...assignmentChanges,
-        homework: homework ? { description: homework.description, tasks_latex: homework.tasks_latex } : undefined,
+        homework: homework && {
+          description: homework.description,
+          numbered_tasks: homework.numbered_tasks,
+          tasks_latex: homework.tasks_latex,
+          task_files: homework.task_files,
+          delete_file_ids: homework.delete_file_ids,
+        },
         homework_files: homework?.files,
       })
       setItems((prev) =>

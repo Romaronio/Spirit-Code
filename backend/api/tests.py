@@ -689,6 +689,84 @@ class TasksLatexTests(AuthTestCase):
         response = self.patch({'numbered_tasks': json.dumps([])})
         self.assertEqual(response.data['numbered_tasks'], [])
 
+    def test_task_answer_visible_only_to_teacher(self):
+        self.login_as(self.teacher)
+        tasks = [{'number': 5, 'latex': 'x', 'answer': ' 42 '}, {'number': 6, 'latex': 'y', 'answer': ''}]
+        response = self.patch({
+            'numbered_tasks': json.dumps(tasks),
+            'homework': json.dumps({'numbered_tasks': [{'number': 1, 'latex': 'z', 'answer': '7'}]}),
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['numbered_tasks'], [
+            {'number': 5, 'latex': 'x', 'answer': '42'}, {'number': 6, 'latex': 'y'},
+        ])
+        self.assertEqual(response.data['homework']['numbered_tasks'][0]['answer'], '7')
+
+        self.login_as(self.anna)
+        data = self.client.get(f'/api/assignments/{self.bio.id}/').data
+        self.assertEqual(data['numbered_tasks'], [{'number': 5, 'latex': 'x'}, {'number': 6, 'latex': 'y'}])
+        self.assertEqual(data['homework']['numbered_tasks'], [{'number': 1, 'latex': 'z'}])
+        listed = self.client.get('/api/assignments/').data['results']
+        self.assertNotIn('answer', json.dumps(listed))
+
+        self.login_as(self.teacher)
+        bad = [{'number': 5, 'answer': 'x' * 501}]
+        self.assertEqual(self.patch({'numbered_tasks': json.dumps(bad)}).status_code, 400)
+
+
+class TaskFilesTests(AuthTestCase):
+    def setUp(self):
+        super().setUp()
+        self.tmp = tempfile.mkdtemp()
+        self.media = override_settings(MEDIA_ROOT=self.tmp)
+        self.media.enable()
+        self.login_as(self.teacher)
+
+    def tearDown(self):
+        self.media.disable()
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def patch(self, data):
+        return self.client.patch(f'/api/assignments/{self.bio.id}/', data, format='multipart')
+
+    def test_files_attached_to_numbers(self):
+        response = self.patch({
+            'numbered_tasks': json.dumps([{'number': 24, 'latex': 'x'}]),
+            'task_files_24': SimpleUploadedFile('24.txt', b'abc'),
+            'files': SimpleUploadedFile('общий.txt', b'1'),
+            'homework': json.dumps({'numbered_tasks': [{'number': 9, 'latex': 'y'}]}),
+            'homework_task_files_9': SimpleUploadedFile('9.csv', b'1;2'),
+        })
+        self.assertEqual(response.status_code, 200)
+        numbers = {f['name']: f['task_number'] for f in response.data['files']}
+        self.assertEqual(numbers, {'24.txt': 24, 'общий.txt': None})
+        self.assertEqual(response.data['homework']['files'][0]['task_number'], 9)
+
+        # Убрали номер — его файлы удаляются, общий файл остаётся
+        response = self.patch({'numbered_tasks': json.dumps([])})
+        self.assertEqual([f['name'] for f in response.data['files']], ['общий.txt'])
+
+    def test_delete_selected_files(self):
+        self.patch({
+            'numbered_tasks': json.dumps([{'number': 1, 'latex': 'x'}]),
+            'task_files_1': [SimpleUploadedFile('a.txt', b'a'), SimpleUploadedFile('b.txt', b'b')],
+        })
+        a = LessonFile.objects.get(name='a.txt')
+        other = Assignment.objects.create(title='Чужое', subject='Биология', deadline='2026-12-01')
+        foreign = LessonFile.objects.create(assignment=other, name='чужой.txt', file=SimpleUploadedFile('c.txt', b'c'))
+
+        response = self.patch({'delete_file_ids': json.dumps([a.id, foreign.id])})
+        self.assertEqual([f['name'] for f in response.data['files']], ['b.txt'])
+        self.assertTrue(LessonFile.objects.filter(pk=foreign.pk).exists())
+
+    def test_task_file_type_checked(self):
+        response = self.patch({
+            'numbered_tasks': json.dumps([{'number': 1, 'latex': 'x'}]),
+            'task_files_1': SimpleUploadedFile('virus.exe', b'MZ'),
+        })
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(LessonFile.objects.exists())
+
 
 def png_bytes():
     from io import BytesIO

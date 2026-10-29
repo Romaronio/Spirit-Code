@@ -24,6 +24,23 @@ export interface FileEntry {
   file: File
 }
 
+// Несохранённые правки файлов к номерам заданий: новые файлы по номерам и id убранных
+export interface TaskFilesDraft {
+  added: Record<number, FileEntry[]>
+  removed: Array<number | string>
+}
+
+export const EMPTY_TASK_FILES: TaskFilesDraft = { added: {}, removed: [] }
+
+// Черновик → поля запроса (файлы убранных номеров не отправляем — сервер удалит их сам)
+export function taskFileChanges(draft: TaskFilesDraft, numbers: number[]) {
+  const task_files: Record<number, File[]> = {}
+  for (const n of numbers) {
+    if (draft.added[n]?.length) task_files[n] = draft.added[n].map((f) => f.file)
+  }
+  return { task_files, delete_file_ids: draft.removed }
+}
+
 function problemWith(file: File): string | null {
   const ext = file.name.includes('.') ? file.name.split('.').pop()!.toLowerCase() : ''
   if (!ALLOWED_EXTENSIONS.includes(ext)) {

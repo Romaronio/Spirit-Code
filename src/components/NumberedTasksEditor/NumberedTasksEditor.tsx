@@ -5,19 +5,25 @@ import type { DocFile } from '../LatexDocument/LatexDocument'
 import type { NumberedTask } from '../../types'
 import { parseLatex } from '../../utils/latex'
 import { taskNumberTitle } from '../../utils/taskNumbers'
+import { ACCEPT, EMPTY_TASK_FILES, pickFiles, type TaskFilesDraft } from '../../utils/uploads'
+
+// Сохранённый файл урока или ДЗ; с task_number — файл к этому номеру
+type AttachedFile = DocFile & { id?: number | string; task_number?: number | null }
 
 interface Props {
   value: NumberedTask[]
   onChange: (tasks: NumberedTask[]) => void
-  files?: DocFile[]
+  files?: AttachedFile[]
   pendingNames?: string[]
   inputClassName?: string
+  taskFiles?: TaskFilesDraft // без него в окне нет раздела с файлами к номеру
+  onTaskFilesChange?: (draft: TaskFilesDraft) => void
 }
 
 // В форме урока — только кнопка «Добавить номер» и плашки уже добавленных номеров.
 // Сами задания редактируются в отдельном окне: слева вкладки номеров, справа LaTeX.
 // Правки сразу уходят в форму, поэтому закрытие окна ничего не теряет
-function NumberedTasksEditor({ value, onChange, files, pendingNames }: Props) {
+function NumberedTasksEditor({ value, onChange, files, pendingNames, taskFiles, onTaskFilesChange }: Props) {
   // null — окно закрыто, иначе номер открытой вкладки (0 — пока нет номеров)
   const [openNumber, setOpenNumber] = useState<number | null>(null)
 
@@ -37,8 +43,8 @@ function NumberedTasksEditor({ value, onChange, files, pendingNames }: Props) {
             <button
               key={t.number}
               type="button"
-              className={`${styles.chip} ${t.latex.trim() ? '' : styles.chipEmpty}`}
-              title={describe(t.latex)}
+              className={`${styles.chip} ${isEmpty(t, countFiles(t.number, files, taskFiles)) ? styles.chipEmpty : ''}`}
+              title={describe(t, countFiles(t.number, files, taskFiles))}
               onClick={() => setOpenNumber(t.number)}
             >
               {taskNumberTitle(t.number)}
@@ -59,6 +65,8 @@ function NumberedTasksEditor({ value, onChange, files, pendingNames }: Props) {
           onClose={() => setOpenNumber(null)}
           files={files}
           pendingNames={pendingNames}
+          taskFiles={taskFiles}
+          onTaskFilesChange={onTaskFilesChange}
         />
       )}
     </div>
@@ -71,11 +79,15 @@ interface WindowProps {
   current: number
   onSelect: (number: number) => void
   onClose: () => void
-  files?: DocFile[]
+  files?: AttachedFile[]
   pendingNames?: string[]
+  taskFiles?: TaskFilesDraft
+  onTaskFilesChange?: (draft: TaskFilesDraft) => void
 }
 
-function NumberedTasksWindow({ value, onChange, current, onSelect, onClose, files, pendingNames }: WindowProps) {
+function NumberedTasksWindow({
+  value, onChange, current, onSelect, onClose, files, pendingNames, taskFiles, onTaskFilesChange,
+}: WindowProps) {
   const [newNumber, setNewNumber] = useState('')
   const [error, setError] = useState('')
   const task = value.find((t) => t.number === current)
@@ -112,10 +124,17 @@ function NumberedTasksWindow({ value, onChange, current, onSelect, onClose, file
   }
 
   function handleRemove(t: NumberedTask) {
-    if (t.latex.trim() && !window.confirm(`Удалить ${taskNumberTitle(t.number)} вместе с его LaTeX?`)) return
+    const hasContent = !isEmpty(t, countFiles(t.number, files, taskFiles)) || t.answer?.trim()
+    if (hasContent && !window.confirm(`Удалить ${taskNumberTitle(t.number)} вместе с его LaTeX, ответом и файлами?`)) return
     const rest = value.filter((x) => x.number !== t.number)
     onChange(rest)
     onSelect(rest[0]?.number ?? 0)
+    // Новые файлы номера больше не нужны; сохранённые сервер удалит вместе с номером
+    if (taskFiles?.added[t.number]) {
+      const added = { ...taskFiles.added }
+      delete added[t.number]
+      onTaskFilesChange?.({ ...taskFiles, added })
+    }
   }
 
   // Распознавание фото возвращает текст через несколько секунд — за это время учитель
@@ -127,6 +146,12 @@ function NumberedTasksWindow({ value, onChange, current, onSelect, onClose, file
 
   function handleLatex(number: number, latex: string) {
     const next = latestValue.current.map((t) => (t.number === number ? { ...t, latex } : t))
+    latestValue.current = next
+    onChange(next)
+  }
+
+  function handleAnswer(number: number, answer: string) {
+    const next = latestValue.current.map((t) => (t.number === number ? { ...t, answer } : t))
     latestValue.current = next
     onChange(next)
   }
@@ -151,7 +176,7 @@ function NumberedTasksWindow({ value, onChange, current, onSelect, onClose, file
                 onClick={() => onSelect(t.number)}
               >
                 <span className={styles.tabTitle}>{taskNumberTitle(t.number)}</span>
-                <span className={styles.tabStatus}>{describe(t.latex)}</span>
+                <span className={styles.tabStatus}>{describe(t, countFiles(t.number, files, taskFiles))}</span>
               </button>
             ))}
             <div className={styles.addRow}>
@@ -193,6 +218,24 @@ function NumberedTasksWindow({ value, onChange, current, onSelect, onClose, file
                   files={files}
                   pendingNames={pendingNames}
                 />
+                <label className={styles.field}>
+                  Ответ — видит только учитель
+                  <input
+                    type="text"
+                    maxLength={500}
+                    placeholder="Например, 42"
+                    value={task.answer ?? ''}
+                    onChange={(e) => handleAnswer(task.number, e.target.value)}
+                  />
+                </label>
+                {taskFiles && onTaskFilesChange && (
+                  <TaskFilesSection
+                    number={task.number}
+                    saved={(files ?? []).filter((f) => f.task_number === task.number)}
+                    draft={taskFiles}
+                    onChange={onTaskFilesChange}
+                  />
+                )}
               </>
             ) : (
               <p className={styles.hint}>Добавьте номер слева.</p>
@@ -214,10 +257,87 @@ function suggestNumber(tasks: NumberedTask[]): number {
   return Math.min(max + 1, 999)
 }
 
-function describe(latex: string): string {
-  if (!latex.trim()) return 'пусто — ученик не увидит'
-  const count = parseLatex(latex).tasks
-  return count ? `задач: ${count}` : 'есть текст'
+function describe(task: NumberedTask, fileCount: number): string {
+  const parts = []
+  if (task.latex.trim()) {
+    const count = parseLatex(task.latex).tasks
+    parts.push(count ? `задач: ${count}` : 'есть текст')
+  }
+  if (fileCount) parts.push(`файлов: ${fileCount}`)
+  if (task.answer?.trim()) parts.push('есть ответ')
+  if (!task.latex.trim() && !fileCount) parts.push('ученик не увидит')
+  return parts.join(', ')
+}
+
+// Сколько файлов будет у номера после сохранения
+function countFiles(number: number, files: AttachedFile[] | undefined, draft: TaskFilesDraft = EMPTY_TASK_FILES) {
+  const saved = (files ?? []).filter(
+    (f) => f.task_number === number && (f.id === undefined || !draft.removed.includes(f.id))
+  ).length
+  return saved + (draft.added[number]?.length ?? 0)
+}
+
+// Ученик видит номер, если у него есть LaTeX или файлы
+function isEmpty(task: NumberedTask, fileCount: number) {
+  return !task.latex.trim() && fileCount === 0
+}
+
+// Файлы для выполнения номера: сохранённые (их можно убрать) и только что выбранные
+function TaskFilesSection({ number, saved, draft, onChange }: {
+  number: number
+  saved: AttachedFile[]
+  draft: TaskFilesDraft
+  onChange: (draft: TaskFilesDraft) => void
+}) {
+  const [error, setError] = useState('')
+  const kept = saved.filter((f) => f.id === undefined || !draft.removed.includes(f.id))
+  const added = draft.added[number] ?? []
+
+  function handlePick(e: React.ChangeEvent<HTMLInputElement>) {
+    const { entries, error } = pickFiles(e.target.files)
+    onChange({ ...draft, added: { ...draft.added, [number]: [...added, ...entries] } })
+    setError(error)
+    e.target.value = ''
+  }
+
+  return (
+    <div className={styles.field}>
+      Файлы для выполнения — ученик скачает их в окне номера
+      {(kept.length > 0 || added.length > 0) && (
+        <ul className={styles.fileList}>
+          {kept.map((f) => (
+            <li key={f.id}>
+              <a href={f.url} download={f.name}>📎 {f.name}</a>
+              <button
+                type="button"
+                className={styles.remove}
+                onClick={() => f.id !== undefined && onChange({ ...draft, removed: [...draft.removed, f.id] })}
+              >
+                Убрать
+              </button>
+            </li>
+          ))}
+          {added.map((f) => (
+            <li key={f.id}>
+              <span>📎 {f.name} <span className={styles.hint}>· новый</span></span>
+              <button
+                type="button"
+                className={styles.remove}
+                onClick={() => onChange({ ...draft, added: { ...draft.added, [number]: added.filter((x) => x.id !== f.id) } })}
+              >
+                Убрать
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <label className={styles.fileButton}>
+        📎 Прикрепить файлы
+        <input type="file" multiple accept={ACCEPT} className={styles.hiddenInput} onChange={handlePick} />
+      </label>
+      {error && <p className={styles.error}>{error}</p>}
+    </div>
+  )
 }
 
 export default NumberedTasksEditor

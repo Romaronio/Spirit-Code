@@ -48,6 +48,29 @@ def _parse_json(raw):
     return raw
 
 
+def _task_uploads(request, prefix):
+    """Файлы к номерам заданий приходят полями «<prefix>_<номер>»: [(номер, файл), ...]"""
+    uploads = []
+    for key in request.FILES:
+        number = key[len(prefix) + 1:] if key.startswith(prefix + '_') else ''
+        if not number.isdigit() or not 1 <= int(number) <= 999:
+            continue
+        uploads += [(int(number), f) for f in request.FILES.getlist(key)]
+    return uploads
+
+
+def _file_ids(request, field):
+    """Список id файлов из JSON-поля запроса; всё, что не похоже на id, отбрасываем"""
+    raw = _parse_json(request.data.get(field))
+    return [int(i) for i in raw if str(i).isdigit()] if isinstance(raw, list) else []
+
+
+def _sync_task_files(files, numbered_tasks):
+    """Файлы номеров, которых больше нет в заданиях, удаляем вместе с номером"""
+    numbers = [t['number'] for t in numbered_tasks or []]
+    files.filter(task_number__isnull=False).exclude(task_number__in=numbers).delete()
+
+
 class AccountViewSet(viewsets.ModelViewSet):
     """API endpoint для работы с аккаунтами. Управляет аккаунтами только учитель"""
     queryset = Account.objects.all()
@@ -178,6 +201,8 @@ class AssignmentViewSet(viewsets.ModelViewSet):
         if not isinstance(homework_data, dict):
             homework_data = None
         homework_files = request.FILES.getlist('homework_files')
+        task_files = _task_uploads(request, 'homework_task_files')
+        delete_ids = _file_ids(request, 'delete_homework_file_ids')
 
         # Поля, которых нет в запросе, не трогаем: None — «не прислали», '' — «очистить»
         fields = {
@@ -192,7 +217,7 @@ class AssignmentViewSet(viewsets.ModelViewSet):
                 fields['numbered_tasks'] = clean_numbered_tasks(homework_data['numbered_tasks'])
             except ValidationError as e:
                 raise ValidationError({'homework': e.detail})
-        if not fields and not homework_files:
+        if not fields and not homework_files and not task_files and not delete_ids:
             return  # про ДЗ в запросе ничего нет — не трогаем
 
         homework, created = Homework.objects.get_or_create(
@@ -205,17 +230,30 @@ class AssignmentViewSet(viewsets.ModelViewSet):
                 setattr(homework, key, fields[key])
             homework.save()
 
+        # Фильтр по ДЗ не даёт удалить файлы чужих заданий
+        homework.files.filter(id__in=delete_ids).delete()
         for f in homework_files:
             HomeworkFile.objects.create(homework=homework, name=f.name, file=f)
+        for number, f in task_files:
+            HomeworkFile.objects.create(homework=homework, name=f.name, file=f, task_number=number)
+        _sync_task_files(homework.files, homework.numbered_tasks)
 
     def _save_lesson_files(self, request, assignment):
-        """Прикрепляет к уроку загруженные файлы урока"""
+        """Прикрепляет к уроку загруженные файлы урока и файлы к номерам заданий,
+        удаляет файлы, которые учитель убрал"""
+        assignment.files.filter(id__in=_file_ids(request, 'delete_file_ids')).delete()
         for f in request.FILES.getlist('files'):
             LessonFile.objects.create(assignment=assignment, name=f.name, file=f)
+        for number, f in _task_uploads(request, 'task_files'):
+            LessonFile.objects.create(assignment=assignment, name=f.name, file=f, task_number=number)
+        _sync_task_files(assignment.files, assignment.numbered_tasks)
 
     def _check_files(self, request):
         """Размер и тип всех файлов проверяем до того, как что-то сохранить"""
-        check_uploads(request.FILES.getlist('files') + request.FILES.getlist('homework_files'))
+        check_uploads(
+            request.FILES.getlist('files') + request.FILES.getlist('homework_files')
+            + [f for _, f in _task_uploads(request, 'task_files') + _task_uploads(request, 'homework_task_files')]
+        )
 
     def _fresh(self, assignment):
         """Перечитываем из БД, чтобы в ответе были свежие homework и files"""

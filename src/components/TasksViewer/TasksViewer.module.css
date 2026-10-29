@@ -72,3 +72,41 @@
     padding: 16px 16px 24px;
   }
 }
+
+.answer {
+  margin: 0 0 16px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: #fff4e5;
+  color: #140f0f;
+}
+
+.answerNote {
+  color: #777;
+  font-size: 13px;
+}
+
+.attachments {
+  margin-bottom: 20px;
+  padding: 12px 14px;
+  border: 1px solid #ff8400;
+  border-radius: 8px;
+}
+
+.attachmentsTitle {
+  margin: 0 0 8px;
+  font-weight: 600;
+}
+
+.attachments ul {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.attachments a {
+  color: #140f0f;
+}

@@ -1,4 +1,4 @@
-import type { Account, AnswerComment, Assignment, BankTask, LessonFile, Homework, HomeworkFile, NewAssignment, NewBankTask, NumberedTask, Payment, PhotoLatexResult, ReviewStatus, StudentHomework, TypingModeSummary, TypingResult, TypingStats, TypingSummary } from "../types";
+import type { Account, AnswerComment, Assignment, BankTask, LessonFile, Homework, HomeworkFile, NewAssignment, NewBankTask, NumberedTask, Payment, TaskFileChanges, PhotoLatexResult, ReviewStatus, StudentHomework, TypingModeSummary, TypingResult, TypingStats, TypingSummary } from "../types";
 import { clearSession, loadToken } from "../utils/session";
 
 // Адрес API. По умолчанию относительный путь: и локально (через прокси Vite),
@@ -128,6 +128,22 @@ export async function getMe(): Promise<Account> {
 
 // ============== ASSIGNMENTS API ==============
 
+// Файлы к номерам: поля «<prefix>_<номер>» и JSON-список id файлов, которые учитель убрал
+function appendTaskFiles(formData: FormData, prefix: string, deleteField: string, changes?: TaskFileChanges) {
+  for (const [number, files] of Object.entries(changes?.task_files ?? {})) {
+    files.forEach((file) => formData.append(`${prefix}_${number}`, file));
+  }
+  if (changes?.delete_file_ids?.length) {
+    formData.append(deleteField, JSON.stringify(changes.delete_file_ids));
+  }
+}
+
+// Поля ДЗ без файлов — файлы уходят отдельными полями формы
+function homeworkJson(homework: { description: string; numbered_tasks?: NumberedTask[]; tasks_latex?: string }) {
+  const { description, numbered_tasks, tasks_latex } = homework;
+  return JSON.stringify({ description, numbered_tasks, tasks_latex });
+}
+
 export async function getAllAssignments(subject?: string): Promise<Assignment[]> {
   const query = subject ? `?subject=${encodeURIComponent(subject)}` : '';
   const response = await fetchAPI<{ results: Assignment[] }>(`/assignments/${query}`);
@@ -156,8 +172,10 @@ export async function createAssignment(data: NewAssignment): Promise<Assignment>
     formData.append('tasks_latex', data.tasks_latex);
   }
   if (data.homework && (data.homework.description || data.homework.tasks_latex || data.homework.numbered_tasks?.length)) {
-    formData.append('homework', JSON.stringify(data.homework));
+    formData.append('homework', homeworkJson(data.homework));
   }
+  appendTaskFiles(formData, 'task_files', 'delete_file_ids', data);
+  appendTaskFiles(formData, 'homework_task_files', 'delete_homework_file_ids', data.homework);
   if (data.files) {
     data.files.forEach((file) => formData.append('files', file));
   }
@@ -178,10 +196,10 @@ export async function updateAssignment(
     recording_url?: string
     numbered_tasks?: NumberedTask[]
     tasks_latex?: string
-    homework?: { description: string; numbered_tasks?: NumberedTask[]; tasks_latex?: string }
+    homework?: { description: string; numbered_tasks?: NumberedTask[]; tasks_latex?: string } & TaskFileChanges
     files?: File[]
     homework_files?: File[]
-  }
+  } & TaskFileChanges
 ): Promise<Assignment> {
   const formData = new FormData();
   if (data.title !== undefined) formData.append('title', data.title);
@@ -192,8 +210,10 @@ export async function updateAssignment(
   if (data.numbered_tasks !== undefined) formData.append('numbered_tasks', JSON.stringify(data.numbered_tasks));
   if (data.tasks_latex !== undefined) formData.append('tasks_latex', data.tasks_latex);
   if (data.homework) {
-    formData.append('homework', JSON.stringify(data.homework));
+    formData.append('homework', homeworkJson(data.homework));
   }
+  appendTaskFiles(formData, 'task_files', 'delete_file_ids', data);
+  appendTaskFiles(formData, 'homework_task_files', 'delete_homework_file_ids', data.homework);
   if (data.files) {
     data.files.forEach((file) => formData.append('files', file));
   }

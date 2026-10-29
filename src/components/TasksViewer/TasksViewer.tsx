@@ -7,6 +7,8 @@ interface Props {
   subtitle?: string
   source: string
   files?: DocFile[]
+  attachments?: DocFile[] // файлы для выполнения номера — ученик скачивает их здесь
+  answer?: string // ответ к номеру, передаётся только учителю
   onClose: () => void
 }
 
@@ -14,7 +16,7 @@ interface Props {
 const FULLSCREEN_QUERY = '(max-width: 1000px)'
 
 // Задания в панели справа от задания — вместо скачивания PDF
-function TasksViewer({ title, subtitle, source, files, onClose }: Props) {
+function TasksViewer({ title, subtitle, source, files, attachments = [], answer, onClose }: Props) {
   const closeRef = useRef<HTMLButtonElement>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
 
@@ -51,7 +53,24 @@ function TasksViewer({ title, subtitle, source, files, onClose }: Props) {
         </button>
       </header>
       <div ref={bodyRef} className={styles.body}>
-        <LatexDocument source={source} files={files} />
+        {answer?.trim() && (
+          <p className={styles.answer}>
+            Ответ: <strong>{answer}</strong> <span className={styles.answerNote}>· видите только вы</span>
+          </p>
+        )}
+        {attachments.length > 0 && (
+          <div className={styles.attachments}>
+            <p className={styles.attachmentsTitle}>Файлы для выполнения</p>
+            <ul>
+              {attachments.map((f) => (
+                <li key={f.name + f.url}>
+                  <a href={f.url} download={f.name}>📎 {f.name}</a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {source.trim() && <LatexDocument source={source} files={files} />}
       </div>
     </aside>
   )

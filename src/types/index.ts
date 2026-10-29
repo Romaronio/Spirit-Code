@@ -18,6 +18,7 @@ export interface LessonFile {
   id?: number | string
   name: string
   url: string
+  task_number?: number | null // файл к номеру задания; null — общий файл урока
   created_at?: string
 }
 
@@ -25,6 +26,7 @@ export interface HomeworkFile {
   id?: number | string
   name: string
   url: string
+  task_number?: number | null // файл к номеру задания ДЗ; null — общий файл ДЗ
   created_at?: string
 }
 
@@ -92,10 +94,17 @@ export interface Assignment {
 export interface NumberedTask {
   number: number
   latex: string
+  answer?: string // видит только учитель: сервер не отдаёт его ученикам
+}
+
+// Файлы к номерам заданий для отправки: новые по номерам и id убранных сохранённых
+export interface TaskFileChanges {
+  task_files?: Record<number, File[]>
+  delete_file_ids?: Array<number | string>
 }
 
 // Данные формы «Новое задание»
-export interface NewAssignment {
+export type NewAssignment = {
   title: string
   subject: string
   deadline: string
@@ -103,14 +112,14 @@ export interface NewAssignment {
   recording_url?: string
   numbered_tasks?: NumberedTask[]
   tasks_latex?: string
-  homework?: { description: string; numbered_tasks?: NumberedTask[]; tasks_latex?: string }
+  homework?: { description: string; numbered_tasks?: NumberedTask[]; tasks_latex?: string } & TaskFileChanges
   files?: File[]
   homework_files?: File[]
-}
+} & TaskFileChanges
 
-export type AssignmentChanges = Omit<Partial<Assignment>, 'files' | 'homework'> & {
+export type AssignmentChanges = Omit<Partial<Assignment>, 'files' | 'homework'> & TaskFileChanges & {
   files?: File[]
-  homework?: { description: string; numbered_tasks?: NumberedTask[]; tasks_latex?: string; files?: File[] }
+  homework?: { description: string; numbered_tasks?: NumberedTask[]; tasks_latex?: string; files?: File[] } & TaskFileChanges
 }
 
 // Действия с перепиской по ответу (реализованы в App.tsx)

@@ -6,7 +6,7 @@ import { hasSubject, normalize } from '../../utils/subjects'
 import type { Account, Assignment, AssignmentChanges, CommentActions, NumberedTask, ReviewStatus, User } from '../../types'
 import { ReviewButtons, StatusBadge } from '../../components/AnswerStatus/AnswerStatus'
 import CommentThread from '../../components/CommentThread/CommentThread'
-import { ACCEPT, MAX_FILE_SIZE_MB, pickFiles, type FileEntry } from '../../utils/uploads'
+import { ACCEPT, EMPTY_TASK_FILES, MAX_FILE_SIZE_MB, pickFiles, taskFileChanges, type FileEntry, type TaskFilesDraft } from '../../utils/uploads'
 import { taskNumberTitle } from '../../utils/taskNumbers'
 import { parseLatex } from '../../utils/latex'
 import LatexEditor from '../../components/LatexEditor/LatexEditor'
@@ -85,13 +85,14 @@ function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStud
   const [description, setDescription] = useState(assignment.description ?? '')
   const [numberedTasks, setNumberedTasks] = useState<NumberedTask[]>(assignment.numbered_tasks ?? [])
   const [tasksLatex, setTasksLatex] = useState(assignment.tasks_latex ?? '')
-  const [files, setFiles] = useState<FileEntry[]>([])
+  const [taskFiles, setTaskFiles] = useState<TaskFilesDraft>(EMPTY_TASK_FILES)
 
   const [isEditingHomework, setIsEditingHomework] = useState(false)
   const [homeworkDescription, setHomeworkDescription] = useState(assignment.homework?.description ?? '')
   const [homeworkTasks, setHomeworkTasks] = useState<NumberedTask[]>(assignment.homework?.numbered_tasks ?? [])
   const [homeworkLatex, setHomeworkLatex] = useState(assignment.homework?.tasks_latex ?? '')
   const [homeworkFiles, setHomeworkFiles] = useState<FileEntry[]>([])
+  const [homeworkTaskFiles, setHomeworkTaskFiles] = useState<TaskFilesDraft>(EMPTY_TASK_FILES)
 
   // Сохранение правок учителем: редактор закрываем только после успеха,
   // а при ошибке оставляем выбранные файлы и показываем сообщение
@@ -102,12 +103,20 @@ function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStud
   // Какие задания открыты в панели: по номеру, классной работы без номера или домашние
   // Номера ДЗ — ключи вида 'hw-5', чтобы не путать с номерами классной работы
   const [openTasks, setOpenTasks] = useState<number | 'classwork' | 'homework' | `hw-${number}` | null>(null)
-  const openNumbered = assignment.numbered_tasks?.find((t) => t.number === openTasks && t.latex.trim())
-  const shownNumbered = (assignment.numbered_tasks ?? []).filter((t) => t.latex.trim())
-  // Номера без LaTeX ученик не видит — учителю показываем их отдельно, чтобы не потерялись
-  const emptyNumbers = (assignment.numbered_tasks ?? []).filter((t) => !t.latex.trim()).map((t) => t.number)
-  const openHomeworkNumbered = assignment.homework?.numbered_tasks?.find((t) => openTasks === `hw-${t.number}` && t.latex.trim())
-  const shownHomeworkNumbered = (assignment.homework?.numbered_tasks ?? []).filter((t) => t.latex.trim())
+  // Номер виден ученику, если у него есть LaTeX или файлы для выполнения
+  const lessonFiles = assignment.files ?? []
+  const homeworkFilesSaved = assignment.homework?.files ?? []
+  const isShown = (t: NumberedTask, files: { task_number?: number | null }[]) =>
+    t.latex.trim() !== '' || files.some((f) => f.task_number === t.number)
+  const openNumbered = assignment.numbered_tasks?.find((t) => t.number === openTasks && isShown(t, lessonFiles))
+  const shownNumbered = (assignment.numbered_tasks ?? []).filter((t) => isShown(t, lessonFiles))
+  // Пустые номера ученик не видит — учителю показываем их отдельно, чтобы не потерялись
+  const emptyNumbers = (assignment.numbered_tasks ?? []).filter((t) => !isShown(t, lessonFiles)).map((t) => t.number)
+  const openHomeworkNumbered = assignment.homework?.numbered_tasks?.find((t) => openTasks === `hw-${t.number}` && isShown(t, homeworkFilesSaved))
+  const shownHomeworkNumbered = (assignment.homework?.numbered_tasks ?? []).filter((t) => isShown(t, homeworkFilesSaved))
+  // Общие файлы — без файлов к номерам: те ученик скачивает в окне номера
+  const commonLessonFiles = lessonFiles.filter((f) => f.task_number == null)
+  const commonHomeworkFiles = homeworkFilesSaved.filter((f) => f.task_number == null)
   const closeTasks = useCallback(() => setOpenTasks(null), [])
 
   // Форма отправки ответа учеником
@@ -123,17 +132,6 @@ function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStud
   const savedFiles = (myAnswer?.files ?? []).filter(
     (f) => f.id === undefined || !deletedSavedFileIds.includes(f.id)
   )
-
-  function handleFilesChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const { entries, error } = pickFiles(e.target.files)
-    setFiles((prev) => [...prev, ...entries])
-    setEditError(error)
-    e.target.value = ''
-  }
-
-  function handleRemoveFile(id: string) {
-    setFiles((prev) => prev.filter((f) => f.id !== id))
-  }
 
   function handleHomeworkFilesChange(e: React.ChangeEvent<HTMLInputElement>) {
     const { entries, error } = pickFiles(e.target.files)
@@ -204,9 +202,9 @@ function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStud
         description,
         numbered_tasks: numberedTasks,
         tasks_latex: tasksLatex,
-        files: files.map((f) => f.file),
+        ...taskFileChanges(taskFiles, numberedTasks.map((t) => t.number)),
       })
-      setFiles([])
+      setTaskFiles(EMPTY_TASK_FILES)
       setIsEditing(false)
     } catch (err) {
       setEditError(err instanceof Error ? err.message : 'Не удалось сохранить изменения')
@@ -220,7 +218,7 @@ function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStud
     setDescription(assignment.description ?? '')
     setNumberedTasks(assignment.numbered_tasks ?? [])
     setTasksLatex(assignment.tasks_latex ?? '')
-    setFiles([])
+    setTaskFiles(EMPTY_TASK_FILES)
     setEditError('')
     setIsEditing(false)
   }
@@ -235,9 +233,11 @@ function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStud
           numbered_tasks: homeworkTasks,
           tasks_latex: homeworkLatex,
           files: homeworkFiles.map((f) => f.file),
+          ...taskFileChanges(homeworkTaskFiles, homeworkTasks.map((t) => t.number)),
         },
       })
       setHomeworkFiles([])
+      setHomeworkTaskFiles(EMPTY_TASK_FILES)
       setIsEditingHomework(false)
     } catch (err) {
       setHomeworkError(err instanceof Error ? err.message : 'Не удалось сохранить домашнее задание')
@@ -251,11 +251,11 @@ function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStud
     setHomeworkTasks(assignment.homework?.numbered_tasks ?? [])
     setHomeworkLatex(assignment.homework?.tasks_latex ?? '')
     setHomeworkFiles([])
+    setHomeworkTaskFiles(EMPTY_TASK_FILES)
     setHomeworkError('')
     setIsEditingHomework(false)
   }
 
-  const hasFiles = assignment.files && assignment.files.length > 0
 
   return (
     <div className={styles.page}>
@@ -294,8 +294,9 @@ function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStud
                 value={numberedTasks}
                 onChange={setNumberedTasks}
                 files={assignment.files}
-                pendingNames={files.map((f) => f.name)}
                 inputClassName={styles.input}
+                taskFiles={taskFiles}
+                onTaskFilesChange={setTaskFiles}
               />
 
               {(numberedTasks.length === 0 || tasksLatex.trim()) && (
@@ -304,30 +305,32 @@ function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStud
                   value={tasksLatex}
                   onChange={setTasksLatex}
                   files={assignment.files}
-                  pendingNames={files.map((f) => f.name)}
                 />
               )}
 
-              <label className={styles.label}>
-                Файлы с урока
-                <input type="file" multiple accept={ACCEPT} onChange={handleFilesChange} />
-              </label>
-
-              {files.length > 0 && (
-                <ul className={styles.files}>
-                  {files.map((f) => (
-                    <li key={f.id}>
-                      <span>{f.name}</span>
-                      <button
-                        type="button"
-                        className={styles.linkButton}
-                        onClick={() => handleRemoveFile(f.id)}
-                      >
-                        Удалить
-                      </button>
-                    </li>
-                  ))}
-                </ul>
+              {/* Старые общие файлы урока: новые не прикрепляются, но эти можно убрать */}
+              {commonLessonFiles.some((f) => f.id !== undefined && !taskFiles.removed.includes(f.id)) && (
+                <>
+                  <span className={styles.label}>Файлы с урока</span>
+                  <ul className={styles.files}>
+                    {commonLessonFiles
+                      .filter((f) => f.id !== undefined && !taskFiles.removed.includes(f.id))
+                      .map((f) => (
+                        <li key={f.id}>
+                          <a className={styles.link} href={f.url} download={f.name}>
+                            📎 {f.name}
+                          </a>
+                          <button
+                            type="button"
+                            className={styles.linkButton}
+                            onClick={() => setTaskFiles({ ...taskFiles, removed: [...taskFiles.removed, f.id!] })}
+                          >
+                            Удалить
+                          </button>
+                        </li>
+                      ))}
+                  </ul>
+                </>
               )}
 
               {editError && <p className={styles.error}>{editError}</p>}
@@ -382,7 +385,7 @@ function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStud
                 <section className={styles.section}>
                   {canEdit && emptyNumbers.length > 0 && (
                     <p className={styles.empty}>
-                      Без LaTeX (ученик их не видит): {emptyNumbers.map(taskNumberTitle).join(', ')}
+                      Пустые номера (ученик их не видит): {emptyNumbers.map(taskNumberTitle).join(', ')}
                     </p>
                   )}
                   {/* Ученик видит номера классной работы в выпадающем списке «Задания» */}
@@ -408,11 +411,11 @@ function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStud
                 </section>
               )}
 
-              <section className={styles.section}>
-                <h2>Файлы с урока</h2>
-                {hasFiles ? (
+              {commonLessonFiles.length > 0 && (
+                <section className={styles.section}>
+                  <h2>Файлы с урока</h2>
                   <ul className={styles.files}>
-                    {assignment.files!.map((f) => (
+                    {commonLessonFiles.map((f) => (
                       <li key={f.id}>
                         <a className={styles.link} href={f.url} download={f.name}>
                           📎 {f.name}
@@ -420,10 +423,8 @@ function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStud
                       </li>
                     ))}
                   </ul>
-                ) : (
-                  <p className={styles.empty}>Файлов пока нет</p>
-                )}
-              </section>
+                </section>
+              )}
 
               {canEdit && (
                 <button
@@ -459,6 +460,8 @@ function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStud
                   onChange={setHomeworkTasks}
                   files={assignment.homework?.files}
                   pendingNames={homeworkFiles.map((f) => f.name)}
+                  taskFiles={homeworkTaskFiles}
+                  onTaskFilesChange={setHomeworkTaskFiles}
                 />
 
                 {(homeworkTasks.length === 0 || homeworkLatex.trim()) && (
@@ -471,9 +474,10 @@ function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStud
                   />
                 )}
 
-                <label className={styles.label}>
-                  Файлы с заданием
-                  <input type="file" multiple accept={ACCEPT} onChange={handleHomeworkFilesChange} />
+                <span className={styles.label}>Файлы с заданием</span>
+                <label className={styles.fileButton}>
+                  📎 Прикрепить файлы
+                  <input type="file" multiple accept={ACCEPT} className={styles.hiddenInput} onChange={handleHomeworkFilesChange} />
                 </label>
 
                 {homeworkFiles.length > 0 && (
@@ -544,9 +548,9 @@ function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStud
                         )}
                       </TasksMenu>
                     )}
-                    {assignment.homework.files && assignment.homework.files.length > 0 && (
+                    {commonHomeworkFiles.length > 0 && (
                       <ul className={styles.files}>
-                        {assignment.homework.files.map((f) => (
+                        {commonHomeworkFiles.map((f) => (
                           <li key={f.id}>
                             <a className={styles.link} href={f.url} download={f.name}>
                               📎 {f.name}
@@ -663,9 +667,10 @@ function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStud
                   onChange={(e) => setStudentDescription(e.target.value)}
                 />
               </label>
-              <label className={styles.label}>
-                Файлы с ответом (каждый — до {MAX_FILE_SIZE_MB} МБ)
-                <input type="file" multiple accept={ACCEPT} onChange={handleStudentFilesChange} />
+              <span className={styles.label}>Файлы с ответом (каждый — до {MAX_FILE_SIZE_MB} МБ)</span>
+              <label className={styles.fileButton}>
+                📎 Прикрепить файлы
+                <input type="file" multiple accept={ACCEPT} className={styles.hiddenInput} onChange={handleStudentFilesChange} />
               </label>
               {savedFiles.length > 0 && (
                 <ul className={styles.files}>
@@ -721,6 +726,8 @@ function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStud
             subtitle={`${assignment.subject} · классная работа`}
             source={openNumbered.latex}
             files={assignment.files}
+            attachments={lessonFiles.filter((f) => f.task_number === openNumbered.number)}
+            answer={canEdit ? openNumbered.answer : undefined}
             onClose={closeTasks}
           />
         )}
@@ -739,6 +746,8 @@ function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStud
             subtitle={`${assignment.subject} · домашнее задание, сдать до ${assignment.deadline}`}
             source={openHomeworkNumbered.latex}
             files={assignment.homework?.files}
+            attachments={homeworkFilesSaved.filter((f) => f.task_number === openHomeworkNumbered.number)}
+            answer={canEdit ? openHomeworkNumbered.answer : undefined}
             onClose={closeTasks}
           />
         )}
