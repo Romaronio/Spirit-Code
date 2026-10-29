@@ -340,3 +340,31 @@ class BankTask(models.Model):
 
     def __str__(self):
         return f"Задание {self.number} (#{self.id})"
+
+
+class Call(models.Model):
+    """Созвон-урок в LiveKit. Идёт, пока учитель не завершит его (или не истечёт MAX_DURATION).
+
+    Подключиться могут учитель и ученики с предметом созвона; пустой предмет — все ученики.
+    """
+    MAX_DURATION = timedelta(hours=6)  # забытый незавершённый созвон дольше не показываем
+
+    title = models.CharField(max_length=255, blank=True, default='')
+    subject = models.CharField(max_length=100, blank=True, default='')
+    started_by = models.ForeignKey(
+        Account,
+        on_delete=models.CASCADE,
+        related_name='calls',
+    )
+    started_at = models.DateTimeField(auto_now_add=True)
+    ended_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-started_at']
+
+    def __str__(self):
+        return f"Созвон #{self.id} {self.subject or 'все'}"
+
+    @property
+    def room_name(self):
+        return f'spirit-call-{self.id}'

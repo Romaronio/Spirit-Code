@@ -1,4 +1,4 @@
-import type { Account, AnswerComment, Assignment, BankTask, LessonFile, Homework, HomeworkFile, NewAssignment, NewBankTask, NumberedTask, Payment, TaskFileChanges, PhotoLatexResult, ReviewStatus, StudentHomework, TypingModeSummary, TypingResult, TypingStats, TypingSummary } from "../types";
+import type { Account, AnswerComment, Assignment, BankTask, Call, CallJoin, NewCall, LessonFile, Homework, HomeworkFile, NewAssignment, NewBankTask, NumberedTask, Payment, TaskFileChanges, PhotoLatexResult, ReviewStatus, StudentHomework, TypingModeSummary, TypingResult, TypingStats, TypingSummary } from "../types";
 import { clearSession, loadToken } from "../utils/session";
 
 // Адрес API. По умолчанию относительный путь: и локально (через прокси Vite),
@@ -420,4 +420,25 @@ export async function deleteBankTask(id: number): Promise<void> {
   return fetchAPI<void>(`/bank-tasks/${id}/`, {
     method: 'DELETE',
   });
+}
+
+// ============== CALLS API (созвоны LiveKit) ==============
+
+export async function getCalls(): Promise<Call[]> {
+  return fetchAPI<Call[]>('/calls/');
+}
+
+export async function startCall(call: NewCall): Promise<Call> {
+  return fetchAPI<Call>('/calls/', {
+    method: 'POST',
+    body: JSON.stringify(call),
+  });
+}
+
+export async function joinCall(id: number): Promise<CallJoin> {
+  return fetchAPI<CallJoin>(`/calls/${id}/join/`, { method: 'POST' });
+}
+
+export async function endCall(id: number): Promise<void> {
+  return fetchAPI<void>(`/calls/${id}/end/`, { method: 'POST' });
 }

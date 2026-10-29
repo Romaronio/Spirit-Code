@@ -1,3 +1,6 @@
+import base64
+import hashlib
+import hmac
 import json
 import os
 import shutil
@@ -8,9 +11,10 @@ from urllib.parse import urlsplit
 from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
+from django.utils import timezone
 from rest_framework.test import APITestCase
 
-from .models import Account, Assignment, AuthToken, BankTask, LessonFile, StudentHomework, StudentHomeworkFile, TypingResult
+from .models import Account, Assignment, AuthToken, BankTask, Call, LessonFile, StudentHomework, StudentHomeworkFile, TypingResult
 
 
 class AuthTestCase(APITestCase):
@@ -911,3 +915,59 @@ class BankTaskTests(AuthTestCase):
         self.assertEqual([t['id'] for t in response.data], [task.id])
         self.assertEqual(self.client.post('/api/bank-tasks/', {'number': 1, 'latex': 'x'}, format='json').status_code, 403)
         self.assertEqual(self.client.delete(f'/api/bank-tasks/{task.id}/').status_code, 403)
+
+
+@override_settings(LIVEKIT_API_KEY='testkey', LIVEKIT_API_SECRET='testsecret', LIVEKIT_URL='', LIVEKIT_API_HOST='')
+class CallTests(AuthTestCase):
+    def start_call(self, subject='Биология'):
+        self.login_as(self.teacher)
+        response = self.client.post('/api/calls/', {'subject': subject, 'title': ' Урок '}, format='json')
+        self.assertEqual(response.status_code, 201)
+        return response.data['id']
+
+    def test_teacher_starts_and_ends(self):
+        call_id = self.start_call()
+        self.assertEqual(self.client.get('/api/calls/').data[0]['title'], 'Урок')
+        self.assertEqual(self.client.post(f'/api/calls/{call_id}/end/').status_code, 204)
+        self.assertEqual(self.client.get('/api/calls/').data, [])
+        self.assertEqual(self.client.post(f'/api/calls/{call_id}/join/').status_code, 404)
+
+    def test_students_see_calls_by_subject(self):
+        call_id = self.start_call('биология')
+        common_id = self.start_call('')
+        self.login_as(self.anna)
+        self.assertEqual({c['id'] for c in self.client.get('/api/calls/').data}, {call_id, common_id})
+        self.login_as(self.ivan)
+        self.assertEqual([c['id'] for c in self.client.get('/api/calls/').data], [common_id])
+        self.assertEqual(self.client.post(f'/api/calls/{call_id}/join/').status_code, 404)
+
+    def test_student_cannot_start_or_end(self):
+        call_id = self.start_call()
+        self.login_as(self.anna)
+        self.assertEqual(self.client.post('/api/calls/', {'subject': ''}, format='json').status_code, 403)
+        self.assertEqual(self.client.post(f'/api/calls/{call_id}/end/').status_code, 403)
+
+    def test_join_token(self):
+        call_id = self.start_call()
+        self.login_as(self.anna)
+        response = self.client.post(f'/api/calls/{call_id}/join/')
+        self.assertEqual(response.status_code, 200)
+        header, payload, signature = response.data['token'].split('.')
+        expected = hmac.new(b'testsecret', f'{header}.{payload}'.encode(), hashlib.sha256).digest()
+        self.assertEqual(base64.urlsafe_b64decode(signature + '=' * (-len(signature) % 4)), expected)
+        claims = json.loads(base64.urlsafe_b64decode(payload + '=' * (-len(payload) % 4)))
+        self.assertEqual(claims['iss'], 'testkey')
+        self.assertEqual(claims['sub'], f'account-{self.anna.id}')
+        self.assertEqual(claims['name'], 'anna')
+        self.assertEqual(claims['video']['room'], f'spirit-call-{call_id}')
+        self.assertFalse(claims['video']['roomAdmin'])
+
+    def test_old_call_is_hidden(self):
+        call_id = self.start_call()
+        Call.objects.filter(id=call_id).update(started_at=timezone.now() - Call.MAX_DURATION - timedelta(minutes=1))
+        self.assertEqual(self.client.get('/api/calls/').data, [])
+
+    @override_settings(LIVEKIT_API_KEY='', LIVEKIT_API_SECRET='')
+    def test_not_configured(self):
+        call_id = self.start_call()
+        self.assertEqual(self.client.post(f'/api/calls/{call_id}/join/').status_code, 503)

@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from .media import signed_url
-from .models import MAX_LATEX_LENGTH, MAX_TOTAL_LATEX_LENGTH, Account, AnswerComment, Assignment, BankTask, LessonFile, Homework, HomeworkFile, Payment, StudentHomework, StudentHomeworkFile, TypingResult
+from .models import MAX_LATEX_LENGTH, MAX_TOTAL_LATEX_LENGTH, Account, AnswerComment, Assignment, BankTask, Call, LessonFile, Homework, HomeworkFile, Payment, StudentHomework, StudentHomeworkFile, TypingResult
 
 MIN_PASSWORD_LENGTH = 8
 
@@ -317,4 +317,20 @@ class BankTaskSerializer(serializers.ModelSerializer):
         return value
 
     def validate_answer(self, value):
+        return value.strip()
+
+
+class CallSerializer(serializers.ModelSerializer):
+    """Созвон-урок: кто начал, по какому предмету, идёт ли ещё"""
+    started_by_name = serializers.CharField(source='started_by.name', read_only=True)
+
+    class Meta:
+        model = Call
+        fields = ['id', 'title', 'subject', 'started_by_name', 'started_at', 'ended_at']
+        read_only_fields = ['started_at', 'ended_at']
+
+    def validate_title(self, value):
+        return value.strip()
+
+    def validate_subject(self, value):
         return value.strip()

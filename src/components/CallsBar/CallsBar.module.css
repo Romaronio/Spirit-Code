@@ -1,0 +1,142 @@
+.bar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+/* Идущий урок — тёмная плашка, как блок «Сделать сейчас» в макете */
+.live {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+  padding: 20px 24px;
+  border-radius: 20px;
+  background: var(--text);
+  color: var(--bg);
+}
+
+.dot {
+  flex-shrink: 0;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 0 rgba(255, 132, 0, 0.6);
+  animation: pulse 1.6s infinite;
+}
+
+@keyframes pulse {
+  70% {
+    box-shadow: 0 0 0 10px rgba(255, 132, 0, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 132, 0, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dot {
+    animation: none;
+  }
+}
+
+.liveText {
+  display: flex;
+  flex: 1 1 240px;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.liveTitle {
+  font-size: 20px;
+  font-weight: 700;
+  word-break: break-word;
+}
+
+.liveMeta {
+  color: #cdbba8;
+  font-size: 14px;
+}
+
+.join,
+.end {
+  min-height: 44px;
+  padding: 0 20px;
+  border: 1px solid var(--accent);
+  border-radius: 12px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.join:hover {
+  border-color: var(--accent-hover);
+  background: var(--accent-hover);
+}
+
+.join:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.end {
+  border-color: #cdbba8;
+  background: transparent;
+  color: var(--bg);
+}
+
+.end:hover {
+  border-color: var(--bg);
+}
+
+/* Учитель: начать урок */
+.start {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 12px;
+  padding: 16px 20px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.startLabel {
+  margin-right: 4px;
+  font-weight: 700;
+}
+
+.field {
+  display: flex;
+  flex: 1 1 200px;
+  max-width: 320px;
+}
+
+.field select,
+.field input {
+  width: 100%;
+  height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 15px;
+}
+
+.error {
+  color: var(--danger);
+  font-size: 14px;
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

@@ -8,6 +8,7 @@ services:
     environment:
       DJANGO_DB_PATH: /data/db.sqlite3
       DJANGO_NUM_PROXIES: 1  # перед Django стоит Caddy — для лимита попыток входа
+      LIVEKIT_API_HOST: http://livekit:7880  # закрывать комнату, когда учитель завершил урок
     command: >
       sh -c "python manage.py migrate --noinput &&
              python manage.py collectstatic --noinput &&
@@ -24,6 +25,7 @@ services:
     restart: unless-stopped
     depends_on:
       - backend
+      - livekit
     ports:
       - "80:80"
       - "443:443"
@@ -32,6 +34,20 @@ services:
       - static:/staticfiles:ro
       - caddy_data:/data
       - caddy_config:/config
+
+  # Созвоны (LiveKit). Сигнализация идёт через Caddy (wss://…/livekit),
+  # видео и звук — напрямую на порты 7881/tcp и 7882/udp (их нужно открыть в фаерволе)
+  livekit:
+    image: livekit/livekit-server:v1.13.11
+    restart: unless-stopped
+    command: --config /etc/livekit.yaml
+    environment:
+      LIVEKIT_KEYS: "${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}"
+    ports:
+      - "7881:7881/tcp"
+      - "7882:7882/udp"
+    volumes:
+      - ./livekit.yaml:/etc/livekit.yaml:ro
 
 volumes:
   static:

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { lazy, Suspense, useState, useEffect, useCallback } from 'react'
 import { Routes, Route, useNavigate } from 'react-router-dom'
 import AuthPage from './pages/AuthPage/AuthPage'
 import HomePage from './pages/HomePage/HomePage'
@@ -8,6 +8,9 @@ import TasksBankPage from './pages/TasksBankPage/TasksBankPage'
 import type { Account, AnswerComment, Assignment, AssignmentChanges, CommentActions, NewAssignment, ReviewStatus, User } from './types'
 import * as api from './services/api'
 import { clearSession, loadUser } from './utils/session'
+
+// Страница созвона тянет LiveKit (сотни КБ) — грузим её, только когда открывают урок
+const CallPage = lazy(() => import('./pages/CallPage/CallPage'))
 
 
 function App() {
@@ -250,6 +253,14 @@ function App() {
       />
       <Route path="/typing" element={<TypingPage user={user} />} />
       <Route path="/tasks-bank" element={<TasksBankPage user={user} />} />
+      <Route
+        path="/call/:id"
+        element={
+          <Suspense fallback={<div style={{ padding: '20px', textAlign: 'center' }}>Загрузка...</div>}>
+            <CallPage user={user} />
+          </Suspense>
+        }
+      />
     </Routes>
   )
 }

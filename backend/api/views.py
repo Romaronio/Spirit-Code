@@ -3,6 +3,7 @@ import secrets
 from functools import reduce
 from operator import or_
 
+from django.conf import settings
 from django.contrib.auth.hashers import make_password
 from django.db import transaction
 from django.db.models import Q
@@ -14,7 +15,8 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.views import APIView
-from .models import MAX_LATEX_LENGTH, Account, AnswerComment, Assignment, AuthToken, BankTask, LessonFile, Homework, HomeworkFile, Payment, StudentHomework, StudentHomeworkFile, TypingResult
+from .models import MAX_LATEX_LENGTH, Account, AnswerComment, Assignment, AuthToken, BankTask, Call, LessonFile, Homework, HomeworkFile, Payment, StudentHomework, StudentHomeworkFile, TypingResult
+from . import livekit
 from .permissions import IsStudent, IsTeacher
 from .photo_latex import PhotoLatexError, photo_to_latex
 from .uploads import check_student_quota, check_uploads
@@ -22,6 +24,7 @@ from .serializers import (
     AccountSerializer,
     AssignmentSerializer,
     BankTaskSerializer,
+    CallSerializer,
     LessonFileSerializer,
     HomeworkSerializer,
     HomeworkFileSerializer,
@@ -591,3 +594,64 @@ class PhotoLatexView(APIView):
             return Response(photo_to_latex(image, number))
         except PhotoLatexError as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class CallViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
+    """Созвоны-уроки (LiveKit).
+
+    GET /calls/ — идущие созвоны: учителю все, ученику — по его предметам (и общие, без предмета).
+    POST /calls/ — учитель начинает созвон {subject, title}.
+    POST /calls/{id}/join/ — токен LiveKit для входа в комнату.
+    POST /calls/{id}/end/ — учитель завершает созвон для всех.
+    """
+    serializer_class = CallSerializer
+    pagination_class = None
+
+    def get_permissions(self):
+        if self.action in ('create', 'end'):
+            return [IsTeacher()]
+        return [IsAuthenticated()]
+
+    def get_queryset(self):
+        queryset = Call.objects.select_related('started_by').filter(
+            ended_at__isnull=True,
+            started_at__gte=timezone.now() - Call.MAX_DURATION,
+        )
+        user = self.request.user
+        if getattr(user, 'is_teacher', False):
+            return queryset
+        # Сравниваем в Python: iexact в SQLite не понимает регистр русских букв.
+        # Идущих созвонов единицы, так что это дёшево
+        subjects = {str(s).strip().casefold() for s in (getattr(user, 'subjects', None) or [])}
+        ids = [c.id for c in queryset if not c.subject or c.subject.casefold() in subjects]
+        return queryset.filter(id__in=ids)
+
+    def perform_create(self, serializer):
+        serializer.save(started_by=self.request.user)
+
+    @action(detail=True, methods=['post'])
+    def join(self, request, pk=None):
+        call = self.get_object()
+        user = request.user
+        try:
+            token = livekit.make_token(
+                identity=f'account-{user.id}',
+                name=user.name,
+                room=call.room_name,
+                is_admin=user.is_teacher,
+            )
+        except livekit.LiveKitNotConfigured as e:
+            return Response({'error': str(e)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        return Response({
+            'call': CallSerializer(call).data,
+            'token': token,
+            'url': settings.LIVEKIT_URL,
+        })
+
+    @action(detail=True, methods=['post'])
+    def end(self, request, pk=None):
+        call = self.get_object()
+        call.ended_at = timezone.now()
+        call.save(update_fields=['ended_at'])
+        livekit.delete_room(call.room_name)
+        return Response(status=status.HTTP_204_NO_CONTENT)

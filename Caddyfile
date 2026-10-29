@@ -17,6 +17,11 @@ spiritcode.duckdns.org {
         reverse_proxy backend:8000
     }
 
+    # Созвоны: WebSocket-сигнализация LiveKit (видео идёт напрямую на порты 7881/7882)
+    handle_path /livekit/* {
+        reverse_proxy livekit:7880
+    }
+
     handle /admin/* {
         reverse_proxy backend:8000
     }

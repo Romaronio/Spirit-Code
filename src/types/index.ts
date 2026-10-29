@@ -197,3 +197,22 @@ export interface BankTask {
 }
 
 export type NewBankTask = Pick<BankTask, 'number' | 'latex' | 'answer'>
+
+// Созвон-урок (LiveKit)
+export interface Call {
+  id: number
+  title: string
+  subject: string // пусто — для всех учеников
+  started_by_name: string
+  started_at: string
+  ended_at: string | null
+}
+
+export type NewCall = Pick<Call, 'title' | 'subject'>
+
+// Пропуск в комнату: токен LiveKit и адрес сервера (пусто — этот же сайт, путь /livekit)
+export interface CallJoin {
+  call: Call
+  token: string
+  url: string
+}

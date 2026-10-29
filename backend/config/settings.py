@@ -201,3 +201,13 @@ GIGACHAT_MODEL = os.environ.get('GIGACHAT_MODEL', 'GigaChat-2-Max')
 # Корневой и промежуточный сертификаты Минцифры (с gu-st.ru) — ими подписан сертификат GigaChat
 GIGACHAT_CA_BUNDLE = BASE_DIR / 'certs' / 'russian_trusted_ca.pem'
 TESSERACT_CMD = os.environ.get('TESSERACT_CMD', 'tesseract')
+
+# Созвоны (LiveKit). Ключ и секрет — те же, что в конфиге livekit-server.
+# LIVEKIT_URL — адрес для браузера (wss://…); пусто — тот же сайт по пути /livekit
+# (на сервере его проксирует Caddy, локально — Vite). По умолчанию — ключи dev-режима
+# `livekit-server --dev`, только при DEBUG.
+LIVEKIT_URL = os.environ.get('LIVEKIT_URL', '').strip()
+LIVEKIT_API_KEY = os.environ.get('LIVEKIT_API_KEY', 'devkey' if DEBUG else '').strip()
+LIVEKIT_API_SECRET = os.environ.get('LIVEKIT_API_SECRET', 'secret' if DEBUG else '').strip()
+# Адрес livekit-server для запросов с бэкенда (закрыть комнату, когда учитель завершил урок)
+LIVEKIT_API_HOST = os.environ.get('LIVEKIT_API_HOST', 'http://localhost:7880' if DEBUG else '').strip()

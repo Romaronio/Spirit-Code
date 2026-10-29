@@ -1,0 +1,141 @@
+/* Страница урока тёмная (фон — тёмно-коричневый цвет текста из дизайна): на нём лучше видно видео.
+   Цвета компонентов LiveKit переопределяем через их переменные --lk-* */
+.page {
+  height: 100vh;
+  height: 100dvh;
+  background: var(--text);
+  color: #f7efe4;
+}
+
+.room {
+  --lk-bg: var(--text);
+  --lk-bg2: #3a2a1e;
+  --lk-bg3: #4a3727;
+  --lk-fg: #f7efe4;
+  --lk-control-bg: #3a2a1e;
+  --lk-control-hover-bg: #4a3727;
+  --lk-control-active-bg: var(--accent);
+  --lk-control-active-hover-bg: var(--accent-hover);
+  --lk-accent-bg: var(--accent);
+  --lk-accent-fg: var(--on-accent);
+  --lk-border-radius: 12px;
+  --lk-font-family: var(--font-body);
+
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--text);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  border-bottom: 1px solid #3a2a1e;
+}
+
+.live {
+  flex-shrink: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 18px;
+  line-height: 26px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.endAll {
+  min-height: 40px;
+  padding: 0 16px;
+  border: 1px solid #cdbba8;
+  border-radius: 10px;
+  background: transparent;
+  color: #f7efe4;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.endAll:hover {
+  border-color: #f7efe4;
+}
+
+.stage {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 12px;
+}
+
+.fill {
+  height: 100%;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 16px 16px;
+}
+
+/* Включённые кнопки LiveKit сам красит в --lk-control-active-bg (оранжевый) */
+.control,
+.leave {
+  min-height: 44px;
+  padding: 0 18px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.leave {
+  background: #b3361a;
+  color: #fff;
+}
+
+.leave:hover {
+  background: #c9441f;
+}
+
+.startAudio {
+  position: fixed;
+  bottom: 96px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.deviceError {
+  padding: 0 16px;
+  color: #ffb39e;
+  font-size: 14px;
+  text-align: center;
+}
+
+.message {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  min-height: 100vh;
+  padding: 16px;
+  font-size: 18px;
+  text-align: center;
+}
+
+.homeLink {
+  padding: 10px 20px;
+  border-radius: 12px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 700;
+  text-decoration: none;
+}

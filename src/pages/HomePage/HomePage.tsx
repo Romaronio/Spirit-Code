@@ -3,6 +3,7 @@ import { Link, Navigate } from 'react-router-dom'
 import styles from './HomePage.module.css'
 import type { Account, Assignment, CommentActions, NewAssignment, ReviewStatus, User } from '../../types'
 import AssignmentCard from '../../components/AssignmentCard/AssignmentCard'
+import CallsBar from '../../components/CallsBar/CallsBar'
 import AssignmentForm from '../../components/AssignmentForm/AssignmentForm'
 import StudentsPanel from '../../components/StudentsPanel/StudentsPanel'
 import AnswersPanel from '../../components/AnswersPanel/AnswersPanel'
@@ -10,7 +11,7 @@ import ProgressDonut from '../../components/ProgressDonut/ProgressDonut'
 import PaymentsPanel from '../../components/PaymentsPanel/PaymentsPanel'
 import BankTaskForm from '../../components/BankTaskForm/BankTaskForm'
 import ChatWindow from '../../components/ChatWindow/ChatWindow'
-import { hasSubject, normalize, subjectsOf } from '../../utils/subjects'
+import { hasSubject, normalize, subjectsOf, uniqueSubjects } from '../../utils/subjects'
 
 interface Props {
   user: User | null;
@@ -208,7 +209,12 @@ function HomePage({
             </div>
           )}
         </section>
-  
+
+        <CallsBar
+          isTeacher={isTeacher}
+          subjects={uniqueSubjects([...accounts.flatMap((a) => a.subjects ?? []), ...items.map((a) => a.subject)])}
+        />
+
         {isTeacher ? (
           // Учитель: форма | ответы и ученики | все задания — в три колонки
           <div className={styles.tools}>
