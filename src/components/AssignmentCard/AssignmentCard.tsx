@@ -50,7 +50,9 @@ function AssignmentCard({ assignment, user, onDelete }: Props) {
         <h3 className={styles.title} title={assignment.title}>{assignment.title}</h3>
 
         <div className={styles.footer}>
-          <span className={styles.deadline}>до {formatDeadline(assignment.deadline)}</span>
+          {assignment.deadline && (
+            <span className={styles.deadline}>до {formatDeadline(assignment.deadline)}</span>
+          )}
           <span className={styles.open}>Открыть →</span>
         </div>
       </Link>

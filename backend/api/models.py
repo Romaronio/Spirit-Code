@@ -97,7 +97,7 @@ class Assignment(models.Model):
     """Модель для заданий"""
     title = models.CharField(max_length=255)
     subject = models.CharField(max_length=100)
-    deadline = models.DateField()
+    deadline = models.DateField(blank=True, null=True)
     recording_url = models.URLField(blank=True, null=True)
     description = models.TextField(blank=True, null=True)
     # Задания по номерам (например, номера заданий ЕГЭ): [{"number": 5, "latex": "...", "answer": "..."}].

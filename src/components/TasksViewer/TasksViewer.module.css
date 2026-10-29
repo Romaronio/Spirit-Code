@@ -110,3 +110,21 @@
 .attachments a {
   color: #140f0f;
 }
+
+/* «Следующее задание» — в конце задания, справа */
+.next {
+  display: block;
+  margin: 24px 0 0 auto;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 8px;
+  background: #ff8400;
+  color: #140f0f;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.next:hover {
+  background: #ff9a2e;
+}

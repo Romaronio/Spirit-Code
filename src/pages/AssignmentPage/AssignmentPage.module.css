@@ -222,6 +222,19 @@
   margin-bottom: 16px;
 }
 
+/* Форма ответа ученика: поля, кнопка файлов и список — столбиком, не наползают друг на друга */
+.answerForm {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.answerForm h2,
+.answerForm p,
+.answerForm .files {
+  margin: 0;
+}
+
 .openTasks {
   display: flex;
   align-items: center;

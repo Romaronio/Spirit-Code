@@ -6,12 +6,15 @@ import { hasSubject, normalize } from '../../utils/subjects'
 import type { Account, Assignment, AssignmentChanges, CommentActions, NumberedTask, ReviewStatus, User } from '../../types'
 import { ReviewButtons, StatusBadge } from '../../components/AnswerStatus/AnswerStatus'
 import CommentThread from '../../components/CommentThread/CommentThread'
-import { ACCEPT, EMPTY_TASK_FILES, MAX_FILE_SIZE_MB, pickFiles, taskFileChanges, type FileEntry, type TaskFilesDraft } from '../../utils/uploads'
+import { ACCEPT, EMPTY_TASK_FILES, pickFiles, taskFileChanges, type FileEntry, type TaskFilesDraft } from '../../utils/uploads'
 import { taskNumberTitle } from '../../utils/taskNumbers'
 import { parseLatex } from '../../utils/latex'
 import LatexEditor from '../../components/LatexEditor/LatexEditor'
 import NumberedTasksEditor from '../../components/NumberedTasksEditor/NumberedTasksEditor'
 import TasksViewer from '../../components/TasksViewer/TasksViewer'
+
+// Что открыто в панели заданий: номер классной работы, задания без номера или номер ДЗ ('hw-5')
+type TasksKey = number | 'classwork' | 'homework' | `hw-${number}`
 
 interface PageProps {
   user: User | null
@@ -102,7 +105,7 @@ function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStud
 
   // Какие задания открыты в панели: по номеру, классной работы без номера или домашние
   // Номера ДЗ — ключи вида 'hw-5', чтобы не путать с номерами классной работы
-  const [openTasks, setOpenTasks] = useState<number | 'classwork' | 'homework' | `hw-${number}` | null>(null)
+  const [openTasks, setOpenTasks] = useState<TasksKey | null>(null)
   // Номер виден ученику, если у него есть LaTeX или файлы для выполнения
   const lessonFiles = assignment.files ?? []
   const homeworkFilesSaved = assignment.homework?.files ?? []
@@ -118,6 +121,23 @@ function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStud
   const commonLessonFiles = lessonFiles.filter((f) => f.task_number == null)
   const commonHomeworkFiles = homeworkFilesSaved.filter((f) => f.task_number == null)
   const closeTasks = useCallback(() => setOpenTasks(null), [])
+  // Задания в том же порядке, что и кнопки в списках, — для кнопки «Следующее задание»
+  const classworkOrder: TasksKey[] = [
+    ...shownNumbered.map((t) => t.number),
+    ...(assignment.tasks_latex?.trim() ? ['classwork' as const] : []),
+  ]
+  const homeworkOrder: TasksKey[] = [
+    ...shownHomeworkNumbered.map((t) => `hw-${t.number}` as const),
+    ...(assignment.homework?.tasks_latex?.trim() ? ['homework' as const] : []),
+  ]
+  const nextTasks = (() => {
+    for (const order of [classworkOrder, homeworkOrder]) {
+      const i = openTasks === null ? -1 : order.indexOf(openTasks)
+      if (i !== -1) return order[i + 1]
+    }
+    return undefined
+  })()
+  const openNext = nextTasks === undefined ? undefined : () => setOpenTasks(nextTasks)
 
   // Форма отправки ответа учеником
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -265,7 +285,7 @@ function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStud
         <div className={styles.card}>
           <span className={styles.subject}>{assignment.subject}</span>
           <h1 className={styles.title}>{assignment.title}</h1>
-          <p className={styles.deadline}>Сдать до: {assignment.deadline}</p>
+          {assignment.deadline && <p className={styles.deadline}>Сдать до: {assignment.deadline}</p>}
 
           {isEditing ? (
             <div className={styles.editor}>
@@ -634,7 +654,7 @@ function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStud
 
           {/* Секция "Отправить ответ" — только для учеников */}
           {user.role === 'student' && (
-            <section className={styles.section}>
+            <section className={`${styles.section} ${styles.answerForm}`}>
               <h2>Отправить ответ</h2>
               {myAnswer && (
                 <p className={styles.reviewStatus}>
@@ -667,7 +687,7 @@ function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStud
                   onChange={(e) => setStudentDescription(e.target.value)}
                 />
               </label>
-              <span className={styles.label}>Файлы с ответом (каждый — до {MAX_FILE_SIZE_MB} МБ)</span>
+              <span className={styles.label}>Файлы с ответом</span>
               <label className={styles.fileButton}>
                 📎 Прикрепить файлы
                 <input type="file" multiple accept={ACCEPT} className={styles.hiddenInput} onChange={handleStudentFilesChange} />
@@ -729,6 +749,7 @@ function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStud
             attachments={lessonFiles.filter((f) => f.task_number === openNumbered.number)}
             answer={canEdit ? openNumbered.answer : undefined}
             onClose={closeTasks}
+            onNext={openNext}
           />
         )}
         {openTasks === 'classwork' && assignment.tasks_latex && (
@@ -738,26 +759,29 @@ function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStud
             source={assignment.tasks_latex}
             files={assignment.files}
             onClose={closeTasks}
+            onNext={openNext}
           />
         )}
         {openHomeworkNumbered && (
           <TasksViewer
             title={`${assignment.title} · ${taskNumberTitle(openHomeworkNumbered.number)}`}
-            subtitle={`${assignment.subject} · домашнее задание, сдать до ${assignment.deadline}`}
+            subtitle={`${assignment.subject} · домашнее задание${assignment.deadline ? `, сдать до ${assignment.deadline}` : ''}`}
             source={openHomeworkNumbered.latex}
             files={assignment.homework?.files}
             attachments={homeworkFilesSaved.filter((f) => f.task_number === openHomeworkNumbered.number)}
             answer={canEdit ? openHomeworkNumbered.answer : undefined}
             onClose={closeTasks}
+            onNext={openNext}
           />
         )}
         {openTasks === 'homework' && assignment.homework?.tasks_latex && (
           <TasksViewer
             title={assignment.title}
-            subtitle={`${assignment.subject} · домашнее задание, сдать до ${assignment.deadline}`}
+            subtitle={`${assignment.subject} · домашнее задание${assignment.deadline ? `, сдать до ${assignment.deadline}` : ''}`}
             source={assignment.homework.tasks_latex}
             files={assignment.homework.files}
             onClose={closeTasks}
+            onNext={openNext}
           />
         )}
       </div>

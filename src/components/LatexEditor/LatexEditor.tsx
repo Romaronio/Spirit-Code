@@ -20,10 +20,11 @@ interface Props {
   onChange: (value: string) => void
   files?: DocFile[] // уже прикреплённые файлы — в них ищутся картинки
   pendingNames?: string[] // файлы, выбранные, но ещё не сохранённые
+  showHint?: boolean // подсказка про .tex, фото и картинки под полем
 }
 
 // Поле для кода LaTeX с заданиями и предпросмотром того, что увидит ученик
-function LatexEditor({ label, value, onChange, files = [], pendingNames = [] }: Props) {
+function LatexEditor({ label, value, onChange, files = [], pendingNames = [], showHint = true }: Props) {
   const [showPreview, setShowPreview] = useState(false)
   const [fileError, setFileError] = useState('')
   const [isDragging, setIsDragging] = useState(false)
@@ -176,11 +177,13 @@ function LatexEditor({ label, value, onChange, files = [], pendingNames = [] }: 
           ))}
         </ul>
       )}
-      <p className={styles.hint}>
-        Вставьте код целиком, загрузите или перетащите .tex — преамбулу удалять не нужно. Фото или скриншот задания
-        (кнопкой, перетаскиванием или Ctrl+V) превратится в LaTeX — проверьте результат в предпросмотре. Картинки из{' '}
-        <code>\includegraphics</code> прикрепите файлами с теми же именами.
-      </p>
+      {showHint && (
+        <p className={styles.hint}>
+          Вставьте код целиком, загрузите или перетащите .tex — преамбулу удалять не нужно. Фото или скриншот задания
+          (кнопкой, перетаскиванием или Ctrl+V) превратится в LaTeX — проверьте результат в предпросмотре. Картинки из{' '}
+          <code>\includegraphics</code> прикрепите файлами с теми же именами.
+        </p>
+      )}
       {value.trim() && (
         <p className={styles.summary}>
           {doc.tasks > 0 ? `Заданий: ${doc.tasks}` : 'Плашек \\zadacha не найдено — будет показан просто текст'}

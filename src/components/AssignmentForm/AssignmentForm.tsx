@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import styles from './AssignmentForm.module.css'
-import { EMPTY_TASK_FILES, MAX_FILE_SIZE_MB, taskFileChanges, type TaskFilesDraft } from '../../utils/uploads'
+import { EMPTY_TASK_FILES, taskFileChanges, type TaskFilesDraft } from '../../utils/uploads'
 import NumberedTasksEditor from '../NumberedTasksEditor/NumberedTasksEditor'
 import type { NewAssignment, NumberedTask } from '../../types'
 
@@ -29,8 +29,8 @@ function AssignmentForm({ onAdd }: AssignmentFormProps) {
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
 
-    if (title.trim() === '' || subject === '' || deadline === '') {
-      setError('Заполните название, предмет и срок сдачи')
+    if (title.trim() === '' || subject === '') {
+      setError('Заполните название и предмет')
       return
     }
 
@@ -39,7 +39,7 @@ function AssignmentForm({ onAdd }: AssignmentFormProps) {
         title: title.trim(),
         subject: subject,
         description: description.trim(),
-        deadline,
+        deadline: deadline || undefined,
         recording_url: recordingUrl.trim() || undefined,
         numbered_tasks: numberedTasks,
         homework:
@@ -116,11 +116,14 @@ function AssignmentForm({ onAdd }: AssignmentFormProps) {
             value={description}
             onChange={(e) => setDescription(e.target.value)}
           />
-          <input
-            type="date"
-            value={deadline}
-            onChange={(e) => setDeadline(e.target.value)}
-          />
+          <label className={styles.label}>
+            Срок сдачи (необязательно)
+            <input
+              type="date"
+              value={deadline}
+              onChange={(e) => setDeadline(e.target.value)}
+            />
+          </label>
 
           <label className={styles.label}>
             Ссылка на запись урока
@@ -159,7 +162,6 @@ function AssignmentForm({ onAdd }: AssignmentFormProps) {
             onTaskFilesChange={setHomeworkTaskFiles}
           />
 
-          <p className={styles.label}>Каждый файл — до {MAX_FILE_SIZE_MB} МБ</p>
           {error && <p className={styles.error}>{error}</p>}
 
           <button type="submit" className={styles.submit}>

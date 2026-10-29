@@ -83,6 +83,7 @@ function BankTaskForm() {
 
           <LatexEditor
             label="Условие (LaTeX)"
+            showHint={false}
             value={latex}
             onChange={(value) => {
               setLatex(value)

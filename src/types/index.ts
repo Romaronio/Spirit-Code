@@ -78,7 +78,7 @@ export interface Assignment {
   id?: number
   title: string
   subject: string
-  deadline: string // формат 'ГГГГ-ММ-ДД'
+  deadline?: string | null // формат 'ГГГГ-ММ-ДД', может быть не задан
   recording_url?: string
   description?: string
   numbered_tasks?: NumberedTask[] // задания по номерам — у каждого своя кнопка
@@ -107,7 +107,7 @@ export interface TaskFileChanges {
 export type NewAssignment = {
   title: string
   subject: string
-  deadline: string
+  deadline?: string
   description?: string
   recording_url?: string
   numbered_tasks?: NumberedTask[]

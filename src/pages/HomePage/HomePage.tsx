@@ -93,7 +93,7 @@ function HomePage({
 
   const assignmentsSection = (
     <section className={styles.assignmentsColumn}>
-      <h2 className={styles.heading}>Задания</h2>
+      {!isTeacher && <h2 className={styles.heading}>Задания</h2>}
 
       {sortedItems.length === 0 ? (
         <p>{emptyMessage}</p>

@@ -164,7 +164,7 @@ function AnswersPanel({ items, accounts, onReview, activeAnswerId, onOpenChat, r
                           <Link to={`/assignment/${a.id}`} className={styles.link}>
                             {a.title}
                           </Link>
-                          <span className={styles.date}> · до {a.deadline}</span>
+                          {a.deadline && <span className={styles.date}> · до {a.deadline}</span>}
                         </li>
                       ))}
                     </ul>

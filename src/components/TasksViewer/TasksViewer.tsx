@@ -10,13 +10,14 @@ interface Props {
   attachments?: DocFile[] // файлы для выполнения номера — ученик скачивает их здесь
   answer?: string // ответ к номеру, передаётся только учителю
   onClose: () => void
+  onNext?: () => void // открыть следующее задание; нет — значит, это последнее
 }
 
 // Совпадает с @media в TasksViewer.module.css: уже — панель на весь экран
 const FULLSCREEN_QUERY = '(max-width: 1000px)'
 
 // Задания в панели справа от задания — вместо скачивания PDF
-function TasksViewer({ title, subtitle, source, files, attachments = [], answer, onClose }: Props) {
+function TasksViewer({ title, subtitle, source, files, attachments = [], answer, onClose, onNext }: Props) {
   const closeRef = useRef<HTMLButtonElement>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
 
@@ -71,6 +72,11 @@ function TasksViewer({ title, subtitle, source, files, attachments = [], answer,
           </div>
         )}
         {source.trim() && <LatexDocument source={source} files={files} />}
+        {onNext && (
+          <button type="button" className={styles.next} onClick={onNext}>
+            Следующее задание →
+          </button>
+        )}
       </div>
     </aside>
   )
