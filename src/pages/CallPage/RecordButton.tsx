@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { useLocalParticipant } from '@livekit/components-react'
+import { useTracks } from '@livekit/components-react'
+import { Track } from 'livekit-client'
 import styles from './CallPage.module.css'
 import { canPickFolder, ensureWriteAccess, loadFolder, pickFolder, type FolderHandle } from '../../utils/recordFolder'
 
@@ -20,11 +21,22 @@ interface Recording {
   recorder: MediaRecorder
   audio: AudioContext
   output: MediaStreamAudioDestinationNode
-  mic: { track: MediaStreamTrack; source: MediaStreamAudioSourceNode } | null
+  // Звуковые дорожки созвона, подключённые к записи
+  sources: Map<MediaStreamTrack, MediaStreamAudioSourceNode>
 }
 
-// Первый формат, который умеет браузер (Chrome/Edge/Firefox пишут webm, Safari — mp4)
-const MIME_TYPES = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm', 'video/mp4']
+// Первый формат, который умеет браузер. MP4 (H.264) — в первую очередь: webm из браузера без длительности,
+// и «Медиаплеер» Windows показывает в нём застывшую картинку при живом звуке. Chrome/Edge пишут mp4
+// с версии 126, Safari — всегда; Firefox умеет только webm.
+const MIME_TYPES = [
+  'video/mp4;codecs=avc1.640028,mp4a.40.2',
+  'video/mp4;codecs=avc1.42E01F,mp4a.40.2',
+  'video/mp4;codecs=avc1,opus',
+  'video/mp4',
+  'video/webm;codecs=vp9,opus',
+  'video/webm;codecs=vp8,opus',
+  'video/webm',
+]
 
 function pickMimeType() {
   return MIME_TYPES.find((type) => MediaRecorder.isTypeSupported(type)) ?? ''
@@ -92,12 +104,15 @@ function formatTime(seconds: number) {
   return `${m}:${String(s).padStart(2, '0')}`
 }
 
-// Запись урока в браузере учителя: видео выбранной вкладки или экрана, звук вкладки
-// (голоса учеников) смешивается с микрофоном учителя. В Chrome и Edge запись пишется в папку,
+// Запись урока в браузере учителя: видео выбранной вкладки или экрана, а звук — прямо из созвона
+// (микрофоны учителя и учеников, звук показа экрана), поэтому не важно, что выбрано в окне браузера. В Chrome и Edge запись пишется в папку,
 // которую учитель выбирает при первой записи (кнопка «Папка» — сменить); в остальных браузерах скачивается.
 function RecordButton({ fileName, onError }: Props) {
-  const { microphoneTrack } = useLocalParticipant()
-  const micTrack = microphoneTrack?.track?.mediaStreamTrack ?? null
+  // Только дорожки, которые учитель реально получает (onlySubscribed по умолчанию)
+  const audioRefs = useTracks([Track.Source.Microphone, Track.Source.ScreenShareAudio])
+  const audioTracks = audioRefs
+    .map((ref) => ref.publication?.track?.mediaStreamTrack)
+    .filter((track): track is MediaStreamTrack => !!track)
   const recordingRef = useRef<Recording | null>(null)
   const [recording, setRecording] = useState(false)
   const [starting, setStarting] = useState(false)
@@ -115,18 +130,24 @@ function RecordButton({ fileName, onError }: Props) {
     }
   }, [])
 
-  // Микрофон могут выключить и включить заново — подключаем к записи текущую дорожку
+  // Ученики заходят и выходят, микрофоны выключают и включают заново — подключаем к записи текущие дорожки
   useEffect(() => {
     const rec = recordingRef.current
-    if (!rec || rec.mic?.track === micTrack) return
-    rec.mic?.source.disconnect()
-    rec.mic = null
-    if (micTrack) {
-      const source = rec.audio.createMediaStreamSource(new MediaStream([micTrack]))
-      source.connect(rec.output)
-      rec.mic = { track: micTrack, source }
+    if (!rec) return
+    const current = new Set(audioTracks)
+    for (const [track, source] of rec.sources) {
+      if (!current.has(track)) {
+        source.disconnect()
+        rec.sources.delete(track)
+      }
     }
-  }, [micTrack, recording])
+    for (const track of current) {
+      if (rec.sources.has(track)) continue
+      const source = rec.audio.createMediaStreamSource(new MediaStream([track]))
+      source.connect(rec.output)
+      rec.sources.set(track, source)
+    }
+  }, [audioTracks, recording])
 
   useEffect(() => {
     if (!recording) return
@@ -196,8 +217,9 @@ function RecordButton({ fileName, onError }: Props) {
     try {
       display = await navigator.mediaDevices.getDisplayMedia({
         video: { frameRate: 30 },
-        audio: true,
-        // Chrome сразу предложит эту вкладку — в ней слышны ученики
+        // Звук берём из созвона, иначе голоса учеников попали бы в запись дважды
+        audio: false,
+        // Chrome сразу предложит эту вкладку с уроком
         preferCurrentTab: true,
         selfBrowserSurface: 'include',
       } as DisplayMediaStreamOptions)
@@ -211,9 +233,6 @@ function RecordButton({ fileName, onError }: Props) {
 
     const audio = new AudioContext()
     const output = audio.createMediaStreamDestination()
-    if (display.getAudioTracks().length > 0) {
-      audio.createMediaStreamSource(new MediaStream(display.getAudioTracks())).connect(output)
-    }
     const stream = new MediaStream([...display.getVideoTracks(), ...output.stream.getAudioTracks()])
     const cleanup = () => {
       display.getTracks().forEach((t) => t.stop())
@@ -235,12 +254,12 @@ function RecordButton({ fileName, onError }: Props) {
       return
     }
 
-    const rec: Recording = { recorder, audio, output, mic: null }
+    const rec: Recording = { recorder, audio, output, sources: new Map() }
     recorder.ondataavailable = (event) => {
       if (event.data.size > 0) out.write(event.data)
     }
     recorder.onstop = () => {
-      rec.mic?.source.disconnect()
+      rec.sources.forEach((source) => source.disconnect())
       cleanup()
       recordingRef.current = null
       setRecording(false)
