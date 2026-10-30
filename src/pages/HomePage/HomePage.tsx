@@ -190,7 +190,6 @@ function HomePage({
       <main className={styles.main}>
         <section className={styles.hero}>
           <div className={styles.welcome}>
-            {isTeacher && <span className={styles.prompt}>~/spirit-code $ whoami</span>}
             <h1 className={styles.greeting}>Добро пожаловать, {user.name}</h1>
             <p className={styles.lead}>{lead}</p>
           </div>

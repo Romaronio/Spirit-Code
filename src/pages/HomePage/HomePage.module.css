@@ -133,12 +133,6 @@
   padding: 32px;
 }
 
-.prompt {
-  color: var(--accent-text);
-  font-family: var(--font-mono);
-  font-size: 13px;
-}
-
 .greeting {
   font-size: 40px;
   line-height: 1.15;
