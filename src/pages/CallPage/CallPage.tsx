@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import {
   CarouselLayout,
@@ -15,6 +15,7 @@ import {
   StartAudio,
   TrackToggle,
   useTracks,
+  type TrackReference,
 } from '@livekit/components-react'
 import { DisconnectReason, Track } from 'livekit-client'
 import '@livekit/components-styles'
@@ -176,13 +177,49 @@ function Stage() {
           <CarouselLayout tracks={cameras}>
             <ParticipantTile />
           </CarouselLayout>
-          <FocusLayout trackRef={screen} />
+          <ScreenView trackRef={screen} />
         </FocusLayoutContainer>
       ) : (
         <GridLayout tracks={cameras} className={styles.fill}>
           <ParticipantTile />
         </GridLayout>
       )}
+    </div>
+  )
+}
+
+// Демонстрация экрана с кнопкой «Во весь экран»: разворачивается только сам экран,
+// без шапки, кнопок и камер. Выйти — Esc, кнопка «Свернуть» или двойной клик.
+function ScreenView({ trackRef }: { trackRef: TrackReference }) {
+  const boxRef = useRef<HTMLDivElement>(null)
+  const [full, setFull] = useState(false)
+
+  useEffect(() => {
+    const update = () => setFull(!!boxRef.current && document.fullscreenElement === boxRef.current)
+    document.addEventListener('fullscreenchange', update)
+    return () => document.removeEventListener('fullscreenchange', update)
+  }, [])
+
+  function toggle() {
+    const box = boxRef.current
+    if (!box) return
+    if (document.fullscreenElement) {
+      void document.exitFullscreen()
+    } else if (box.requestFullscreen) {
+      void box.requestFullscreen().catch(() => {})
+    } else {
+      // iPhone не умеет разворачивать блоки, только само видео
+      const video = box.querySelector('video') as (HTMLVideoElement & { webkitEnterFullscreen?: () => void }) | null
+      video?.webkitEnterFullscreen?.()
+    }
+  }
+
+  return (
+    <div ref={boxRef} className={`${styles.screenView} ${full ? styles.screenFull : ''}`} onDoubleClick={toggle}>
+      <FocusLayout trackRef={trackRef} />
+      <button type="button" className={`lk-button ${styles.fullButton}`} onClick={toggle}>
+        {full ? 'Свернуть' : 'Во весь экран'}
+      </button>
     </div>
   )
 }

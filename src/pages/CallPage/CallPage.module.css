@@ -79,6 +79,60 @@
   height: 100%;
 }
 
+/* Демонстрация экрана: кнопка «Во весь экран» в углу, видна при наведении */
+.screenView {
+  position: relative;
+  min-width: 0;
+  height: 100%;
+}
+
+.screenView > :global(.lk-participant-tile) {
+  height: 100%;
+}
+
+.fullButton {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+  padding: 8px 14px;
+  background: rgba(0, 0, 0, 0.6);
+  font-size: 14px;
+  font-weight: 600;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.screenView:hover .fullButton,
+.fullButton:focus-visible {
+  opacity: 1;
+}
+
+/* На телефоне наведения нет — кнопку показываем всегда */
+@media (hover: none) {
+  .fullButton {
+    opacity: 1;
+  }
+}
+
+/* Во весь экран: только картинка на чёрном фоне, без подписей и рамок LiveKit */
+.screenFull {
+  background: #000;
+}
+
+.screenFull :global(.lk-participant-tile) {
+  border-radius: 0;
+}
+
+.screenFull :global(.lk-participant-media-video) {
+  background: #000;
+}
+
+.screenFull :global(.lk-participant-metadata),
+.screenFull :global(.lk-focus-toggle-button) {
+  display: none;
+}
+
 .controls {
   display: flex;
   flex-wrap: wrap;
