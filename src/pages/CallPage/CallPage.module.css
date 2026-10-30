@@ -105,6 +105,46 @@
   background: #c9441f;
 }
 
+/* Идёт запись: красная кнопка с мигающей точкой и таймером */
+.recording,
+.recording:hover {
+  background: #b3361a;
+  color: #fff;
+}
+
+.recDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #fff;
+  animation: recBlink 1.2s ease-in-out infinite;
+}
+
+@keyframes recBlink {
+  50% {
+    opacity: 0.3;
+  }
+}
+
+/* Длинное имя папки обрезаем, чтобы кнопки не разъезжались */
+.folder {
+  max-width: 240px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  display: inline-block;
+  line-height: 44px;
+}
+
+.savedTo {
+  flex-basis: 100%;
+  margin: 0;
+  color: #cdbba8;
+  font-size: 13px;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
 .startAudio {
   position: fixed;
   bottom: 96px;

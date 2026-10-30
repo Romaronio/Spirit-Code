@@ -21,6 +21,7 @@ import '@livekit/components-styles'
 import styles from './CallPage.module.css'
 import * as api from '../../services/api'
 import { callName } from '../../utils/calls'
+import RecordButton from './RecordButton'
 import type { CallJoin, User } from '../../types'
 
 interface Props {
@@ -142,6 +143,7 @@ function CallPage({ user }: Props) {
           >
             Показать экран
           </TrackToggle>
+          {isTeacher && <RecordButton fileName={`Урок · ${callName(join.call)}`} onError={setDeviceError} />}
           <DisconnectButton className={styles.leave}>Выйти</DisconnectButton>
         </div>
 
