@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useState, type CSSProperties } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import styles from './HomePage.module.css'
 import type { Account, Assignment, CommentActions, NewAssignment, ReviewStatus, User } from '../../types'
@@ -42,30 +42,37 @@ function HomePage({
 }: Props) {
   // Открытая переписка (у учителя): показывается вместо колонки с заданиями
   const [openChat, setOpenChat] = useState<{ assignmentId: number; answerId: number } | null>(null)
+  // Окно «Все задания» (у учителя)
+  const [showAll, setShowAll] = useState(false)
   const closeChat = useCallback(() => setOpenChat(null), [])
 
-  // Чат по высоте равен панели «Ответы учеников» — следим за её размером
-  const answersRef = useRef<HTMLElement>(null)
-  const [answersHeight, setAnswersHeight] = useState<number>()
-  const isChatOpen = openChat !== null
-
   // Сколько уроков в одной строке на ПК. Выбор запоминаем в браузере
-  const [perRow, setPerRow] = useState(readPerRow)
+  const [perRow, setPerRow] = useState(() => readPerRow(PER_ROW_KEY))
   const changePerRow = (value: number) => {
     setPerRow(value)
-    try {
-      localStorage.setItem(PER_ROW_KEY, String(value))
-    } catch {
-      // без localStorage просто не запоминаем
-    }
+    savePerRow(PER_ROW_KEY, value)
   }
+  // В окне «Все задания» — своя настройка, окно шире колонки на странице
+  const [allPerRow, setAllPerRow] = useState(() => readPerRow(ALL_PER_ROW_KEY))
+  const changeAllPerRow = (value: number) => {
+    setAllPerRow(value)
+    savePerRow(ALL_PER_ROW_KEY, value)
+  }
+
+  // Окно закрывается по Esc, страница под ним не прокручивается
   useEffect(() => {
-    const el = answersRef.current
-    if (!el || !isChatOpen) return
-    const observer = new ResizeObserver(() => setAnswersHeight(el.offsetHeight))
-    observer.observe(el)
-    return () => observer.disconnect()
-  }, [isChatOpen])
+    if (!showAll) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setShowAll(false)
+    }
+    document.addEventListener('keydown', onKey)
+    const overflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.body.style.overflow = overflow
+    }
+  }, [showAll])
 
   if (!user) {
     return <Navigate to="/" replace />
@@ -128,20 +135,7 @@ function HomePage({
       <div className={`${styles.headingRow} ${isTeacher ? styles.headingRowTeacher : ''}`}>
         {!isTeacher && <h2 className={styles.heading}>Задания</h2>}
         {sortedItems.length > 0 && (
-          <div className={styles.perRow} role="group" aria-label="Уроков в строке">
-            <span className={styles.perRowLabel}>Уроков в строке:</span>
-            {PER_ROW_OPTIONS.map((value) => (
-              <button
-                key={value}
-                type="button"
-                className={`${styles.perRowButton} ${perRow === value ? styles.perRowActive : ''}`}
-                aria-pressed={perRow === value}
-                onClick={() => changePerRow(value)}
-              >
-                {value}
-              </button>
-            ))}
-          </div>
+          <PerRowSwitch value={perRow} onChange={changePerRow} />
         )}
       </div>
 
@@ -192,6 +186,11 @@ function HomePage({
           <div className={styles.welcome}>
             <h1 className={styles.greeting}>Добро пожаловать, {user.name}</h1>
             <p className={styles.lead}>{lead}</p>
+            {isTeacher && (
+              <button type="button" className={styles.allButton} onClick={() => setShowAll(true)}>
+                Посмотреть все задания
+              </button>
+            )}
           </div>
           {!isTeacher && (
             <div className={styles.progressCard}>
@@ -221,7 +220,6 @@ function HomePage({
             <AssignmentForm onAdd={onAdd} />
             <div className={styles.sideColumn}>
               <AnswersPanel
-                ref={answersRef}
                 items={items}
                 accounts={accounts}
                 onReview={onReview}
@@ -246,7 +244,6 @@ function HomePage({
                   answer={chat.answer}
                   currentUserId={user.id}
                   commentActions={commentActions}
-                  height={answersHeight}
                   onClose={closeChat}
                 />
               </div>
@@ -258,6 +255,48 @@ function HomePage({
           assignmentsSection
         )}
       </main>
+
+      {showAll && (
+        <div className={styles.modalBackdrop} onClick={() => setShowAll(false)}>
+          <div
+            className={styles.modal}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Все задания"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={styles.modalHeader}>
+              <h2 className={styles.modalTitle}>Все задания · {sortedItems.length}</h2>
+              {sortedItems.length > 0 && (
+                <PerRowSwitch value={allPerRow} onChange={changeAllPerRow} />
+              )}
+              <button
+                type="button"
+                className={styles.modalClose}
+                aria-label="Закрыть"
+                onClick={() => setShowAll(false)}
+              >
+                ×
+              </button>
+            </div>
+            <div className={styles.modalBody}>
+              {sortedItems.length === 0 ? (
+                <p>{emptyMessage}</p>
+              ) : (
+                <div
+                  className={`${styles.grid} ${styles.gridFixed}`}
+                  style={{ '--per-row': allPerRow } as CSSProperties}
+                  data-per-row={allPerRow}
+                >
+                  {sortedItems.map((item) => (
+                    <AssignmentCard key={item.id} assignment={item} user={user} onDelete={onDelete} />
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -277,16 +316,45 @@ function plural(n: number, one: string, few: string, many: string) {
 
 // Иконка базы заданий: раскрытая книга, контур цвета текста ссылки
 const PER_ROW_KEY = 'spirit.lessonsPerRow'
+const ALL_PER_ROW_KEY = 'spirit.allLessonsPerRow'
 const PER_ROW_OPTIONS = [1, 3, 5, 7]
 const PER_ROW_DEFAULT = 3
 
-function readPerRow(): number {
+function readPerRow(key: string): number {
   try {
-    const value = Number(localStorage.getItem(PER_ROW_KEY))
+    const value = Number(localStorage.getItem(key))
     return PER_ROW_OPTIONS.includes(value) ? value : PER_ROW_DEFAULT
   } catch {
     return PER_ROW_DEFAULT
   }
+}
+
+function savePerRow(key: string, value: number) {
+  try {
+    localStorage.setItem(key, String(value))
+  } catch {
+    // без localStorage просто не запоминаем
+  }
+}
+
+// Переключатель «Уроков в строке» (только на ПК)
+function PerRowSwitch({ value, onChange }: { value: number; onChange: (value: number) => void }) {
+  return (
+    <div className={styles.perRow} role="group" aria-label="Уроков в строке">
+      <span className={styles.perRowLabel}>Уроков в строке:</span>
+      {PER_ROW_OPTIONS.map((option) => (
+        <button
+          key={option}
+          type="button"
+          className={`${styles.perRowButton} ${value === option ? styles.perRowActive : ''}`}
+          aria-pressed={value === option}
+          onClick={() => onChange(option)}
+        >
+          {option}
+        </button>
+      ))}
+    </div>
+  )
 }
 
 function BookIcon() {

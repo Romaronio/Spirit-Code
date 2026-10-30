@@ -346,3 +346,91 @@
     font-size: 28px;
   }
 }
+
+/* Кнопка «Посмотреть все задания» в приветствии учителя */
+.allButton {
+  align-self: flex-start;
+  min-height: 44px;
+  padding: 0 18px;
+  border: 1px solid var(--accent);
+  border-radius: 12px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.allButton:hover {
+  border-color: var(--accent-hover);
+  background: var(--accent-hover);
+}
+
+/* Окно со всеми заданиями */
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.modal {
+  display: flex;
+  flex-direction: column;
+  width: min(1400px, 100%);
+  max-height: 100%;
+  border: 1px solid var(--line-soft);
+  border-radius: 28px;
+  background: var(--bg, #f1e8da);
+  overflow: hidden;
+}
+
+.modalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 28px;
+  border-bottom: 1px solid var(--line);
+}
+
+.modalTitle {
+  font-size: 24px;
+  line-height: 30px;
+}
+
+.modalClose {
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.modalClose:hover {
+  border-color: var(--accent);
+}
+
+.modalBody {
+  padding: 24px 28px;
+  overflow-y: auto;
+}
+
+@media (max-width: 600px) {
+  .modalBackdrop {
+    padding: 8px;
+  }
+
+  .modalHeader,
+  .modalBody {
+    padding: 16px;
+  }
+}

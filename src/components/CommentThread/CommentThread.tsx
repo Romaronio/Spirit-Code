@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type RefObject } from 'react'
 import styles from './CommentThread.module.css'
 import type { AnswerComment } from '../../types'
 import MathText from '../MathText/MathText'
@@ -38,6 +38,21 @@ const MATH_TEMPLATES = [
 // Курсор внутри формулы, если перед ним нечётное число неэкранированных $
 function isInsideMath(before: string) {
   return (before.match(/(?<!\\)\$/g)?.length ?? 0) % 2 === 1
+}
+
+// Поле ввода растёт по высоте вместе с текстом — до MAX_INPUT_HEIGHT,
+// дальше появляется прокрутка внутри поля
+const MAX_INPUT_HEIGHT = 200
+
+function useAutoGrow(ref: RefObject<HTMLTextAreaElement | null>, value: string) {
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    el.style.height = 'auto'
+    const height = el.scrollHeight + el.offsetHeight - el.clientHeight
+    el.style.height = `${Math.min(height, MAX_INPUT_HEIGHT)}px`
+    el.style.overflowY = height > MAX_INPUT_HEIGHT ? 'auto' : 'hidden'
+  }, [ref, value])
 }
 
 // Сколько держать палец на сообщении, чтобы открылось меню (телефон)
@@ -80,6 +95,10 @@ function CommentThread({
   const pressTimer = useRef<number | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   const messagesRef = useRef<HTMLDivElement>(null)
+  const editRef = useRef<HTMLTextAreaElement>(null)
+
+  useAutoGrow(inputRef, text)
+  useAutoGrow(editRef, editingId === null ? '' : editText)
 
   // В окне чата держим прокрутку у последнего сообщения
   useEffect(() => {
@@ -261,6 +280,7 @@ function CommentThread({
                   {isEditing ? (
                     <div className={styles.editor}>
                       <textarea
+                        ref={editRef}
                         className={styles.input}
                         rows={2}
                         maxLength={2000}

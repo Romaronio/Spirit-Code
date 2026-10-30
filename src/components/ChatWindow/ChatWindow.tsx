@@ -10,16 +10,12 @@ interface Props {
   answer: StudentHomework
   currentUserId?: number
   commentActions: CommentActions
-  height?: number // высота панели ответов — чат подгоняется под неё
   onClose: () => void
 }
 
 // Окно переписки учителя с учеником по одному ответу.
 // Открывается на странице учителя вместо колонки с заданиями.
-// Ниже этой высоты чат не сжимается (например, когда панель ответов свёрнута)
-const MIN_HEIGHT = 360
-
-function ChatWindow({ assignment, answer, currentUserId, commentActions, height, onClose }: Props) {
+function ChatWindow({ assignment, answer, currentUserId, commentActions, onClose }: Props) {
   const ref = useRef<HTMLElement>(null)
 
   // На телефоне колонки идут друг под другом — прокручиваем к открытому чату
@@ -47,7 +43,6 @@ function ChatWindow({ assignment, answer, currentUserId, commentActions, height,
     <section
       ref={ref}
       className={styles.window}
-      style={height ? ({ '--chat-height': `${Math.max(height, MIN_HEIGHT)}px` } as React.CSSProperties) : undefined}
       aria-label={`Переписка с ${answer.student_name}`}
     >
       <header className={styles.header}>
