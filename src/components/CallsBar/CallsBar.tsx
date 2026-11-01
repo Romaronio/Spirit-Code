@@ -6,7 +6,9 @@ import type { Account, Assignment, Call } from '../../types'
 import { callName } from '../../utils/calls'
 import { hasSubject, normalize } from '../../utils/subjects'
 
-const POLL_INTERVAL_MS = 15_000 // как часто проверяем, не начался ли урок
+// Как часто проверяем, не начался ли урок. Запрос лёгкий, а постоянное соединение
+// заняло бы один из двух обработчиков gunicorn — поэтому частый опрос
+const POLL_INTERVAL_MS = 3_000
 
 interface Props {
   isTeacher: boolean
@@ -36,23 +38,33 @@ function CallsBar({ isTeacher, subjects, students, lessons = [] }: Props) {
     }
   }
 
-  // Список идущих уроков обновляем каждые 15 секунд, пока вкладка открыта
+  // Список идущих уроков обновляем каждые 3 секунды, пока вкладка на экране,
+  // и сразу, когда пользователь вернулся на вкладку
   useEffect(() => {
     let alive = true
-    const refresh = () =>
+    let loading = false // медленный ответ — не шлём следующий запрос поверх
+    const refresh = () => {
+      if (loading || document.visibilityState !== 'visible') return
+      loading = true
       api
         .getCalls()
         .then((list) => {
           if (alive) setCalls(list)
         })
         .catch((err) => console.error('Ошибка загрузки созвонов:', err))
+        .finally(() => {
+          loading = false
+        })
+    }
     refresh()
-    const timer = window.setInterval(() => {
-      if (document.visibilityState === 'visible') refresh()
-    }, POLL_INTERVAL_MS)
+    const timer = window.setInterval(refresh, POLL_INTERVAL_MS)
+    document.addEventListener('visibilitychange', refresh)
+    window.addEventListener('focus', refresh)
     return () => {
       alive = false
       window.clearInterval(timer)
+      document.removeEventListener('visibilitychange', refresh)
+      window.removeEventListener('focus', refresh)
     }
   }, [])
 
