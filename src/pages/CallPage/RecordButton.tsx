@@ -98,6 +98,31 @@ async function folderOutput(folder: FolderHandle, name: string, onError: Props['
   }
 }
 
+// «Автозапись» запоминается в этом браузере учителя
+const AUTO_RECORD_KEY = 'spirit.autoRecord'
+
+function readAutoRecord() {
+  try {
+    return localStorage.getItem(AUTO_RECORD_KEY) === '1'
+  } catch {
+    return false // без localStorage просто не запоминаем
+  }
+}
+
+function saveAutoRecord(value: boolean) {
+  try {
+    localStorage.setItem(AUTO_RECORD_KEY, value ? '1' : '0')
+  } catch {
+    // без localStorage просто не запоминаем
+  }
+}
+
+// Действует ли ещё нажатие, после которого браузер разрешает начать запись экрана
+function hasUserGesture() {
+  const activation = (navigator as Navigator & { userActivation?: { isActive: boolean } }).userActivation
+  return activation?.isActive ?? false
+}
+
 function formatTime(seconds: number) {
   const m = Math.floor(seconds / 60)
   const s = seconds % 60
@@ -119,6 +144,11 @@ function RecordButton({ fileName, onError }: Props) {
   const [seconds, setSeconds] = useState(0)
   const [folder, setFolder] = useState<FolderHandle | null>(null)
   const [savedTo, setSavedTo] = useState('')
+  // Автозапись: при входе в урок запись начинается сама. Браузер разрешает запись экрана только
+  // сразу после нажатия — если нажатие «Войти» уже «остыло», показываем крупную кнопку
+  const [autoRecord, setAutoRecord] = useState(readAutoRecord)
+  const [askToStart, setAskToStart] = useState(() => readAutoRecord() && !hasUserGesture())
+  const autoTried = useRef(false)
 
   useEffect(() => {
     let cancelled = false
@@ -172,6 +202,21 @@ function RecordButton({ fileName, onError }: Props) {
     [],
   )
 
+  // Вошли в урок с включённой автозаписью — начинаем сразу или просим одно нажатие
+  useEffect(() => {
+    if (!autoRecord || askToStart || autoTried.current) return
+    autoTried.current = true
+    void start(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- только при входе в урок
+  }, [])
+
+  function toggleAutoRecord() {
+    const next = !autoRecord
+    setAutoRecord(next)
+    saveAutoRecord(next)
+    if (!next) setAskToStart(false)
+  }
+
   function stop() {
     const rec = recordingRef.current
     if (rec && rec.recorder.state !== 'inactive') rec.recorder.stop()
@@ -194,23 +239,27 @@ function RecordButton({ fileName, onError }: Props) {
     return undefined
   }
 
-  async function start() {
+  // auto — попытка автозаписи при входе: не вышло (браузер не дал без нажатия) — просим нажать
+  async function start(auto = false) {
     if (typeof MediaRecorder === 'undefined' || !navigator.mediaDevices?.getDisplayMedia) {
       onError('Этот браузер не умеет записывать экран — откройте урок в Chrome, Edge или Firefox')
       return
     }
     setStarting(true)
+    setAskToStart(false)
     try {
-      await startRecording()
+      const started = await startRecording(auto)
+      if (auto && !started) setAskToStart(true)
     } finally {
       setStarting(false)
     }
   }
 
-  async function startRecording() {
+  // true — запись пошла
+  async function startRecording(auto: boolean): Promise<boolean> {
     // Сначала папка: разрешение на запись браузер даёт только сразу после нажатия кнопки
     const target = await resolveFolder()
-    if (target === undefined) return
+    if (target === undefined) return false
     setSavedTo('')
 
     let display: MediaStream
@@ -225,10 +274,10 @@ function RecordButton({ fileName, onError }: Props) {
       } as DisplayMediaStreamOptions)
     } catch (err) {
       // «Отмена» в окне выбора — молча; после выбора папки браузер мог не открыть окно без нового нажатия
-      if (err instanceof DOMException && err.name === 'InvalidStateError') {
+      if (!auto && err instanceof DOMException && err.name === 'InvalidStateError') {
         onError('Папка выбрана — нажмите «Запись» ещё раз')
       }
-      return
+      return false
     }
 
     const audio = new AudioContext()
@@ -251,7 +300,7 @@ function RecordButton({ fileName, onError }: Props) {
     } catch (err) {
       cleanup()
       onError(err instanceof Error ? `Не удалось начать запись: ${err.message}` : 'Не удалось начать запись')
-      return
+      return false
     }
 
     const rec: Recording = { recorder, audio, output, sources: new Map() }
@@ -275,6 +324,7 @@ function RecordButton({ fileName, onError }: Props) {
     recorder.start(1000)
     setSeconds(0)
     setRecording(true)
+    return true
   }
 
   return (
@@ -282,7 +332,7 @@ function RecordButton({ fileName, onError }: Props) {
       <button
         type="button"
         className={`lk-button ${styles.control} ${recording ? styles.recording : ''}`}
-        onClick={recording ? stop : start}
+        onClick={recording ? stop : () => void start()}
         disabled={starting}
         title={recording ? 'Остановить запись' : 'Записать урок в видеофайл'}
       >
@@ -306,7 +356,29 @@ function RecordButton({ fileName, onError }: Props) {
           {folder ? `Папка: ${folder.name}` : 'Папка для записей'}
         </button>
       )}
+      <button
+        type="button"
+        className={`lk-button ${styles.control}`}
+        aria-pressed={autoRecord}
+        data-lk-enabled={autoRecord}
+        onClick={toggleAutoRecord}
+        title="Начинать запись при каждом входе в урок"
+      >
+        Автозапись: {autoRecord ? 'вкл' : 'выкл'}
+      </button>
       {savedTo && <p className={styles.savedTo}>{savedTo}</p>}
+      {askToStart && !recording && (
+        <div className={styles.autoRecord} role="dialog" aria-label="Автозапись урока">
+          <span>Автозапись включена — браузеру нужно одно нажатие, чтобы начать запись</span>
+          <button type="button" className={styles.autoRecordStart} onClick={() => void start()} disabled={starting}>
+            <span className={styles.recDot} aria-hidden="true" />
+            Начать запись урока
+          </button>
+          <button type="button" className={styles.autoRecordLater} onClick={() => setAskToStart(false)}>
+            Не сейчас
+          </button>
+        </div>
+      )}
     </>
   )
 }

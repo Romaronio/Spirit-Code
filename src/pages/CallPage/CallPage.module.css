@@ -198,6 +198,58 @@
   line-height: 44px;
 }
 
+/* Автозапись: браузер ждёт нажатия — крупная кнопка сверху по центру */
+.autoRecord {
+  position: fixed;
+  top: 72px;
+  left: 50%;
+  z-index: 60;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: min(560px, calc(100% - 32px));
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: #3a2a1e;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+  color: #f7efe4;
+  font-size: 15px;
+  text-align: center;
+  transform: translateX(-50%);
+}
+
+.autoRecordStart {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 18px;
+  border: none;
+  border-radius: 10px;
+  background: #b3361a;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.autoRecordStart:hover {
+  background: #c9441f;
+}
+
+.autoRecordLater {
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid #cdbba8;
+  border-radius: 10px;
+  background: transparent;
+  color: #f7efe4;
+  font-size: 15px;
+  cursor: pointer;
+}
+
 .savedTo {
   flex-basis: 100%;
   margin: 0;
