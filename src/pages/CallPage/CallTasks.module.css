@@ -47,6 +47,60 @@
   overflow-wrap: anywhere;
 }
 
+.headerButtons {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+/* «Во весь экран» — только на компьютере: на узком экране панель и так во весь экран */
+.fullButton {
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 17px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.fullButton:hover {
+  border-color: var(--accent);
+}
+
+@media (max-width: 900px) {
+  .fullButton {
+    display: none;
+  }
+}
+
+/* Панель во весь экран: без скруглений, текст по центру удобной ширины и крупнее */
+.full {
+  margin: 0;
+  border-radius: 0;
+}
+
+.full .header,
+.full .body {
+  padding-right: max(24px, calc((100% - 960px) / 2));
+  padding-left: max(24px, calc((100% - 960px) / 2));
+}
+
+.full .body {
+  font-size: 18px;
+}
+
+.full .title {
+  font-size: 22px;
+}
+
+.full .taskTitle {
+  font-size: 22px;
+}
+
 .close {
   flex-shrink: 0;
   width: 34px;

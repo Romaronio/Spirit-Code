@@ -40,6 +40,20 @@ function CallTasks({ call, isTeacher, open, onOpen, onClose, onCallChange }: Pro
   const [away, setAway] = useState<Record<string, { name: string; task: string }>>({})
   const [error, setError] = useState('')
 
+  // Во весь экран — только на компьютере: на телефоне панель и так на весь экран
+  const panelRef = useRef<HTMLElement>(null)
+  const [full, setFull] = useState(false)
+  useEffect(() => {
+    const update = () => setFull(!!panelRef.current && document.fullscreenElement === panelRef.current)
+    document.addEventListener('fullscreenchange', update)
+    return () => document.removeEventListener('fullscreenchange', update)
+  }, [])
+
+  function toggleFull() {
+    if (document.fullscreenElement) void document.exitFullscreen()
+    else void panelRef.current?.requestFullscreen?.().catch(() => {})
+  }
+
   const lessonId = call.assignment
   const shownTask = call.shown_task
 
@@ -177,15 +191,24 @@ function CallTasks({ call, isTeacher, open, onOpen, onClose, onCallChange }: Pro
   if (!open) return null
 
   return (
-    <aside className={styles.panel} aria-label="Задания урока">
+    <aside ref={panelRef} className={`${styles.panel} ${full ? styles.full : ''}`} aria-label="Задания урока">
       <header className={styles.header}>
         <div className={styles.headerText}>
           <h2 className={styles.title}>Задания</h2>
           {lesson && <p className={styles.subtitle}>{lesson.title} · {lesson.subject}</p>}
         </div>
-        <button type="button" className={styles.close} onClick={onClose} aria-label="Скрыть задания">
-          ✕
-        </button>
+        <div className={styles.headerButtons}>
+          {document.fullscreenEnabled && (
+            <button type="button" className={styles.fullButton} onClick={toggleFull}>
+              {full ? 'Свернуть' : 'Во весь экран'}
+            </button>
+          )}
+          {!full && (
+            <button type="button" className={styles.close} onClick={onClose} aria-label="Скрыть задания">
+              ✕
+            </button>
+          )}
+        </div>
       </header>
 
       <div className={styles.body}>
