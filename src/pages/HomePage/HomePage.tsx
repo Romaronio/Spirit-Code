@@ -9,7 +9,6 @@ import StudentsPanel from '../../components/StudentsPanel/StudentsPanel'
 import AnswersPanel from '../../components/AnswersPanel/AnswersPanel'
 import ProgressDonut from '../../components/ProgressDonut/ProgressDonut'
 import PaymentsPanel from '../../components/PaymentsPanel/PaymentsPanel'
-import BankTaskForm from '../../components/BankTaskForm/BankTaskForm'
 import ChatWindow from '../../components/ChatWindow/ChatWindow'
 import { hasSubject, normalize, subjectsOf, uniqueSubjects } from '../../utils/subjects'
 
@@ -167,10 +166,6 @@ function HomePage({
             <Link to="/home" className={`${styles.navLink} ${styles.navActive}`} aria-current="page">
               Задания
             </Link>
-            <Link to="/tasks-bank" className={`${styles.navLink} ${styles.navAccent}`}>
-              <BookIcon />
-              База заданий
-            </Link>
             <Link to="/typing" className={`${styles.navLink} ${styles.navAccent}`}>
               Тренажёр печати
             </Link>
@@ -226,7 +221,6 @@ function HomePage({
                 activeAnswerId={chat?.answer.id}
                 onOpenChat={(assignmentId, answerId) => setOpenChat({ assignmentId, answerId })}
               />
-              <BankTaskForm />
               <PaymentsPanel accounts={accounts} />
               <StudentsPanel
                 accounts={accounts}
@@ -357,16 +351,5 @@ function PerRowSwitch({ value, onChange }: { value: number; onChange: (value: nu
   )
 }
 
-function BookIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
-      <g stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round" fill="none">
-        <path d="M12 6.5C10 5 7 4.5 3.5 5v13c3.5-.5 6.5 0 8.5 1.5z" />
-        <path d="M12 6.5C14 5 17 4.5 20.5 5v13c-3.5-.5-6.5 0-8.5 1.5z" />
-        <path d="M14.5 9.5h3.5M14.5 12.5h3.5" />
-      </g>
-    </svg>
-  )
-}
 
 export default HomePage

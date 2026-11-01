@@ -191,17 +191,6 @@ export interface PhotoLatexResult {
   warnings: string[]
 }
 
-// Задача из базы заданий ЕГЭ (/api/bank-tasks/)
-export interface BankTask {
-  id: number
-  number: number // номер задания в ЕГЭ
-  latex: string
-  answer: string
-  created_at: string
-}
-
-export type NewBankTask = Pick<BankTask, 'number' | 'latex' | 'answer'>
-
 // Созвон-урок (LiveKit)
 export interface Call {
   id: number

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import styles from './AssignmentPage.module.css'
 import * as api from '../../services/api'
@@ -8,7 +8,6 @@ import { ReviewButtons, StatusBadge } from '../../components/AnswerStatus/Answer
 import CommentThread from '../../components/CommentThread/CommentThread'
 import { ACCEPT, EMPTY_TASK_FILES, pickFiles, taskFileChanges, type FileEntry, type TaskFilesDraft } from '../../utils/uploads'
 import { taskNumberTitle } from '../../utils/taskNumbers'
-import { parseLatex } from '../../utils/latex'
 import LatexEditor from '../../components/LatexEditor/LatexEditor'
 import NumberedTasksEditor from '../../components/NumberedTasksEditor/NumberedTasksEditor'
 import TasksViewer from '../../components/TasksViewer/TasksViewer'
@@ -449,7 +448,6 @@ function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStud
                     {assignment.tasks_latex?.trim() && (
                       <OpenTasksButton
                         title={shownNumbered.length ? 'Другие задания' : 'Задания'}
-                        source={assignment.tasks_latex}
                         isOpen={openTasks === 'classwork'}
                         answered={hasTaskAnswer(myAnswer, 'classwork')}
                         onOpen={() => setOpenTasks('classwork')}
@@ -589,7 +587,6 @@ function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStud
                         {assignment.homework.tasks_latex?.trim() && (
                           <OpenTasksButton
                             title={shownHomeworkNumbered.length ? 'Другие задания' : 'Домашнее задание'}
-                            source={assignment.homework.tasks_latex}
                             isOpen={openTasks === 'homework'}
                             answered={hasTaskAnswer(myAnswer, 'homework')}
                             onOpen={() => setOpenTasks('homework')}
@@ -824,9 +821,8 @@ function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStud
   )
 }
 
-// Кнопка задания; у заданий без номера (есть source) — ещё и число задач в документе
-function OpenTasksButton({ title, source = '', isOpen, answered, onOpen }: { title: string; source?: string; isOpen: boolean; answered?: boolean; onOpen: () => void }) {
-  const tasks = useMemo(() => parseLatex(source).tasks, [source])
+// Кнопка задания: «N задание» или «Другие задания»
+function OpenTasksButton({ title, isOpen, answered, onOpen }: { title: string; isOpen: boolean; answered?: boolean; onOpen: () => void }) {
   return (
     <button
       type="button"
@@ -837,7 +833,6 @@ function OpenTasksButton({ title, source = '', isOpen, answered, onOpen }: { tit
       <span className={styles.openTasksIcon}>📄</span>
       <span>
         <span className={styles.openTasksTitle}>{title}</span>
-        {tasks > 0 && <span className={styles.openTasksCount}>{tasksCount(tasks)}</span>}
         {answered && <span className={styles.openTasksAnswered}>✓ ответ прикреплён</span>}
       </span>
     </button>
@@ -1073,11 +1068,5 @@ function TasksIcon() {
   )
 }
 
-function tasksCount(n: number) {
-  const mod10 = n % 10
-  const mod100 = n % 100
-  const word = mod10 === 1 && mod100 !== 11 ? 'задача' : mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14) ? 'задачи' : 'задач'
-  return `${n} ${word}`
-}
 
 export default AssignmentPage

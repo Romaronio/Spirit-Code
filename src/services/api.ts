@@ -1,4 +1,4 @@
-import type { Account, AnswerComment, Assignment, BankTask, Call, CallJoin, NewCall, LessonFile, Homework, HomeworkFile, NewAssignment, NewBankTask, NumberedTask, Payment, TaskFileChanges, PhotoLatexResult, ReviewStatus, StudentHomework, TypingModeSummary, TypingResult, TypingStats, TypingSummary } from "../types";
+import type { Account, AnswerComment, Assignment, Call, CallJoin, NewCall, LessonFile, Homework, HomeworkFile, NewAssignment, NumberedTask, Payment, TaskFileChanges, PhotoLatexResult, ReviewStatus, StudentHomework, TypingModeSummary, TypingResult, TypingStats, TypingSummary } from "../types";
 import { clearSession, loadToken } from "../utils/session";
 
 // Адрес API. По умолчанию относительный путь: и локально (через прокси Vite),
@@ -424,25 +424,6 @@ export async function photoToLatex(image: File, number: number): Promise<PhotoLa
   formData.append('image', image);
   formData.append('number', String(number));
   return fetchAPIFormData<PhotoLatexResult>('/photo-latex/', formData, 'POST');
-}
-
-// ============== БАЗА ЗАДАНИЙ ЕГЭ ==============
-
-export async function getBankTasks(): Promise<BankTask[]> {
-  return fetchAPI<BankTask[]>('/bank-tasks/');
-}
-
-export async function createBankTask(task: NewBankTask): Promise<BankTask> {
-  return fetchAPI<BankTask>('/bank-tasks/', {
-    method: 'POST',
-    body: JSON.stringify(task),
-  });
-}
-
-export async function deleteBankTask(id: number): Promise<void> {
-  return fetchAPI<void>(`/bank-tasks/${id}/`, {
-    method: 'DELETE',
-  });
 }
 
 // ============== CALLS API (созвоны LiveKit) ==============

@@ -4,7 +4,6 @@ import AuthPage from './pages/AuthPage/AuthPage'
 import HomePage from './pages/HomePage/HomePage'
 import AssignmentPage from './pages/AssignmentPage/AssignmentPage'
 import TypingPage from './pages/TypingPage/TypingPage'
-import TasksBankPage from './pages/TasksBankPage/TasksBankPage'
 import type { Account, AnswerComment, Assignment, AssignmentChanges, CommentActions, NewAssignment, ReviewStatus, User } from './types'
 import * as api from './services/api'
 import { clearSession, loadUser } from './utils/session'
@@ -252,7 +251,6 @@ function App() {
         }
       />
       <Route path="/typing" element={<TypingPage user={user} />} />
-      <Route path="/tasks-bank" element={<TasksBankPage user={user} />} />
       <Route
         path="/call/:id"
         element={

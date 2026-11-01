@@ -303,12 +303,6 @@
   font-weight: 700;
 }
 
-.openTasksCount {
-  display: block;
-  color: var(--muted);
-  font-size: 13px;
-}
-
 /* Кнопка вместо стандартного «Выберите файл / Файл не выбран» */
 .fileButton {
   align-self: flex-start;
