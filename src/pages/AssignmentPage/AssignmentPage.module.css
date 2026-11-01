@@ -330,3 +330,54 @@
 .hiddenInput {
   display: none;
 }
+
+/* Ответ к заданию — под документом в панели задания */
+.taskAnswerBox {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.taskAnswerBox h3 {
+  margin: 0 0 10px;
+  font-size: 17px;
+}
+
+.openTasksAnswered {
+  display: block;
+  color: var(--success);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* Ответы ученика по заданиям — в карточке ответа у учителя */
+.taskAnswers {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 8px 0;
+  padding-left: 0;
+  list-style: none;
+}
+
+.taskAnswers > li {
+  padding: 8px 10px;
+  border-left: 3px solid var(--accent);
+  border-radius: 6px;
+  background: var(--surface);
+}
+
+.taskAnswerTitle {
+  font-weight: 600;
+}
+
+.taskAnswerCorrect {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* «Сохранение… / Ответ сохранён» под ответом к заданию */
+.saveState {
+  color: var(--muted);
+  font-size: 13px;
+}

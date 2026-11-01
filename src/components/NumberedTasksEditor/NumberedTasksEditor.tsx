@@ -215,6 +215,7 @@ function NumberedTasksWindow({
                   label="LaTeX задания — у ученика будет отдельная кнопка"
                   value={task.latex}
                   onChange={(latex) => handleLatex(task.number, latex)}
+                  taskNumber={task.number}
                   files={files}
                   pendingNames={pendingNames}
                 />

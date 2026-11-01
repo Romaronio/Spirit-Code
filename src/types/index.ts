@@ -45,6 +45,7 @@ export interface StudentHomeworkFile {
   id?: number | string
   name: string
   url?: string
+  task_key?: string // файл к ответу на задание; '' — общий файл ответа
   created_at?: string
 }
 
@@ -67,6 +68,9 @@ export interface StudentHomework {
   student?: number
   student_name?: string
   description: string
+  // Ответы к отдельным заданиям: 'cw-5' — номер классной работы, 'hw-5' — номер ДЗ,
+  // 'classwork' / 'homework' — задания без номера
+  task_answers?: Record<string, string>
   files?: StudentHomeworkFile[]
   submitted_at?: string
   status?: ReviewStatus // отметка учителя после проверки

@@ -153,7 +153,7 @@ class StudentHomeworkFileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = StudentHomeworkFile
-        fields = ['id', 'name', 'url', 'file', 'student_homework', 'created_at']
+        fields = ['id', 'name', 'url', 'file', 'student_homework', 'task_key', 'created_at']
         extra_kwargs = {
             'file': {'write_only': True}
         }
@@ -188,10 +188,10 @@ class StudentHomeworkSerializer(serializers.ModelSerializer):
     class Meta:
         model = StudentHomework
         fields = [
-            'id', 'assignment', 'student', 'student_name', 'description', 'files',
+            'id', 'assignment', 'student', 'student_name', 'description', 'task_answers', 'files',
             'submitted_at', 'status', 'checked_at', 'comments',
         ]
-        read_only_fields = ['status', 'checked_at']
+        read_only_fields = ['status', 'checked_at', 'task_answers']
 
 
 class StudentHomeworkCreateSerializer(serializers.ModelSerializer):

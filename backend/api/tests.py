@@ -158,6 +158,56 @@ class SubmitTests(AuthTestCase):
         response = self.client.post(f'/api/assignments/{self.bio.id}/submit/', {'description': 'x'})
         self.assertEqual(response.status_code, 403)
 
+
+class TaskAnswerTests(AuthTestCase):
+    def setUp(self):
+        super().setUp()
+        self.bio.numbered_tasks = [{'number': 5, 'latex': 'x', 'answer': '42'}]
+        self.bio.save()
+        self.url = f'/api/assignments/{self.bio.id}/submit-task/'
+
+    def test_answer_to_task_with_file(self):
+        self.login_as(self.anna)
+        response = self.client.post(self.url, {
+            'task': 'cw-5', 'text': ' 42 ', 'files': SimpleUploadedFile('code.py', b'print(42)'),
+        })
+        self.assertEqual(response.status_code, 201)
+        sh = StudentHomework.objects.get()
+        self.assertEqual(sh.task_answers, {'cw-5': '42'})
+        f = sh.files.get()
+        self.assertEqual(f.task_key, 'cw-5')
+        # Общий ответ не трогает ответы к заданиям и их файлы
+        self.client.post(f'/api/assignments/{self.bio.id}/submit/', {
+            'description': 'всё', 'delete_file_ids': json.dumps([f.id]),
+        })
+        sh.refresh_from_db()
+        self.assertEqual(sh.task_answers, {'cw-5': '42'})
+        self.assertTrue(sh.files.filter(id=f.id).exists())
+        # Пустой текст и удалённый файл — ответа к заданию больше нет
+        self.client.post(self.url, {'task': 'cw-5', 'text': '', 'delete_file_ids': json.dumps([f.id])})
+        sh.refresh_from_db()
+        self.assertEqual(sh.task_answers, {})
+        self.assertFalse(sh.files.exists())
+
+    def test_resubmit_resets_status(self):
+        sh = StudentHomework.objects.create(assignment=self.bio, student=self.anna, status='accepted')
+        self.login_as(self.anna)
+        self.assertEqual(self.client.post(self.url, {'task': 'cw-5', 'text': '41'}).status_code, 200)
+        sh.refresh_from_db()
+        self.assertEqual(sh.status, 'pending')
+
+    def test_unknown_task_rejected(self):
+        self.login_as(self.anna)
+        self.assertEqual(self.client.post(self.url, {'task': 'cw-6', 'text': '1'}).status_code, 400)
+        self.assertEqual(self.client.post(self.url, {'task': 'homework', 'text': '1'}).status_code, 400)
+        self.assertFalse(StudentHomework.objects.exists())
+
+    def test_foreign_subject_and_teacher(self):
+        self.login_as(self.ivan)
+        self.assertEqual(self.client.post(self.url, {'task': 'cw-5', 'text': '1'}).status_code, 404)
+        self.login_as(self.teacher)
+        self.assertEqual(self.client.post(self.url, {'task': 'cw-5', 'text': '1'}).status_code, 403)
+
     def test_students_see_only_own_answers(self):
         self.ivan.subjects = ['Биология']
         self.ivan.save()

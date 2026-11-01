@@ -208,6 +208,9 @@ class StudentHomework(models.Model):
         on_delete=models.CASCADE
     )
     description = models.TextField(blank=True, default='')
+    # Ответы к отдельным заданиям: {"cw-5": "текст", "hw-3": "...", "classwork": "...", "homework": "..."}
+    # cw-N — номер классной работы, hw-N — номер ДЗ, classwork/homework — задания без номера
+    task_answers = models.JSONField(blank=True, default=dict)
     submitted_at = models.DateTimeField(auto_now_add=True)
     # Отметка учителя после проверки
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
@@ -230,6 +233,8 @@ class StudentHomeworkFile(models.Model):
     )
     name = models.CharField(max_length=255)
     file = models.FileField(upload_to='student_homework_files/', null=True, blank=True, validators=[validate_upload])
+    # Файл к ответу на конкретное задание (ключ как в StudentHomework.task_answers); '' — общий файл ответа
+    task_key = models.CharField(max_length=20, blank=True, default='')
 
     created_at = models.DateTimeField(auto_now_add=True)
 

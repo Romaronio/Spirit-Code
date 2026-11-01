@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import styles from './TasksViewer.module.css'
 import LatexDocument, { type DocFile } from '../LatexDocument/LatexDocument'
 
@@ -9,15 +9,17 @@ interface Props {
   files?: DocFile[]
   attachments?: DocFile[] // файлы для выполнения номера — ученик скачивает их здесь
   answer?: string // ответ к номеру, передаётся только учителю
+  taskNumber?: number // номер задания — им подписаны плашки задач в документе
   onClose: () => void
   onNext?: () => void // открыть следующее задание; нет — значит, это последнее
+  children?: ReactNode // под заданием: форма ответа ученика или ответы учеников для учителя
 }
 
 // Совпадает с @media в TasksViewer.module.css: уже — панель на весь экран
 const FULLSCREEN_QUERY = '(max-width: 1000px)'
 
 // Задания в панели справа от задания — вместо скачивания PDF
-function TasksViewer({ title, subtitle, source, files, attachments = [], answer, onClose, onNext }: Props) {
+function TasksViewer({ title, subtitle, source, files, attachments = [], answer, taskNumber, onClose, onNext, children }: Props) {
   const closeRef = useRef<HTMLButtonElement>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
 
@@ -71,7 +73,8 @@ function TasksViewer({ title, subtitle, source, files, attachments = [], answer,
             </ul>
           </div>
         )}
-        {source.trim() && <LatexDocument source={source} files={files} />}
+        {source.trim() && <LatexDocument source={source} files={files} taskNumber={taskNumber} />}
+        {children}
         {onNext && (
           <button type="button" className={styles.next} onClick={onNext}>
             Следующее задание →

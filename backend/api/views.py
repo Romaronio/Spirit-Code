@@ -51,6 +51,22 @@ def _parse_json(raw):
     return raw
 
 
+MAX_TASK_ANSWER_TEXT = 5000
+
+
+def _task_keys(assignment):
+    """Задания урока, к которым ученик может прислать ответ (ключи как в StudentHomework.task_answers)"""
+    keys = {f"cw-{t['number']}" for t in assignment.numbered_tasks or []}
+    if (assignment.tasks_latex or '').strip():
+        keys.add('classwork')
+    homework = getattr(assignment, 'homework', None)
+    if homework is not None:
+        keys |= {f"hw-{t['number']}" for t in homework.numbered_tasks or []}
+        if (homework.tasks_latex or '').strip():
+            keys.add('homework')
+    return keys
+
+
 def _task_uploads(request, prefix):
     """Файлы к номерам заданий приходят полями «<prefix>_<номер>»: [(номер, файл), ...]"""
     uploads = []
@@ -166,7 +182,7 @@ class AssignmentViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         if self.action in ('list', 'retrieve'):
             return [IsAuthenticated()]
-        if self.action == 'submit':
+        if self.action in ('submit', 'submit_task'):
             return [IsStudent()]
         return [IsTeacher()]
 
@@ -310,6 +326,7 @@ class AssignmentViewSet(viewsets.ModelViewSet):
                 id__in=[i for i in raw_ids if str(i).isdigit()] if isinstance(raw_ids, list) else [],
                 student_homework__assignment=assignment,
                 student_homework__student=request.user,
+                task_key='',
             ).values_list('id', flat=True)
         )
 
@@ -330,6 +347,56 @@ class AssignmentViewSet(viewsets.ModelViewSet):
                 name=f.name,
                 file=f,
             )
+
+        sh.refresh_from_db()
+        serializer = StudentHomeworkSerializer(sh, context=self.get_serializer_context())
+        return Response(serializer.data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'], url_path='submit-task')
+    @transaction.atomic
+    def submit_task(self, request, pk=None):
+        """Ответ ученика к одному заданию урока: текст и файлы.
+        Хранится в общей работе ученика по уроку — статус и переписка у урока общие"""
+        assignment = self.get_object()  # чужой предмет → 404
+        task = str(request.data.get('task', ''))
+        if task not in _task_keys(assignment):
+            raise ValidationError({'task': ['Такого задания нет в уроке']})
+        text = str(request.data.get('text', '')).strip()
+        if len(text) > MAX_TASK_ANSWER_TEXT:
+            raise ValidationError({'text': [f'Ответ длиннее {MAX_TASK_ANSWER_TEXT} знаков']})
+        files = request.FILES.getlist('files')
+
+        raw_ids = _parse_json(request.data.get('delete_file_ids'))
+        delete_ids = list(
+            StudentHomeworkFile.objects.filter(
+                id__in=[i for i in raw_ids if str(i).isdigit()] if isinstance(raw_ids, list) else [],
+                student_homework__assignment=assignment,
+                student_homework__student=request.user,
+                task_key=task,
+            ).values_list('id', flat=True)
+        )
+
+        check_uploads(files)
+        check_student_quota(request.user, files, deleted_ids=delete_ids)
+
+        sh, created = StudentHomework.objects.select_for_update().get_or_create(
+            assignment=assignment,
+            student=request.user,
+        )
+        answers = dict(sh.task_answers or {})
+        if text:
+            answers[task] = text
+        else:
+            answers.pop(task, None)
+        sh.task_answers = answers
+        # Ответ изменился — учителю нужно проверить его заново
+        sh.status = 'pending'
+        sh.checked_at = None
+        sh.save(update_fields=['task_answers', 'status', 'checked_at'])
+
+        StudentHomeworkFile.objects.filter(id__in=delete_ids).delete()
+        for f in files:
+            StudentHomeworkFile.objects.create(student_homework=sh, name=f.name, file=f, task_key=task)
 
         sh.refresh_from_db()
         serializer = StudentHomeworkSerializer(sh, context=self.get_serializer_context())

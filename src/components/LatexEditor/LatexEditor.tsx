@@ -21,10 +21,11 @@ interface Props {
   files?: DocFile[] // уже прикреплённые файлы — в них ищутся картинки
   pendingNames?: string[] // файлы, выбранные, но ещё не сохранённые
   showHint?: boolean // подсказка про .tex, фото и картинки под полем
+  taskNumber?: number // номер задания — предпросмотр подписывает им плашки, как увидит ученик
 }
 
 // Поле для кода LaTeX с заданиями и предпросмотром того, что увидит ученик
-function LatexEditor({ label, value, onChange, files = [], pendingNames = [], showHint = true }: Props) {
+function LatexEditor({ label, value, onChange, files = [], pendingNames = [], showHint = true, taskNumber }: Props) {
   const [showPreview, setShowPreview] = useState(false)
   const [fileError, setFileError] = useState('')
   const [isDragging, setIsDragging] = useState(false)
@@ -197,7 +198,7 @@ function LatexEditor({ label, value, onChange, files = [], pendingNames = [], sh
       )}
       {showPreview && value.trim() && (
         <div className={styles.preview}>
-          <LatexDocument source={value} files={files} />
+          <LatexDocument source={value} files={files} taskNumber={taskNumber} />
         </div>
       )}
     </div>

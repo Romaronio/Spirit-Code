@@ -321,6 +321,29 @@ export async function submitStudentHomework(data: {
   );
 }
 
+// Ответ ученика к одному заданию урока (ключ задания как в StudentHomework.task_answers)
+export async function submitTaskAnswer(data: {
+  assignmentId: number
+  task: string
+  text: string
+  files?: File[]
+  deleteFileIds?: Array<number | string>
+}): Promise<StudentHomework> {
+  const formData = new FormData();
+  formData.append('task', data.task);
+  formData.append('text', data.text);
+  if (data.deleteFileIds) {
+    formData.append('delete_file_ids', JSON.stringify(data.deleteFileIds));
+  }
+  data.files?.forEach((file) => formData.append('files', file));
+
+  return fetchAPIFormData<StudentHomework>(
+    `/assignments/${data.assignmentId}/submit-task/`,
+    formData,
+    'POST'
+  );
+}
+
 // Отметка учителя: сдано / не сдано / снять отметку
 export async function reviewStudentHomework(id: number, status: ReviewStatus): Promise<StudentHomework> {
   return fetchAPI<StudentHomework>(`/student-homeworks/${id}/review/`, {

@@ -11,10 +11,12 @@ export interface DocFile {
 interface Props {
   source: string
   files?: DocFile[] // картинки для \includegraphics ищутся среди прикреплённых файлов
+  // Номер задания урока: плашки \zadacha показывают его («Задание 3»), а не число из LaTeX
+  taskNumber?: number
 }
 
 // Задания, написанные в LaTeX, в виде обычной страницы
-function LatexDocument({ source, files = [] }: Props) {
+function LatexDocument({ source, files = [], taskNumber }: Props) {
   const doc = useMemo(() => parseLatex(source), [source])
   const katex = useKatex(useMemo(() => hasMath(doc.blocks), [doc]))
   const images = useMemo(() => {
@@ -23,13 +25,19 @@ function LatexDocument({ source, files = [] }: Props) {
     return map
   }, [files])
 
-  const ctx: Ctx = { katex, images }
+  // Одна плашка — «Задание 3», несколько — «Задание 3.1», «Задание 3.2»…
+  const taskTitles = taskNumber === undefined
+    ? undefined
+    : Array.from({ length: doc.tasks }, (_, i) => (doc.tasks > 1 ? `Задание ${taskNumber}.${i + 1}` : `Задание ${taskNumber}`))
+  const ctx: Ctx = { katex, images, taskTitles, taskIndex: { value: 0 } }
   return <div className={styles.doc}>{renderBlocks(doc.blocks, ctx)}</div>
 }
 
 interface Ctx {
   katex: Katex | null
   images: Map<string, string>
+  taskTitles?: string[]
+  taskIndex: { value: number } // плашки нумеруются по порядку вывода — он совпадает с порядком в документе
 }
 
 const LIST_TYPES: Record<Exclude<ListKind, 'ul' | 'desc'>, '1' | 'a' | 'A' | 'i' | 'I'> = {
@@ -47,7 +55,7 @@ function renderBlock(b: Block, key: number, ctx: Ctx): React.ReactNode {
     case 'task':
       return (
         <div key={key} className={styles.task}>
-          <span className={styles.taskBadge}>{b.title}</span>
+          <span className={styles.taskBadge}>{ctx.taskTitles?.[ctx.taskIndex.value++] ?? b.title}</span>
           <span className={styles.taskLine} />
         </div>
       )
