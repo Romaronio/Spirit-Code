@@ -1,0 +1,272 @@
+/* На всю ширину экрана: по краям поля 40px (20px на телефоне) */
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-height: 100vh;
+  padding: 28px 40px;
+  color: var(--text);
+}
+
+@media (max-width: 600px) {
+  .page {
+    padding: 16px 20px;
+  }
+}
+
+.back {
+  align-self: flex-start;
+  color: var(--text);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.back:hover {
+  text-decoration: underline;
+}
+
+.muted {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.avatar {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: var(--text);
+  color: var(--accent);
+  font-size: 32px;
+  font-weight: 700;
+}
+
+.headerText {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.name {
+  font-size: 32px;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.subjects {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.subject {
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* Плитки со счётчиками */
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(170px, 100%), 1fr));
+  gap: 12px;
+}
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  padding: 16px;
+  border: 1px solid var(--line-soft);
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.progressTile {
+  flex-direction: row;
+  align-items: center;
+  gap: 14px;
+  grid-column: span 2;
+}
+
+@media (max-width: 420px) {
+  .progressTile {
+    grid-column: auto;
+  }
+}
+
+.progressTile > div {
+  display: flex;
+  flex-direction: column;
+}
+
+.tileValue {
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.tileLabel {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.amber {
+  color: var(--amber);
+}
+
+.danger {
+  color: var(--danger);
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid var(--line-soft);
+  border-radius: 20px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.cardTitle {
+  font-size: 20px;
+}
+
+.lessons {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  list-style: none;
+}
+
+.lesson {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line-soft);
+}
+
+.lesson:first-child {
+  border-top: none;
+}
+
+.lessonText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.lessonTitle {
+  overflow-wrap: anywhere;
+  color: var(--text);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.lessonTitle:hover {
+  color: var(--accent-text);
+  text-decoration: underline;
+}
+
+.cardHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+/* «Раскрыть все уроки» / «Свернуть» — справа в шапке блока */
+.expand {
+  min-height: 40px;
+  padding: 0 16px;
+  border: none;
+  border-radius: 10px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.expand:hover {
+  background: var(--accent-hover);
+}
+
+.notSent {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.twoCols {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(380px, 100%), 1fr));
+  gap: 20px;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.table th,
+.table td {
+  padding: 8px 6px;
+  border-bottom: 1px solid var(--line-soft);
+  text-align: left;
+}
+
+.table th {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.months {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+}
+
+.month {
+  padding: 8px 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.paid {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}

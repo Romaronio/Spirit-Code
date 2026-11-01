@@ -10,6 +10,7 @@ import AnswersPanel from '../../components/AnswersPanel/AnswersPanel'
 import ProgressDonut from '../../components/ProgressDonut/ProgressDonut'
 import PaymentsPanel from '../../components/PaymentsPanel/PaymentsPanel'
 import ChatWindow from '../../components/ChatWindow/ChatWindow'
+import StudentsList from '../../components/StudentsList/StudentsList'
 import { lessonForSubjects, normalize } from '../../utils/subjects'
 
 interface Props {
@@ -224,7 +225,7 @@ function HomePage({
         />
 
         {isTeacher ? (
-          // Учитель: форма | ответы и ученики | все задания — в три колонки
+          // Учитель: форма | ответы и ученики | список учеников (уроки — кнопкой «Посмотреть все задания»)
           <div className={styles.tools}>
             <AssignmentForm onAdd={onAdd} subjects={subjects} onDeleteSubject={onDeleteSubject} />
             <div className={styles.sideColumn}>
@@ -256,7 +257,9 @@ function HomePage({
                 />
               </div>
             ) : (
-              assignmentsSection
+              <div className={styles.assignmentsColumn}>
+                <StudentsList accounts={accounts} items={items} />
+              </div>
             )}
           </div>
         ) : (

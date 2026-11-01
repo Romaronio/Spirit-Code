@@ -5,6 +5,7 @@ import HomePage from './pages/HomePage/HomePage'
 import AssignmentPage from './pages/AssignmentPage/AssignmentPage'
 import TypingPage from './pages/TypingPage/TypingPage'
 import LessonsPage from './pages/LessonsPage/LessonsPage'
+import StudentPage from './pages/StudentPage/StudentPage'
 import type { Account, AnswerComment, Assignment, AssignmentChanges, CommentActions, NewAssignment, ReviewStatus, Subject, User } from './types'
 import * as api from './services/api'
 import { clearSession, loadUser } from './utils/session'
@@ -274,6 +275,7 @@ function App() {
         }
       />
       <Route path="/typing" element={<TypingPage user={user} />} />
+      <Route path="/student/:id" element={<StudentPage user={user} items={items} accounts={accounts} />} />
       <Route
         path="/lessons"
         element={

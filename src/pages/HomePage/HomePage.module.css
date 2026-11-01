@@ -18,7 +18,7 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 12px 32px;
-  padding: 14px 24px;
+  padding: 14px 48px; /* по краям как у содержимого страницы */
 }
 
 .logo {
@@ -105,7 +105,7 @@
 
 /* Контент во всю ширину экрана, по краям только небольшие поля */
 .main {
-  padding: 32px 24px 96px;
+  padding: 32px 48px 96px;
 }
 
 /* Приветствие и прогресс */
@@ -302,11 +302,14 @@
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
-  gap: 0 16px;
+  gap: 0 48px;
 }
 
+/* Учитель: «Новое задание» | ответы, оплата, ученики | список учеников — три колонки одной ширины.
+   На узком экране колонки переносятся друг под друга */
 .tools > * {
-  flex: 1 1 340px;
+  flex: 1 1 0;
+  min-width: min(340px, 100%);
 }
 
 .sideColumn {
@@ -314,23 +317,10 @@
   flex-direction: column;
 }
 
-/* Колонки с формой и панелями не растягиваются шире самих панелей (420px),
-   всё свободное место получает колонка с заданиями */
+/* Сами панели (у них max-width 420px) растягиваем на всю колонку */
 .tools > form,
-.tools > .sideColumn {
-  flex: 0 1 420px;
-}
-
-.tools > .assignmentsColumn {
-  flex: 1 1 340px;
-  margin-left: 32px; /* + 16px общего gap = 48px между ответами и заданиями */
-}
-
-@media (max-width: 1100px) {
-  /* колонки переносятся друг под друга — боковой отступ не нужен */
-  .tools > .assignmentsColumn {
-    margin-left: 0;
-  }
+.tools .sideColumn > * {
+  max-width: none;
 }
 
 @media (max-width: 600px) {
