@@ -145,6 +145,11 @@
   line-height: 28px;
 }
 
+.leadAlert {
+  color: var(--danger);
+  font-weight: 700;
+}
+
 .progressCard {
   display: flex;
   flex: 1 1 300px;

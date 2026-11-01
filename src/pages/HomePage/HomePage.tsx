@@ -180,7 +180,8 @@ function HomePage({
         <section className={styles.hero}>
           <div className={styles.welcome}>
             <h1 className={styles.greeting}>Добро пожаловать, {user.name}</h1>
-            <p className={styles.lead}>{lead}</p>
+            {/* Непроверенные ответы учеников — красным, чтобы учитель сразу заметил */}
+            <p className={`${styles.lead} ${isTeacher && pendingReviewCount > 0 ? styles.leadAlert : ''}`}>{lead}</p>
             {isTeacher && (
               <button type="button" className={styles.allButton} onClick={() => setShowAll(true)}>
                 Посмотреть все задания
