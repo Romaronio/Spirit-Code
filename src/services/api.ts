@@ -443,6 +443,18 @@ export async function joinCall(id: number): Promise<CallJoin> {
   return fetchAPI<CallJoin>(`/calls/${id}/join/`, { method: 'POST' });
 }
 
+export async function getCall(id: number): Promise<Call> {
+  return fetchAPI<Call>(`/calls/${id}/`);
+}
+
+// Учитель: урок и задание, которые открыты у учеников в созвоне
+export async function showCallTask(id: number, data: { assignment: number | null; task: string }): Promise<Call> {
+  return fetchAPI<Call>(`/calls/${id}/show/`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
 export async function endCall(id: number): Promise<void> {
   return fetchAPI<void>(`/calls/${id}/end/`, { method: 'POST' });
 }

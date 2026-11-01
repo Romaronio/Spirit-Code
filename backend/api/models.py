@@ -336,6 +336,8 @@ class Call(models.Model):
 
     Подключиться могут учитель и ученики с предметом созвона; пустой предмет — все ученики.
     Если выбран student — это личный урок: из учеников его видит только он.
+    assignment — урок, задания которого открыты в созвоне; shown_task — задание, которое учитель
+    показал ученикам (ключ как в StudentHomework.task_answers: cw-5, hw-3, classwork, homework).
     """
     MAX_DURATION = timedelta(hours=6)  # забытый незавершённый созвон дольше не показываем
 
@@ -353,6 +355,14 @@ class Call(models.Model):
         on_delete=models.CASCADE,
         related_name='calls',
     )
+    assignment = models.ForeignKey(
+        Assignment,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='calls',
+    )
+    shown_task = models.CharField(max_length=20, blank=True, default='')
     started_at = models.DateTimeField(auto_now_add=True)
     ended_at = models.DateTimeField(null=True, blank=True)
 

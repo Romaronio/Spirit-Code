@@ -208,6 +208,7 @@ function HomePage({
           isTeacher={isTeacher}
           subjects={uniqueSubjects([...accounts.flatMap((a) => a.subjects ?? []), ...items.map((a) => a.subject)])}
           students={accounts.filter((a) => a.role === 'student' && a.id != null)}
+          lessons={isTeacher ? items : []}
         />
 
         {isTeacher ? (

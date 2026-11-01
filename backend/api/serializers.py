@@ -306,11 +306,18 @@ class CallSerializer(serializers.ModelSerializer):
     student = serializers.PrimaryKeyRelatedField(
         queryset=Account.objects.filter(role='student'), required=False, allow_null=True,
     )
+    assignment = serializers.PrimaryKeyRelatedField(
+        queryset=Assignment.objects.all(), required=False, allow_null=True,
+    )
+    assignment_title = serializers.CharField(source='assignment.title', read_only=True, default=None)
 
     class Meta:
         model = Call
-        fields = ['id', 'title', 'subject', 'student', 'student_name', 'started_by_name', 'started_at', 'ended_at']
-        read_only_fields = ['started_at', 'ended_at']
+        fields = [
+            'id', 'title', 'subject', 'student', 'student_name', 'assignment', 'assignment_title', 'shown_task',
+            'started_by_name', 'started_at', 'ended_at',
+        ]
+        read_only_fields = ['started_at', 'ended_at', 'shown_task']
 
     def validate_title(self, value):
         return value.strip()

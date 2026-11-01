@@ -985,6 +985,26 @@ class CallTests(AuthTestCase):
         self.assertEqual(claims['video']['room'], f'spirit-call-{call_id}')
         self.assertFalse(claims['video']['roomAdmin'])
 
+    def test_lesson_and_shown_task(self):
+        self.bio.numbered_tasks = [{'number': 3, 'latex': 'x'}]
+        self.bio.save()
+        self.login_as(self.teacher)
+        call_id = self.client.post('/api/calls/', {'subject': 'Биология', 'assignment': self.bio.id}, format='json').data['id']
+        url = f'/api/calls/{call_id}/show/'
+        response = self.client.post(url, {'assignment': self.bio.id, 'task': 'cw-3'}, format='json')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['shown_task'], 'cw-3')
+        self.assertEqual(response.data['assignment_title'], 'Фотосинтез')
+        self.assertEqual(self.client.post(url, {'assignment': self.bio.id, 'task': 'cw-4'}, format='json').status_code, 400)
+        self.assertEqual(self.client.post(url, {'assignment': 999, 'task': ''}, format='json').status_code, 400)
+        # Подключившийся позже ученик сразу получает показанное задание
+        self.login_as(self.anna)
+        self.assertEqual(self.client.post(f'/api/calls/{call_id}/join/').data['call']['shown_task'], 'cw-3')
+        self.assertEqual(self.client.post(url, {'assignment': self.bio.id, 'task': ''}, format='json').status_code, 403)
+        # Урок удалили — созвон остаётся, просто без урока
+        self.bio.delete()
+        self.assertIsNone(Call.objects.get(id=call_id).assignment)
+
     def test_old_call_is_hidden(self):
         call_id = self.start_call()
         Call.objects.filter(id=call_id).update(started_at=timezone.now() - Call.MAX_DURATION - timedelta(minutes=1))

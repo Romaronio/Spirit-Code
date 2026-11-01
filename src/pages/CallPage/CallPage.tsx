@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import {
   CarouselLayout,
@@ -23,7 +23,8 @@ import styles from './CallPage.module.css'
 import * as api from '../../services/api'
 import { callName } from '../../utils/calls'
 import RecordButton from './RecordButton'
-import type { CallJoin, User } from '../../types'
+import CallTasks from './CallTasks'
+import type { Call, CallJoin, User } from '../../types'
 
 interface Props {
   user: User | null
@@ -43,13 +44,20 @@ function CallPage({ user }: Props) {
   const [join, setJoin] = useState<CallJoin | null>(null)
   const [error, setError] = useState('')
   const [deviceError, setDeviceError] = useState('')
+  const [call, setCall] = useState<Call | null>(null) // урок и показанное задание меняются по ходу созвона
+  const [tasksOpen, setTasksOpen] = useState(false)
+  const openTasks = useCallback(() => setTasksOpen(true), [])
 
   useEffect(() => {
     let cancelled = false
     api
       .joinCall(Number(id))
       .then((data) => {
-        if (!cancelled) setJoin(data)
+        if (cancelled) return
+        setJoin(data)
+        setCall(data.call)
+        // Учителю — если к уроку привязаны задания, ученику — если задание уже показано
+        setTasksOpen(user?.role === 'teacher' ? data.call.assignment != null : Boolean(data.call.shown_task))
       })
       .catch((err) => {
         if (cancelled) return
@@ -60,13 +68,14 @@ function CallPage({ user }: Props) {
     return () => {
       cancelled = true
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- роль на этой странице не меняется
   }, [id])
 
   if (!user) {
     return <Navigate to="/" replace />
   }
 
-  if (!join) {
+  if (!join || !call) {
     return (
       <div className={styles.message}>
         <p>{error || 'Подключаемся к уроку…'}</p>
@@ -116,7 +125,7 @@ function CallPage({ user }: Props) {
       >
         <header className={styles.header}>
           <span className={styles.live} aria-hidden="true" />
-          <h1 className={styles.title}>{callName(join.call)}</h1>
+          <h1 className={styles.title}>{callName(call)}</h1>
           {isTeacher && (
             <button type="button" className={styles.endAll} onClick={handleEndForAll}>
               Завершить для всех
@@ -124,9 +133,19 @@ function CallPage({ user }: Props) {
           )}
         </header>
 
-        <LayoutContextProvider>
-          <Stage />
-        </LayoutContextProvider>
+        <div className={styles.main}>
+          <LayoutContextProvider>
+            <Stage />
+          </LayoutContextProvider>
+          <CallTasks
+            call={call}
+            isTeacher={isTeacher}
+            open={tasksOpen}
+            onOpen={openTasks}
+            onClose={() => setTasksOpen(false)}
+            onCallChange={setCall}
+          />
+        </div>
 
         {deviceError && <p className={styles.deviceError}>{deviceError}</p>}
 
@@ -144,7 +163,16 @@ function CallPage({ user }: Props) {
           >
             Показать экран
           </TrackToggle>
-          {isTeacher && <RecordButton fileName={`Урок · ${callName(join.call)}`} onError={setDeviceError} />}
+          <button
+            type="button"
+            className={`lk-button ${styles.control}`}
+            aria-pressed={tasksOpen}
+            data-lk-enabled={tasksOpen}
+            onClick={() => setTasksOpen((v) => !v)}
+          >
+            Задания
+          </button>
+          {isTeacher && <RecordButton fileName={`Урок · ${callName(call)}`} onError={setDeviceError} />}
           <DisconnectButton className={styles.leave}>Выйти</DisconnectButton>
         </div>
 

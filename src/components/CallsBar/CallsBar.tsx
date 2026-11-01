@@ -2,8 +2,9 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import styles from './CallsBar.module.css'
 import * as api from '../../services/api'
-import type { Account, Call } from '../../types'
+import type { Account, Assignment, Call } from '../../types'
 import { callName } from '../../utils/calls'
+import { hasSubject, normalize } from '../../utils/subjects'
 
 const POLL_INTERVAL_MS = 15_000 // как часто проверяем, не начался ли урок
 
@@ -11,17 +12,19 @@ interface Props {
   isTeacher: boolean
   subjects: string[] // предметы для выбора у учителя
   students: Account[] // ученики для личного урока
+  lessons?: Assignment[] // уроки, задания которых можно открыть в созвоне
 }
 
 const STUDENT_PREFIX = 'student:' // значение в списке «Для кого»: предмет или student:<id>
 
 // Созвоны на главной: учитель начинает урок и видит идущие,
 // ученик видит плашку «Идёт урок — подключиться» (если урока нет — ничего)
-function CallsBar({ isTeacher, subjects, students }: Props) {
+function CallsBar({ isTeacher, subjects, students, lessons = [] }: Props) {
   const navigate = useNavigate()
   const [calls, setCalls] = useState<Call[]>([])
   const [audience, setAudience] = useState('') // '' — все, предмет или student:<id>
   const [title, setTitle] = useState('')
+  const [lessonId, setLessonId] = useState('') // '' — без урока
   const [error, setError] = useState('')
   const [isStarting, setIsStarting] = useState(false)
 
@@ -59,7 +62,8 @@ function CallsBar({ isTeacher, subjects, students }: Props) {
     setIsStarting(true)
     try {
       const student = audience.startsWith(STUDENT_PREFIX) ? Number(audience.slice(STUDENT_PREFIX.length)) : null
-      const call = await api.startCall({ subject: student ? '' : audience, student, title: title.trim() })
+      const assignment = lessonOptions.some((l) => String(l.id) === lessonId) ? Number(lessonId) : null
+      const call = await api.startCall({ subject: student ? '' : audience, student, title: title.trim(), assignment })
       navigate(`/call/${call.id}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Не удалось начать урок')
@@ -78,6 +82,14 @@ function CallsBar({ isTeacher, subjects, students }: Props) {
   }
 
   if (!isTeacher && calls.length === 0) return null
+
+  // Уроки для выбора — по выбранному предмету или по предметам ученика, новые сверху
+  const personal = audience.startsWith(STUDENT_PREFIX)
+    ? students.find((s) => `${STUDENT_PREFIX}${s.id}` === audience)
+    : undefined
+  const lessonOptions = [...lessons]
+    .filter((l) => (personal ? hasSubject(personal.subjects, l.subject) : !audience || normalize(l.subject) === normalize(audience)))
+    .sort((a, b) => (b.id ?? 0) - (a.id ?? 0))
 
   return (
     <section className={styles.bar} aria-label="Онлайн-уроки">
@@ -137,6 +149,19 @@ function CallsBar({ isTeacher, subjects, students }: Props) {
               maxLength={255}
             />
           </label>
+          {lessonOptions.length > 0 && (
+            <label className={styles.field}>
+              <span className={styles.visuallyHidden}>Задания урока</span>
+              <select value={lessonId} onChange={(e) => setLessonId(e.target.value)}>
+                <option value="">Без заданий</option>
+                {lessonOptions.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.title} · {l.subject}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <button type="submit" className={styles.join} disabled={isStarting}>
             {isStarting ? 'Начинаем…' : 'Начать урок'}
           </button>

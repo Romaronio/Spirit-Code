@@ -654,17 +654,18 @@ class CallViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retriev
     POST /calls/ — учитель начинает созвон {subject, title} или личный {student, title}.
     POST /calls/{id}/join/ — токен LiveKit для входа в комнату.
     POST /calls/{id}/end/ — учитель завершает созвон для всех.
+    POST /calls/{id}/show/ — учитель выбирает урок и задание, которое видят ученики {assignment, task}.
     """
     serializer_class = CallSerializer
     pagination_class = None
 
     def get_permissions(self):
-        if self.action in ('create', 'end'):
+        if self.action in ('create', 'end', 'show'):
             return [IsTeacher()]
         return [IsAuthenticated()]
 
     def get_queryset(self):
-        queryset = Call.objects.select_related('started_by', 'student').filter(
+        queryset = Call.objects.select_related('started_by', 'student', 'assignment').filter(
             ended_at__isnull=True,
             started_at__gte=timezone.now() - Call.MAX_DURATION,
         )
@@ -713,3 +714,22 @@ class CallViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retriev
         call.save(update_fields=['ended_at'])
         livekit.delete_room(call.room_name)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=True, methods=['post'])
+    def show(self, request, pk=None):
+        """Урок и задание, открытые у учеников. Сами ученики узнают о смене сразу через
+        канал данных LiveKit, а отсюда состояние берут подключившиеся позже"""
+        call = self.get_object()
+        raw_id = request.data.get('assignment')
+        assignment = None
+        if raw_id not in (None, ''):
+            assignment = Assignment.objects.filter(pk=raw_id).first() if str(raw_id).isdigit() else None
+            if assignment is None:
+                raise ValidationError({'assignment': ['Урок не найден']})
+        task = str(request.data.get('task') or '')
+        if task and (assignment is None or task not in _task_keys(assignment)):
+            raise ValidationError({'task': ['Такого задания нет в уроке']})
+        call.assignment = assignment
+        call.shown_task = task
+        call.save(update_fields=['assignment', 'shown_task'])
+        return Response(CallSerializer(call).data)

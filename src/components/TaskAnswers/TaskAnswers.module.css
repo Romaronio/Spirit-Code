@@ -1,0 +1,121 @@
+/* Ответ к заданию — под документом задания (страница урока и созвон) */
+.taskAnswerBox {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.taskAnswerBox h3 {
+  margin: 0 0 10px;
+  font-size: 17px;
+}
+
+.answerForm {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.answerForm h3,
+.answerForm p,
+.answerForm .files {
+  margin: 0;
+}
+
+.textarea {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 16px;
+  font-family: inherit;
+  font-weight: 400;
+}
+
+/* Кнопка вместо стандартного «Выберите файл / Файл не выбран» */
+.fileButton {
+  align-self: flex-start;
+  padding: 6px 12px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.fileButton:hover {
+  border-color: var(--accent-hover);
+  background: var(--accent-hover);
+}
+
+.hiddenInput {
+  display: none;
+}
+
+.files {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-left: 0;
+  list-style: none;
+}
+
+.files li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.link {
+  color: var(--amber);
+  font-weight: 600;
+  text-decoration: none;
+  word-break: break-all;
+}
+
+.linkButton {
+  border: none;
+  background: none;
+  color: var(--danger);
+  cursor: pointer;
+}
+
+.error {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.empty {
+  color: var(--faint);
+}
+
+/* «Сохранение… / Ответ сохранён» */
+.saveState {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.studentHomeworks {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-left: 0;
+  list-style: none;
+}
+
+.studentHomeworkCard {
+  padding: 12px;
+  background: var(--surface-2);
+  border-radius: 8px;
+}
+
+.studentName {
+  font-weight: 600;
+}
+
+.answerText {
+  white-space: pre-wrap;
+  line-height: 1.5;
+  margin: 6px 0;
+}

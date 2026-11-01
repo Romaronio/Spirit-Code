@@ -69,8 +69,16 @@
   border-color: #f7efe4;
 }
 
+/* Видео и панель заданий рядом */
+.main {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
 .stage {
   flex: 1 1 auto;
+  min-width: 0;
   min-height: 0;
   padding: 12px;
 }

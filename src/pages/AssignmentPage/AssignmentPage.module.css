@@ -325,17 +325,6 @@
   display: none;
 }
 
-/* Ответ к заданию — под документом в панели задания */
-.taskAnswerBox {
-  margin-top: 24px;
-  padding-top: 16px;
-  border-top: 1px solid var(--line);
-}
-
-.taskAnswerBox h3 {
-  margin: 0 0 10px;
-  font-size: 17px;
-}
 
 .openTasksAnswered {
   display: block;
@@ -370,8 +359,3 @@
   font-size: 13px;
 }
 
-/* «Сохранение… / Ответ сохранён» под ответом к заданию */
-.saveState {
-  color: var(--muted);
-  font-size: 13px;
-}
