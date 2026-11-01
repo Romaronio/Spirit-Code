@@ -11,6 +11,7 @@ import ProgressDonut from '../../components/ProgressDonut/ProgressDonut'
 import PaymentsPanel from '../../components/PaymentsPanel/PaymentsPanel'
 import ChatWindow from '../../components/ChatWindow/ChatWindow'
 import StudentsList from '../../components/StudentsList/StudentsList'
+import { promptInstall, useCanInstall } from '../../utils/install'
 import { lessonForSubjects, normalize } from '../../utils/subjects'
 
 interface Props {
@@ -46,6 +47,8 @@ function HomePage({
 }: Props) {
   // Открытая переписка (у учителя): показывается вместо колонки с заданиями
   const [openChat, setOpenChat] = useState<{ assignmentId: number; answerId: number } | null>(null)
+  // Кнопка «Установить приложение» — пока сайт не установлен и браузер это умеет
+  const canInstall = useCanInstall()
   // Окно «Все задания» (у учителя)
   const [showAll, setShowAll] = useState(false)
   const closeChat = useCallback(() => setOpenChat(null), [])
@@ -183,6 +186,16 @@ function HomePage({
               Тренажёр печати
             </Link>
           </nav>
+          {canInstall && (
+            <button
+              type="button"
+              className={styles.install}
+              onClick={() => void promptInstall()}
+              title="Ярлык на рабочем столе и отдельное окно, как у обычной программы"
+            >
+              ⤓ Установить приложение
+            </button>
+          )}
           <button type="button" className={styles.logout} onClick={onLogout}>
             Выйти
           </button>

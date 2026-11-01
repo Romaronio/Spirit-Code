@@ -86,6 +86,24 @@
   color: var(--on-accent);
 }
 
+/* «Установить приложение» — рядом с «Выйти», без заливки, чтобы не спорить с ней */
+.install {
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--text);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.install:hover {
+  background: var(--text);
+  color: var(--surface);
+}
+
 .logout {
   min-height: 44px;
   padding: 0 16px;
