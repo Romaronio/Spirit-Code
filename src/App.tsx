@@ -4,7 +4,8 @@ import AuthPage from './pages/AuthPage/AuthPage'
 import HomePage from './pages/HomePage/HomePage'
 import AssignmentPage from './pages/AssignmentPage/AssignmentPage'
 import TypingPage from './pages/TypingPage/TypingPage'
-import type { Account, AnswerComment, Assignment, AssignmentChanges, CommentActions, NewAssignment, ReviewStatus, User } from './types'
+import LessonsPage from './pages/LessonsPage/LessonsPage'
+import type { Account, AnswerComment, Assignment, AssignmentChanges, CommentActions, NewAssignment, ReviewStatus, Subject, User } from './types'
 import * as api from './services/api'
 import { clearSession, loadUser } from './utils/session'
 
@@ -17,6 +18,7 @@ function App() {
   const [user, setUser] = useState<User | null>(() => loadUser())
   const [items, setItems] = useState<Assignment[]>([])
   const [accounts, setAccounts] = useState<Account[]>([])
+  const [subjects, setSubjects] = useState<Subject[]>([]) // только у учителя
   const [loading, setLoading] = useState(() => loadUser() !== null)
 
   // Загрузка данных после входа. Список учеников доступен только учителю,
@@ -27,13 +29,15 @@ function App() {
 
     async function loadData(role: User['role']) {
       try {
-        const [accountsData, assignmentsData] = await Promise.all([
+        const [accountsData, assignmentsData, subjectsData] = await Promise.all([
           role === 'teacher' ? api.getAllAccounts() : api.getMe().then((me) => [me]),
           api.getAllAssignments(),
+          role === 'teacher' ? api.getSubjects() : Promise.resolve([]),
         ])
         if (cancelled) return
         setAccounts(accountsData)
         setItems(assignmentsData)
+        setSubjects(subjectsData)
       } catch (error) {
         console.error('Ошибка загрузки данных:', error)
       } finally {
@@ -62,6 +66,7 @@ function App() {
     setUser(null)
     setItems([])
     setAccounts([])
+    setSubjects([])
     navigate('/', { replace: true })
   }
 
@@ -69,6 +74,8 @@ function App() {
     try {
       const newAssignment = await api.createAssignment(data)
       setItems((prev) => [newAssignment, ...prev])
+      // Урок по новому предмету добавил его в список предметов на сервере
+      api.getSubjects().then(setSubjects).catch(() => {})
     } catch (error) {
       console.error('Ошибка создания задания:', error)
       throw error
@@ -96,6 +103,8 @@ function App() {
       setItems((prev) =>
         prev.map((item) => (item.id === id ? updated : item))
       )
+      // Урок перенесли в предмет, которого не было в списке, — сервер его добавил
+      if (changes.subject !== undefined) api.getSubjects().then(setSubjects).catch(() => {})
     } catch (error) {
       console.error('Ошибка обновления задания:', error)
       throw error
@@ -130,6 +139,18 @@ function App() {
       console.error('Ошибка удаления ученика:', error)
       throw error
     }
+  }
+
+  async function handleAddSubject(name: string) {
+    const subject = await api.createSubject(name)
+    setSubjects((prev) =>
+      prev.some((s) => s.id === subject.id) ? prev : [...prev, subject].sort((a, b) => a.name.localeCompare(b.name, 'ru')),
+    )
+  }
+
+  async function handleDeleteSubject(id: number) {
+    await api.deleteSubject(id)
+    setSubjects((prev) => prev.filter((s) => s.id !== id))
   }
 
   async function handleSetSubjects(id: number, subjects: string[]) {
@@ -232,6 +253,8 @@ function App() {
             onSetSubjects={handleSetSubjects}
             onReview={handleReview}
             commentActions={commentActions}
+            subjects={subjects}
+            onDeleteSubject={handleDeleteSubject}
           />
         }
       />
@@ -251,6 +274,18 @@ function App() {
         }
       />
       <Route path="/typing" element={<TypingPage user={user} />} />
+      <Route
+        path="/lessons"
+        element={
+          <LessonsPage
+            user={user}
+            items={items}
+            subjects={subjects}
+            onUpdate={handleUpdate}
+            onAddSubject={handleAddSubject}
+          />
+        }
+      />
       <Route
         path="/call/:id"
         element={

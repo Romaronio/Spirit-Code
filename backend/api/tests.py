@@ -14,7 +14,7 @@ from django.test import override_settings
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
-from .models import Account, Assignment, AuthToken, Call, LessonFile, StudentHomework, StudentHomeworkFile, TypingResult
+from .models import Account, Assignment, AuthToken, Call, Subject, LessonFile, StudentHomework, StudentHomeworkFile, TypingResult
 
 
 class AuthTestCase(APITestCase):
@@ -148,6 +148,12 @@ class SubmitTests(AuthTestCase):
         self.assertEqual(sh.student, self.anna)
         sh.files.get().file.delete()
 
+    def test_empty_submit_creates_nothing(self):
+        self.login_as(self.anna)
+        response = self.client.post(f'/api/assignments/{self.bio.id}/submit/', {'description': '   '})
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(StudentHomework.objects.exists())
+
     def test_student_cannot_submit_to_foreign_subject(self):
         self.login_as(self.anna)
         response = self.client.post(f'/api/assignments/{self.eng.id}/submit/', {'description': 'x'})
@@ -157,6 +163,76 @@ class SubmitTests(AuthTestCase):
         self.login_as(self.teacher)
         response = self.client.post(f'/api/assignments/{self.bio.id}/submit/', {'description': 'x'})
         self.assertEqual(response.status_code, 403)
+
+
+class SubjectTests(AuthTestCase):
+    def setUp(self):
+        super().setUp()
+        Subject.objects.all().delete()  # миграция заполняет стандартными — начинаем с пустого списка
+
+    def test_add_list_delete(self):
+        self.login_as(self.teacher)
+        response = self.client.post('/api/subjects/', {'name': '  Физика  '}, format='json')
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data['name'], 'Физика')
+        # Тот же предмет в другом регистре — не дубль
+        again = self.client.post('/api/subjects/', {'name': 'физика'}, format='json')
+        self.assertEqual(again.data['id'], response.data['id'])
+        self.assertEqual([s['name'] for s in self.client.get('/api/subjects/').data], ['Физика'])
+        self.assertEqual(self.client.delete(f"/api/subjects/{response.data['id']}/").status_code, 204)
+        self.assertEqual(self.client.get('/api/subjects/').data, [])
+        self.assertEqual(self.client.post('/api/subjects/', {'name': '  '}, format='json').status_code, 400)
+
+    def test_new_lesson_adds_subject(self):
+        self.login_as(self.teacher)
+        self.client.post('/api/assignments/', {'title': 'Законы Ньютона', 'subject': 'Физика'})
+        self.assertEqual(list(Subject.objects.values_list('name', flat=True)), ['Физика'])
+
+    def test_moving_lesson_adds_subject(self):
+        self.login_as(self.teacher)
+        response = self.client.patch(f'/api/assignments/{self.bio.id}/', {'subject': 'ЕГЭ информатика'})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['subject'], 'ЕГЭ информатика')
+        self.assertEqual(list(Subject.objects.values_list('name', flat=True)), ['ЕГЭ информатика'])
+
+    def test_lesson_in_several_subjects(self):
+        self.login_as(self.teacher)
+        response = self.client.patch(
+            f'/api/assignments/{self.bio.id}/',
+            {'extra_subjects': json.dumps(['ЕГЭ биология', 'биология', ' ЕГЭ  биология '])},
+        )
+        self.assertEqual(response.status_code, 200)
+        # Основной предмет и повторы отброшены
+        self.assertEqual(response.data['extra_subjects'], ['ЕГЭ биология'])
+        self.assertIn('ЕГЭ биология', Subject.objects.values_list('name', flat=True))
+        # Ученик только с дополнительным предметом урок видит, с другим — нет
+        self.ivan.subjects = ['егэ биология']
+        self.ivan.save()
+        self.login_as(self.ivan)
+        self.assertEqual(self.client.get(f'/api/assignments/{self.bio.id}/').status_code, 200)
+        self.ivan.subjects = ['Английский']
+        self.ivan.save()
+        self.assertEqual(self.client.get(f'/api/assignments/{self.bio.id}/').status_code, 404)
+
+    def test_main_subject_not_duplicated(self):
+        self.bio.extra_subjects = ['ЕГЭ биология']
+        self.bio.save()
+        self.login_as(self.teacher)
+        response = self.client.patch(f'/api/assignments/{self.bio.id}/', {'subject': 'ЕГЭ биология'})
+        self.assertEqual(response.data['extra_subjects'], [])
+
+    def test_delete_keeps_lessons_and_students(self):
+        subject = Subject.objects.create(name='Биология')
+        self.login_as(self.teacher)
+        self.client.delete(f'/api/subjects/{subject.id}/')
+        self.assertTrue(Assignment.objects.filter(subject='Биология').exists())
+        self.anna.refresh_from_db()
+        self.assertEqual(self.anna.subjects, ['Биология'])
+
+    def test_only_teacher(self):
+        self.login_as(self.anna)
+        self.assertEqual(self.client.get('/api/subjects/').status_code, 403)
+        self.assertEqual(self.client.post('/api/subjects/', {'name': 'x'}, format='json').status_code, 403)
 
 
 class TaskAnswerTests(AuthTestCase):
@@ -188,6 +264,14 @@ class TaskAnswerTests(AuthTestCase):
         sh.refresh_from_db()
         self.assertEqual(sh.task_answers, {})
         self.assertFalse(sh.files.exists())
+
+    def test_cleared_answer_is_removed(self):
+        self.login_as(self.anna)
+        self.client.post(self.url, {'task': 'cw-5', 'text': '4'})
+        self.assertEqual(StudentHomework.objects.count(), 1)
+        # Стёр всё — учителю не висит пустой ответ «на проверке»
+        self.assertEqual(self.client.post(self.url, {'task': 'cw-5', 'text': ''}).status_code, 204)
+        self.assertFalse(StudentHomework.objects.exists())
 
     def test_resubmit_resets_status(self):
         sh = StudentHomework.objects.create(assignment=self.bio, student=self.anna, status='accepted')

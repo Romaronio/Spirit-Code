@@ -4,7 +4,7 @@ import styles from './CallsBar.module.css'
 import * as api from '../../services/api'
 import type { Account, Assignment, Call } from '../../types'
 import { callName } from '../../utils/calls'
-import { hasSubject, normalize } from '../../utils/subjects'
+import { hasSubject, lessonForSubjects, lessonSubjects } from '../../utils/subjects'
 
 // Как часто проверяем, не начался ли урок. Запрос лёгкий, а постоянное соединение
 // заняло бы один из двух обработчиков gunicorn — поэтому частый опрос
@@ -100,7 +100,7 @@ function CallsBar({ isTeacher, subjects, students, lessons = [] }: Props) {
     ? students.find((s) => `${STUDENT_PREFIX}${s.id}` === audience)
     : undefined
   const lessonOptions = [...lessons]
-    .filter((l) => (personal ? hasSubject(personal.subjects, l.subject) : !audience || normalize(l.subject) === normalize(audience)))
+    .filter((l) => (personal ? lessonForSubjects(personal.subjects, l) : !audience || hasSubject(lessonSubjects(l), audience)))
     .sort((a, b) => (b.id ?? 0) - (a.id ?? 0))
 
   return (

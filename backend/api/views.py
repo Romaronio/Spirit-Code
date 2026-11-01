@@ -1,7 +1,5 @@
 import json
 import secrets
-from functools import reduce
-from operator import or_
 
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
@@ -15,7 +13,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.views import APIView
-from .models import MAX_LATEX_LENGTH, Account, AnswerComment, Assignment, AuthToken, Call, LessonFile, Homework, HomeworkFile, Payment, StudentHomework, StudentHomeworkFile, TypingResult
+from .models import MAX_LATEX_LENGTH, Account, AnswerComment, Assignment, AuthToken, Call, LessonFile, Subject, Homework, HomeworkFile, Payment, StudentHomework, StudentHomeworkFile, TypingResult
 from . import livekit
 from .permissions import IsStudent, IsTeacher
 from .photo_latex import PhotoLatexError, photo_to_latex
@@ -29,6 +27,7 @@ from .serializers import (
     HomeworkFileSerializer,
     PaymentSerializer,
     StudentHomeworkSerializer,
+    SubjectSerializer,
     AnswerCommentSerializer,
     TypingResultSerializer,
     clean_numbered_tasks,
@@ -64,6 +63,16 @@ def _task_keys(assignment):
         if (homework.tasks_latex or '').strip():
             keys.add('homework')
     return keys
+
+
+def _is_empty_answer(sh):
+    """В ответе ученика ничего нет: ни текста, ни ответов к заданиям, ни файлов, ни переписки"""
+    return (
+        not (sh.description or '').strip()
+        and not sh.task_answers
+        and not sh.files.exists()
+        and not sh.comments.exists()
+    )
 
 
 def _task_uploads(request, prefix):
@@ -200,12 +209,16 @@ class AssignmentViewSet(viewsets.ModelViewSet):
 
         user = self.request.user
         if not getattr(user, 'is_teacher', False):
-            subjects = [str(s).strip() for s in (getattr(user, 'subjects', None) or []) if str(s).strip()]
+            subjects = {str(s).strip().casefold() for s in (getattr(user, 'subjects', None) or []) if str(s).strip()}
             if not subjects:
                 return queryset.none()
-            queryset = queryset.filter(
-                reduce(or_, (Q(subject__iexact=s) for s in subjects))
-            )
+            # Урок виден, если любой из его предметов есть у ученика. Сравниваем в Python:
+            # дополнительные предметы лежат в JSON, а iexact в SQLite не понимает регистр русских букв
+            ids = [
+                a.id for a in Assignment.objects.only('id', 'subject', 'extra_subjects')
+                if any(str(s).strip().casefold() in subjects for s in a.all_subjects)
+            ]
+            queryset = queryset.filter(id__in=ids)
         return queryset
 
     def _save_homework(self, request, assignment):
@@ -284,6 +297,7 @@ class AssignmentViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         self._check_files(request)
         assignment = serializer.save()
+        Subject.ensure(assignment.subject)  # новый предмет появляется в списках выбора
 
         self._save_homework(request, assignment)
         self._save_lesson_files(request, assignment)
@@ -303,6 +317,8 @@ class AssignmentViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         self._check_files(request)
         assignment = serializer.save()
+        for name in assignment.all_subjects:  # урок перенесли в новый предмет — он появляется в списках
+            Subject.ensure(name)
 
         self._save_homework(request, assignment)
         self._save_lesson_files(request, assignment)
@@ -346,6 +362,10 @@ class AssignmentViewSet(viewsets.ModelViewSet):
                 name=f.name,
                 file=f,
             )
+
+        if _is_empty_answer(sh):
+            sh.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
 
         sh.refresh_from_db()
         serializer = StudentHomeworkSerializer(sh, context=self.get_serializer_context())
@@ -396,6 +416,11 @@ class AssignmentViewSet(viewsets.ModelViewSet):
         StudentHomeworkFile.objects.filter(id__in=delete_ids).delete()
         for f in files:
             StudentHomeworkFile.objects.create(student_homework=sh, name=f.name, file=f, task_key=task)
+
+        # Ученик стёр всё, что написал, — пустой ответ учителю проверять нечего
+        if _is_empty_answer(sh):
+            sh.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
 
         sh.refresh_from_db()
         serializer = StudentHomeworkSerializer(sh, context=self.get_serializer_context())
@@ -464,6 +489,21 @@ class StudentHomeworkViewSet(viewsets.ModelViewSet):
         sh.checked_at = None if new_status == 'pending' else timezone.now()
         sh.save(update_fields=['status', 'checked_at'])
         return Response(self.get_serializer(sh).data)
+
+
+class SubjectViewSet(mixins.ListModelMixin, mixins.DestroyModelMixin, viewsets.GenericViewSet):
+    """Предметы в списках выбора. GET — список, POST {name} — добавить (такой уже есть —
+    вернётся он), DELETE — убрать из выбора; уроки и ученики не меняются. Только учитель"""
+    queryset = Subject.objects.all()
+    serializer_class = SubjectSerializer
+    permission_classes = [IsTeacher]
+    pagination_class = None
+
+    def create(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        subject = Subject.ensure(serializer.validated_data['name'])
+        return Response(SubjectSerializer(subject).data, status=status.HTTP_201_CREATED)
 
 
 class PaymentViewSet(viewsets.GenericViewSet):

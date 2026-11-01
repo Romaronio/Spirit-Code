@@ -2,18 +2,23 @@ import { useState, type FormEvent } from 'react'
 import styles from './AssignmentForm.module.css'
 import { EMPTY_TASK_FILES, taskFileChanges, type TaskFilesDraft } from '../../utils/uploads'
 import NumberedTasksEditor from '../NumberedTasksEditor/NumberedTasksEditor'
-import type { NewAssignment, NumberedTask } from '../../types'
+import { normalize } from '../../utils/subjects'
+import type { NewAssignment, NumberedTask, Subject } from '../../types'
 
 interface AssignmentFormProps {
   onAdd: (data: NewAssignment) => Promise<void> | void
+  subjects: Subject[] // предметы из списка — из них выбирают, а можно ввести новый
+  onDeleteSubject: (id: number) => Promise<void>
 }
 
-const SUBJECTS = ['Математика', 'Информатика', 'Русский язык']
+const MAX_SUBJECT_LENGTH = 100 // как Assignment.subject на сервере
+const NEW_SUBJECT = '__new__' // значение пункта «Новый предмет» — с настоящим предметом не совпадёт
 
-function AssignmentForm({ onAdd }: AssignmentFormProps) {
+function AssignmentForm({ onAdd, subjects, onDeleteSubject }: AssignmentFormProps) {
   const [isOpen, setIsOpen] = useState(false) // по умолчанию свёрнута, как другие панели
   const [title, setTitle] = useState('')
   const [subject, setSubject] = useState('')
+  const [newSubject, setNewSubject] = useState('')
   const [description, setDescription] = useState('')
   const [deadline, setDeadline] = useState('')
   const [recordingUrl, setRecordingUrl] = useState('')
@@ -29,15 +34,20 @@ function AssignmentForm({ onAdd }: AssignmentFormProps) {
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
 
-    if (title.trim() === '' || subject === '') {
-      setError('Заполните название и предмет')
+    // Новый предмет, совпавший с уже существующим, пишем как существующий — без дублей «математика» / «Математика»
+    const typed = newSubject.trim().replace(/\s+/g, ' ')
+    const finalSubject =
+      subject === NEW_SUBJECT ? subjects.find((s) => normalize(s.name) === normalize(typed))?.name ?? typed : subject
+
+    if (title.trim() === '' || finalSubject === '') {
+      setError(subject === NEW_SUBJECT ? 'Введите название нового предмета' : 'Заполните название и предмет')
       return
     }
 
     try {
       await onAdd({
         title: title.trim(),
-        subject: subject,
+        subject: finalSubject,
         description: description.trim(),
         deadline: deadline || undefined,
         recording_url: recordingUrl.trim() || undefined,
@@ -55,6 +65,7 @@ function AssignmentForm({ onAdd }: AssignmentFormProps) {
 
       setTitle('')
       setSubject('')
+      setNewSubject('')
       setDescription('')
       setDeadline('')
       setRecordingUrl('')
@@ -66,6 +77,19 @@ function AssignmentForm({ onAdd }: AssignmentFormProps) {
       setError('')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ошибка при создании задания')
+    }
+  }
+
+  async function handleDeleteSubject(subj: Subject) {
+    if (!window.confirm(`Убрать предмет «${subj.name}» из списка?
+
+Уроки по нему и предметы учеников не изменятся.`)) return
+    try {
+      await onDeleteSubject(subj.id)
+      if (subject === subj.name) setSubject('')
+      setError('')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Не удалось удалить предмет')
     }
   }
 
@@ -95,18 +119,50 @@ function AssignmentForm({ onAdd }: AssignmentFormProps) {
           <div className={styles.subjectSection}>
             <label className={styles.label}>Предмет</label>
             <div className={styles.subjectOptions}>
-              {SUBJECTS.map((subj) => (
-                <label key={subj} className={styles.radioLabel}>
+              {subjects.map((subj) => (
+                <label key={subj.id} className={styles.radioLabel}>
                   <input
                     type="radio"
                     name="subject"
-                    value={subj}
-                    checked={subject === subj}
+                    value={subj.name}
+                    checked={subject === subj.name}
                     onChange={(e) => setSubject(e.target.value)}
                   />
-                  {subj}
+                  <span className={styles.subjectName}>{subj.name}</span>
+                  <button
+                    type="button"
+                    className={styles.deleteSubject}
+                    aria-label={`Удалить предмет ${subj.name}`}
+                    title="Убрать предмет из списка"
+                    onClick={(e) => {
+                      e.preventDefault() // клик внутри label не должен выбирать предмет
+                      void handleDeleteSubject(subj)
+                    }}
+                  >
+                    ✕
+                  </button>
                 </label>
               ))}
+              <label className={styles.radioLabel}>
+                <input
+                  type="radio"
+                  name="subject"
+                  value={NEW_SUBJECT}
+                  checked={subject === NEW_SUBJECT}
+                  onChange={(e) => setSubject(e.target.value)}
+                />
+                + Новый предмет
+              </label>
+              {subject === NEW_SUBJECT && (
+                <input
+                  type="text"
+                  placeholder="Например, Физика"
+                  value={newSubject}
+                  maxLength={MAX_SUBJECT_LENGTH}
+                  autoFocus
+                  onChange={(e) => setNewSubject(e.target.value)}
+                />
+              )}
             </div>
           </div>
 

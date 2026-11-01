@@ -90,6 +90,27 @@
   accent-color: var(--accent);
 }
 
+.subjectName {
+  flex: 1;
+}
+
+/* ✕ — убрать предмет из списка */
+.deleteSubject {
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.deleteSubject:hover {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
 .error {
   color: var(--danger);
   font-size: 14px;

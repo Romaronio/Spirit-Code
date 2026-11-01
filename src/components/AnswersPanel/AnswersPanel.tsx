@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import styles from './AnswersPanel.module.css'
 import type { Account, Assignment, ReviewStatus, StudentHomework } from '../../types'
 import { ReviewButtons, StatusBadge } from '../AnswerStatus/AnswerStatus'
-import { hasSubject } from '../../utils/subjects'
+import { lessonForSubjects } from '../../utils/subjects'
 
 interface Props {
   items: Assignment[]
@@ -56,7 +56,7 @@ function AnswersPanel({ items, accounts, onReview, activeAnswerId, onOpenChat, r
   const acceptedCount = answers.filter((a) => a.answer.status === 'accepted').length
   const pendingCount = answers.filter((a) => (a.answer.status ?? 'pending') === 'pending').length
   const notSubmitted = selected
-    ? items.filter((a) => hasSubject(selected.subjects, a.subject) && !answeredIds.has(a.id))
+    ? items.filter((a) => lessonForSubjects(selected.subjects, a) && !answeredIds.has(a.id))
     : []
 
   return (

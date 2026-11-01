@@ -1,4 +1,4 @@
-import type { Account, AnswerComment, Assignment, Call, CallJoin, NewCall, LessonFile, Homework, HomeworkFile, NewAssignment, NumberedTask, Payment, TaskFileChanges, PhotoLatexResult, ReviewStatus, StudentHomework, TypingModeSummary, TypingResult, TypingStats, TypingSummary } from "../types";
+import type { Account, AnswerComment, Assignment, Call, Subject, CallJoin, NewCall, LessonFile, Homework, HomeworkFile, NewAssignment, NumberedTask, Payment, TaskFileChanges, PhotoLatexResult, ReviewStatus, StudentHomework, TypingModeSummary, TypingResult, TypingStats, TypingSummary } from "../types";
 import { clearSession, loadToken } from "../utils/session";
 
 // Адрес API. По умолчанию относительный путь: и локально (через прокси Vite),
@@ -193,6 +193,7 @@ export async function updateAssignment(
   data: {
     title?: string
     subject?: string
+    extra_subjects?: string[]
     deadline?: string | null
     description?: string
     recording_url?: string
@@ -206,6 +207,7 @@ export async function updateAssignment(
   const formData = new FormData();
   if (data.title !== undefined) formData.append('title', data.title);
   if (data.subject !== undefined) formData.append('subject', data.subject);
+  if (data.extra_subjects !== undefined) formData.append('extra_subjects', JSON.stringify(data.extra_subjects));
   if (data.deadline) formData.append('deadline', data.deadline);
   if (data.description !== undefined) formData.append('description', data.description || '');
   if (data.recording_url !== undefined) formData.append('recording_url', data.recording_url || '');
@@ -424,6 +426,25 @@ export async function photoToLatex(image: File, number: number): Promise<PhotoLa
   formData.append('image', image);
   formData.append('number', String(number));
   return fetchAPIFormData<PhotoLatexResult>('/photo-latex/', formData, 'POST');
+}
+
+// ============== ПРЕДМЕТЫ ==============
+
+export async function getSubjects(): Promise<Subject[]> {
+  return fetchAPI<Subject[]>('/subjects/');
+}
+
+// Добавляет предмет в списки выбора; такой уже есть (без учёта регистра) — вернётся он
+export async function createSubject(name: string): Promise<Subject> {
+  return fetchAPI<Subject>('/subjects/', {
+    method: 'POST',
+    body: JSON.stringify({ name }),
+  });
+}
+
+// Убирает предмет из списков выбора; уроки по нему и предметы учеников не меняются
+export async function deleteSubject(id: number): Promise<void> {
+  return fetchAPI<void>(`/subjects/${id}/`, { method: 'DELETE' });
 }
 
 // ============== CALLS API (созвоны LiveKit) ==============

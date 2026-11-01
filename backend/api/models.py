@@ -93,10 +93,42 @@ class AuthToken(models.Model):
         return timezone.now() - self.created_at > timedelta(days=settings.AUTH_TOKEN_TTL_DAYS)
 
 
+class Subject(models.Model):
+    """Предмет в списках выбора: форма урока, предметы ученика, созвоны.
+
+    Урок и ученик хранят предмет текстом, поэтому удаление предмета убирает его только
+    из выбора — уроки по нему и предметы, уже назначенные ученикам, не меняются.
+    """
+    name = models.CharField(max_length=100)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+    @classmethod
+    def ensure(cls, name):
+        """Предмет с таким названием без учёта регистра; нет — создаётся.
+        Сравниваем в Python: iexact в SQLite не понимает регистр русских букв"""
+        name = ' '.join(str(name).split())
+        if not name:
+            return None
+        key = name.casefold()
+        for subject in cls.objects.all():
+            if subject.name.casefold() == key:
+                return subject
+        return cls.objects.create(name=name)
+
+
 class Assignment(models.Model):
     """Модель для заданий"""
     title = models.CharField(max_length=255)
     subject = models.CharField(max_length=100)
+    # Ещё предметы, в которых есть этот урок (тот же урок, не копия): например, урок «Информатики»
+    # добавили в «ЕГЭ информатика». Ученик видит урок, если у него есть любой из предметов
+    extra_subjects = models.JSONField(blank=True, default=list)
     deadline = models.DateField(blank=True, null=True)
     recording_url = models.URLField(blank=True, null=True)
     description = models.TextField(blank=True, null=True)
@@ -115,6 +147,10 @@ class Assignment(models.Model):
 
     def __str__(self):
         return f"{self.title} - {self.subject}"
+
+    @property
+    def all_subjects(self):
+        return [self.subject, *(self.extra_subjects or [])]
 
 
 class LessonFile(models.Model):

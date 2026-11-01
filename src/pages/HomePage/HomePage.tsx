@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type CSSProperties } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import styles from './HomePage.module.css'
-import type { Account, Assignment, CommentActions, NewAssignment, ReviewStatus, User } from '../../types'
+import type { Account, Assignment, CommentActions, NewAssignment, ReviewStatus, Subject, User } from '../../types'
 import AssignmentCard from '../../components/AssignmentCard/AssignmentCard'
 import CallsBar from '../../components/CallsBar/CallsBar'
 import AssignmentForm from '../../components/AssignmentForm/AssignmentForm'
@@ -10,7 +10,7 @@ import AnswersPanel from '../../components/AnswersPanel/AnswersPanel'
 import ProgressDonut from '../../components/ProgressDonut/ProgressDonut'
 import PaymentsPanel from '../../components/PaymentsPanel/PaymentsPanel'
 import ChatWindow from '../../components/ChatWindow/ChatWindow'
-import { hasSubject, normalize, subjectsOf, uniqueSubjects } from '../../utils/subjects'
+import { lessonForSubjects, normalize } from '../../utils/subjects'
 
 interface Props {
   user: User | null;
@@ -24,6 +24,8 @@ interface Props {
   onReview: (assignmentId: number, answerId: number, status: ReviewStatus) => Promise<void>;
   commentActions: CommentActions;
   onAdd: (data: NewAssignment) => Promise<void>;
+  subjects: Subject[]; // предметы в списках выбора (у учителя)
+  onDeleteSubject: (id: number) => Promise<void>;
 }
 
 function HomePage({
@@ -38,6 +40,8 @@ function HomePage({
   onSetSubjects,
   onReview,
   commentActions,
+  subjects,
+  onDeleteSubject,
 }: Props) {
   // Открытая переписка (у учителя): показывается вместо колонки с заданиями
   const [openChat, setOpenChat] = useState<{ assignmentId: number; answerId: number } | null>(null)
@@ -86,7 +90,7 @@ function HomePage({
 
   const visibleItems = isTeacher
     ? items
-    : items.filter((item) => hasSubject(mySubjects, item.subject))
+    : items.filter((item) => lessonForSubjects(mySubjects, item))
 
   // Сданными считаем ДЗ, которые учитель отметил «Сдано».
   // Ученику сервер присылает только его собственный ответ.
@@ -104,6 +108,9 @@ function HomePage({
   const pendingReviewCount = items
     .flatMap((item) => item.student_homeworks ?? [])
     .filter((answer) => (answer.status ?? 'pending') === 'pending').length
+
+  // Предметы для учеников и созвонов — список с сервера (можно удалять в форме урока)
+  const subjectList = subjects.map((s) => s.name)
 
   const lead = isTeacher
     ? pendingReviewCount > 0
@@ -166,6 +173,11 @@ function HomePage({
             <Link to="/home" className={`${styles.navLink} ${styles.navActive}`} aria-current="page">
               Задания
             </Link>
+            {isTeacher && (
+              <Link to="/lessons" className={`${styles.navLink} ${styles.navAccent}`}>
+                База уроков
+              </Link>
+            )}
             <Link to="/typing" className={`${styles.navLink} ${styles.navAccent}`}>
               Тренажёр печати
             </Link>
@@ -206,7 +218,7 @@ function HomePage({
 
         <CallsBar
           isTeacher={isTeacher}
-          subjects={uniqueSubjects([...accounts.flatMap((a) => a.subjects ?? []), ...items.map((a) => a.subject)])}
+          subjects={subjectList}
           students={accounts.filter((a) => a.role === 'student' && a.id != null)}
           lessons={isTeacher ? items : []}
         />
@@ -214,7 +226,7 @@ function HomePage({
         {isTeacher ? (
           // Учитель: форма | ответы и ученики | все задания — в три колонки
           <div className={styles.tools}>
-            <AssignmentForm onAdd={onAdd} />
+            <AssignmentForm onAdd={onAdd} subjects={subjects} onDeleteSubject={onDeleteSubject} />
             <div className={styles.sideColumn}>
               <AnswersPanel
                 items={items}
@@ -226,7 +238,7 @@ function HomePage({
               <PaymentsPanel accounts={accounts} />
               <StudentsPanel
                 accounts={accounts}
-                availableSubjects={subjectsOf(items)}
+                availableSubjects={subjectList}
                 onAddStudent={onAddStudent}
                 onDeleteStudent={onDeleteStudent}
                 onSetSubjects={onSetSubjects}

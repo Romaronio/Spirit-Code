@@ -1,5 +1,3 @@
-import type { Assignment } from '../types'
-
 // Сравниваем предметы без учёта регистра и лишних пробелов
 export function normalize(value: string) {
   return value.trim().toLowerCase()
@@ -7,6 +5,16 @@ export function normalize(value: string) {
 
 export function hasSubject(subjects: string[] | undefined, subject: string) {
   return (subjects ?? []).some((s) => normalize(s) === normalize(subject))
+}
+
+// Все предметы урока: основной и дополнительные (урок может быть сразу в нескольких)
+export function lessonSubjects(lesson: { subject: string; extra_subjects?: string[] }) {
+  return [lesson.subject, ...(lesson.extra_subjects ?? [])]
+}
+
+// Виден ли урок ученику с такими предметами — по любому из предметов урока
+export function lessonForSubjects(subjects: string[] | undefined, lesson: { subject: string; extra_subjects?: string[] }) {
+  return lessonSubjects(lesson).some((s) => hasSubject(subjects, s))
 }
 
 export function toggleSubject(subjects: string[], subject: string) {
@@ -27,8 +35,4 @@ export function uniqueSubjects(list: string[]) {
     }
   }
   return result.sort((a, b) => a.localeCompare(b, 'ru'))
-}
-
-export function subjectsOf(assignments: Assignment[]) {
-  return uniqueSubjects(assignments.map((a) => a.subject))
 }

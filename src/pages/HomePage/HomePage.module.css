@@ -75,7 +75,7 @@
   color: var(--text);
 }
 
-/* «Тренажёр печати» — оранжевая кнопка */
+/* «База уроков» и «Тренажёр печати» — оранжевые кнопки */
 .navAccent {
   background: var(--accent);
   color: var(--on-accent);

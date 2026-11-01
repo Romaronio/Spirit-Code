@@ -82,6 +82,7 @@ export interface Assignment {
   id?: number
   title: string
   subject: string
+  extra_subjects?: string[] // ещё предметы, в которых есть этот же урок (не копия)
   deadline?: string | null // формат 'ГГГГ-ММ-ДД', может быть не задан
   recording_url?: string
   description?: string
@@ -192,6 +193,12 @@ export interface PhotoLatexResult {
 }
 
 // Созвон-урок (LiveKit)
+// Предмет в списках выбора (форма урока, предметы ученика, созвоны)
+export interface Subject {
+  id: number
+  name: string
+}
+
 export interface Call {
   id: number
   title: string

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import styles from './AssignmentPage.module.css'
 import * as api from '../../services/api'
-import { hasSubject, normalize } from '../../utils/subjects'
+import { lessonForSubjects, normalize } from '../../utils/subjects'
 import type { Account, Assignment, AssignmentChanges, CommentActions, NumberedTask, ReviewStatus, User } from '../../types'
 import { ReviewButtons, StatusBadge } from '../../components/AnswerStatus/AnswerStatus'
 import CommentThread from '../../components/CommentThread/CommentThread'
@@ -51,7 +51,7 @@ function AssignmentPage({ user, items, accounts, onUpdate, onSubmitStudentHomewo
   const account = accounts.find((a) => normalize(a.name) === normalize(user.name))
   const allowed =
     found !== undefined &&
-    (user.role === 'teacher' || hasSubject(account?.subjects, found.subject))
+    (user.role === 'teacher' || lessonForSubjects(account?.subjects, found))
   const assignment = allowed ? found : undefined
 
   if (!assignment) {

@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from .media import signed_url
-from .models import MAX_LATEX_LENGTH, MAX_TOTAL_LATEX_LENGTH, Account, AnswerComment, Assignment, Call, LessonFile, Homework, HomeworkFile, Payment, StudentHomework, StudentHomeworkFile, TypingResult
+from .models import MAX_LATEX_LENGTH, MAX_TOTAL_LATEX_LENGTH, Account, AnswerComment, Assignment, Call, Subject, LessonFile, Homework, HomeworkFile, Payment, StudentHomework, StudentHomeworkFile, TypingResult
 
 MIN_PASSWORD_LENGTH = 8
 
@@ -210,13 +210,37 @@ class AssignmentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Assignment
         fields = [
-            'id', 'title', 'subject', 'deadline',
+            'id', 'title', 'subject', 'extra_subjects', 'deadline',
             'recording_url', 'description', 'numbered_tasks', 'tasks_latex', 'files', 'homework',
             'student_homeworks', 'created_at', 'updated_at'
         ]
 
     def validate_numbered_tasks(self, value):
         return clean_numbered_tasks(value)
+
+    def validate_extra_subjects(self, value):
+        """Список названий без пустых и повторов (без учёта регистра)"""
+        if value in (None, ''):
+            return []
+        if not isinstance(value, list) or len(value) > 20 or not all(isinstance(s, str) for s in value):
+            raise serializers.ValidationError('Ожидается список предметов')
+        result, seen = [], set()
+        for name in value:
+            name = ' '.join(name.split())
+            if len(name) > 100:
+                raise serializers.ValidationError('Название предмета — до 100 знаков')
+            if name and name.casefold() not in seen:
+                seen.add(name.casefold())
+                result.append(name)
+        return result
+
+    def validate(self, attrs):
+        # Основной предмет в дополнительных не повторяем
+        subject = attrs.get('subject', getattr(self.instance, 'subject', ''))
+        extra = attrs.get('extra_subjects', getattr(self.instance, 'extra_subjects', None) or [])
+        if 'extra_subjects' in attrs or 'subject' in attrs:
+            attrs['extra_subjects'] = [s for s in extra if s.casefold() != subject.strip().casefold()]
+        return attrs
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
@@ -297,6 +321,19 @@ class TypingResultSerializer(serializers.ModelSerializer):
         total_words = data['correct_words'] + data['errors']
         data['accuracy'] = round(data['correct_words'] / total_words * 100, 1) if total_words else 0
         return data
+
+
+class SubjectSerializer(serializers.ModelSerializer):
+    """Предмет в списках выбора"""
+    class Meta:
+        model = Subject
+        fields = ['id', 'name']
+
+    def validate_name(self, value):
+        value = ' '.join(value.split())
+        if not value:
+            raise serializers.ValidationError('Введите название предмета')
+        return value
 
 
 class CallSerializer(serializers.ModelSerializer):
