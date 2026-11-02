@@ -13,7 +13,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.views import APIView
-from .models import MAX_LATEX_LENGTH, Account, AnswerComment, Assignment, AuthToken, Call, LessonFile, Subject, Homework, HomeworkFile, Payment, StudentHomework, StudentHomeworkFile, TypingResult
+from .models import MAX_LATEX_LENGTH, Account, AnswerComment, Assignment, AuthToken, Call, CallAnswer, CallAnswerFile, DataVersion, LessonFile, Subject, Homework, HomeworkFile, Payment, StudentHomework, StudentHomeworkFile, TypingResult
 from . import livekit
 from .permissions import IsStudent, IsTeacher
 from .photo_latex import PhotoLatexError, photo_to_latex
@@ -21,6 +21,7 @@ from .uploads import check_student_quota, check_uploads
 from .serializers import (
     AccountSerializer,
     AssignmentSerializer,
+    CallAnswerSerializer,
     CallSerializer,
     LessonFileSerializer,
     HomeworkSerializer,
@@ -695,6 +696,9 @@ class CallViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retriev
     POST /calls/{id}/join/ — токен LiveKit для входа в комнату.
     POST /calls/{id}/end/ — учитель завершает созвон для всех.
     POST /calls/{id}/show/ — учитель выбирает урок и задание, которое видят ученики {assignment, task}.
+    GET /calls/{id}/answers/ — ответы на уроке к открытому уроку: учителю всех, ученику свои.
+    POST /calls/{id}/answer/ — ученик сохраняет ответ к заданию {task, text, files, delete_file_ids}.
+    Ответы на уроке хранятся отдельно от работы по уроку: в ДЗ не идут и проверки не ждут.
     """
     serializer_class = CallSerializer
     pagination_class = None
@@ -702,6 +706,8 @@ class CallViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retriev
     def get_permissions(self):
         if self.action in ('create', 'end', 'show'):
             return [IsTeacher()]
+        if self.action == 'answer':
+            return [IsStudent()]
         return [IsAuthenticated()]
 
     def get_queryset(self):
@@ -773,3 +779,69 @@ class CallViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retriev
         call.shown_task = task
         call.save(update_fields=['assignment', 'shown_task'])
         return Response(CallSerializer(call).data)
+
+    def _call_answers(self, call, user):
+        queryset = CallAnswer.objects.select_related('student').prefetch_related('files').filter(
+            call=call, assignment=call.assignment_id,
+        )
+        return queryset if user.is_teacher else queryset.filter(student=user)
+
+    @action(detail=True, methods=['get'])
+    def answers(self, request, pk=None):
+        call = self.get_object()
+        if call.assignment_id is None:
+            return Response([])
+        data = CallAnswerSerializer(self._call_answers(call, request.user), many=True, context={'request': request}).data
+        return Response(data)
+
+    @action(detail=True, methods=['post'])
+    @transaction.atomic
+    def answer(self, request, pk=None):
+        call = self.get_object()  # чужой созвон → 404
+        assignment = call.assignment
+        if assignment is None:
+            raise ValidationError({'task': ['Учитель не открыл урок в созвоне']})
+        task = str(request.data.get('task', ''))
+        if task not in _task_keys(assignment):
+            raise ValidationError({'task': ['Такого задания нет в уроке']})
+        text = str(request.data.get('text', '')).strip()
+        if len(text) > MAX_TASK_ANSWER_TEXT:
+            raise ValidationError({'text': [f'Ответ длиннее {MAX_TASK_ANSWER_TEXT} знаков']})
+        files = request.FILES.getlist('files')
+
+        raw_ids = _parse_json(request.data.get('delete_file_ids'))
+        delete_ids = list(
+            CallAnswerFile.objects.filter(
+                id__in=[i for i in raw_ids if str(i).isdigit()] if isinstance(raw_ids, list) else [],
+                answer__call=call,
+                answer__assignment=assignment,
+                answer__student=request.user,
+                answer__task=task,
+            ).values_list('id', flat=True)
+        )
+        check_uploads(files)
+        check_student_quota(request.user, files, deleted_call_ids=delete_ids)
+
+        answer, _ = CallAnswer.objects.select_for_update().get_or_create(
+            call=call, assignment=assignment, student=request.user, task=task,
+        )
+        answer.text = text
+        answer.save(update_fields=['text', 'updated_at'])
+        CallAnswerFile.objects.filter(id__in=delete_ids).delete()
+        for f in files:
+            CallAnswerFile.objects.create(answer=answer, name=f.name, file=f)
+
+        # Стёр всё — пустой ответ не храним
+        if not text and not answer.files.exists():
+            answer.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        answer = self._call_answers(call, request.user).get(pk=answer.pk)
+        return Response(CallAnswerSerializer(answer, context={'request': request}).data)
+
+
+class UpdatesView(APIView):
+    """GET /api/updates/ — номер версии данных. Сменился — пора перезагрузить уроки и ответы"""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        return Response({'version': DataVersion.current()})

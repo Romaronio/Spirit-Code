@@ -1,4 +1,4 @@
-import type { Account, AnswerComment, Assignment, Call, Subject, CallJoin, NewCall, LessonFile, Homework, HomeworkFile, NewAssignment, NumberedTask, Payment, TaskFileChanges, PhotoLatexResult, ReviewStatus, StudentHomework, TypingModeSummary, TypingResult, TypingStats, TypingSummary } from "../types";
+import type { Account, AnswerComment, Assignment, Call, CallAnswer, Subject, CallJoin, NewCall, LessonFile, Homework, HomeworkFile, NewAssignment, NumberedTask, Payment, TaskFileChanges, PhotoLatexResult, ReviewStatus, StudentHomework, TypingModeSummary, TypingResult, TypingStats, TypingSummary } from "../types";
 import { clearSession, loadToken } from "../utils/session";
 
 // Адрес API. По умолчанию относительный путь: и локально (через прокси Vite),
@@ -464,6 +464,11 @@ export async function joinCall(id: number): Promise<CallJoin> {
   return fetchAPI<CallJoin>(`/calls/${id}/join/`, { method: 'POST' });
 }
 
+// Номер версии данных: сменился — пора перезагрузить уроки и ответы
+export async function getUpdatesVersion(): Promise<number> {
+  return (await fetchAPI<{ version: number }>('/updates/')).version;
+}
+
 export async function getCall(id: number): Promise<Call> {
   return fetchAPI<Call>(`/calls/${id}/`);
 }
@@ -474,6 +479,25 @@ export async function showCallTask(id: number, data: { assignment: number | null
     method: 'POST',
     body: JSON.stringify(data),
   });
+}
+
+// Ответы на уроке в созвоне: учителю — всех учеников, ученику — свои. В ДЗ не идут
+export async function getCallAnswers(id: number): Promise<CallAnswer[]> {
+  return fetchAPI<CallAnswer[]>(`/calls/${id}/answers/`);
+}
+
+export async function saveCallAnswer(
+  id: number,
+  data: { task: string; text: string; files?: File[]; deleteFileIds?: Array<number | string> }
+): Promise<CallAnswer | undefined> {
+  const formData = new FormData();
+  formData.append('task', data.task);
+  formData.append('text', data.text);
+  if (data.deleteFileIds) {
+    formData.append('delete_file_ids', JSON.stringify(data.deleteFileIds));
+  }
+  data.files?.forEach((file) => formData.append('files', file));
+  return fetchAPIFormData<CallAnswer | undefined>(`/calls/${id}/answer/`, formData, 'POST');
 }
 
 export async function endCall(id: number): Promise<void> {

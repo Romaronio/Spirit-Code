@@ -1024,6 +1024,22 @@ class PhotoLatexTests(AuthTestCase):
         self.assertIn('ключа GigaChat', response.data['error'])
 
 
+class UpdatesTests(AuthTestCase):
+    def test_version_grows_on_answer(self):
+        self.login_as(self.anna)
+        self.assertEqual(self.client.get('/api/updates/').status_code, 200)
+        before = self.client.get('/api/updates/').data['version']
+        self.bio.numbered_tasks = [{'number': 1, 'latex': 'x'}]
+        self.bio.save()
+        after_lesson = self.client.get('/api/updates/').data['version']
+        self.assertGreater(after_lesson, before)
+        self.client.post(f'/api/assignments/{self.bio.id}/submit-task/', {'task': 'cw-1', 'text': '5'}, format='json')
+        self.assertGreater(self.client.get('/api/updates/').data['version'], after_lesson)
+
+    def test_needs_login(self):
+        self.assertEqual(self.client.get('/api/updates/').status_code, 401)
+
+
 @override_settings(LIVEKIT_API_KEY='testkey', LIVEKIT_API_SECRET='testsecret', LIVEKIT_URL='', LIVEKIT_API_HOST='', CALLS_STUDENTS=['*'])
 class CallTests(AuthTestCase):
     def start_call(self, subject='Биология'):
@@ -1088,6 +1104,45 @@ class CallTests(AuthTestCase):
         # Урок удалили — созвон остаётся, просто без урока
         self.bio.delete()
         self.assertIsNone(Call.objects.get(id=call_id).assignment)
+
+    def test_join_token_marks_teacher(self):
+        call_id = self.start_call()
+        payload = self.client.post(f'/api/calls/{call_id}/join/').data['token'].split('.')[1]
+        claims = json.loads(base64.urlsafe_b64decode(payload + '=' * (-len(payload) % 4)))
+        self.assertEqual(claims['metadata'], 'teacher')
+
+    def test_call_answers_are_not_homework(self):
+        self.bio.numbered_tasks = [{'number': 3, 'latex': 'x'}]
+        self.bio.save()
+        self.login_as(self.teacher)
+        call_id = self.client.post('/api/calls/', {'subject': 'Биология', 'assignment': self.bio.id}, format='json').data['id']
+        url = f'/api/calls/{call_id}/answer/'
+        self.assertEqual(self.client.post(url, {'task': 'cw-3', 'text': 'x'}, format='json').status_code, 403)
+
+        self.login_as(self.anna)
+        response = self.client.post(url, {'task': 'cw-3', 'text': ' 42 '}, format='json')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['text'], '42')
+        self.assertEqual(self.client.post(url, {'task': 'cw-9', 'text': '1'}, format='json').status_code, 400)
+        # В ДЗ ответ на уроке не попал — проверять нечего
+        self.assertFalse(StudentHomework.objects.filter(student=self.anna).exists())
+        self.assertEqual([a['text'] for a in self.client.get(f'/api/calls/{call_id}/answers/').data], ['42'])
+
+        self.login_as(self.teacher)
+        answers = self.client.get(f'/api/calls/{call_id}/answers/').data
+        self.assertEqual([(a['student_name'], a['task'], a['text']) for a in answers], [('anna', 'cw-3', '42')])
+
+        # Стёр ответ — он удалён
+        self.login_as(self.anna)
+        self.assertEqual(self.client.post(url, {'task': 'cw-3', 'text': ''}, format='json').status_code, 204)
+        self.assertEqual(self.client.get(f'/api/calls/{call_id}/answers/').data, [])
+
+    def test_call_answer_needs_lesson_and_access(self):
+        call_id = self.start_call()
+        self.login_as(self.anna)
+        self.assertEqual(self.client.post(f'/api/calls/{call_id}/answer/', {'task': 'cw-1', 'text': '1'}, format='json').status_code, 400)
+        self.login_as(self.ivan)  # не его предмет — созвона для него нет
+        self.assertEqual(self.client.post(f'/api/calls/{call_id}/answer/', {'task': 'cw-1', 'text': '1'}, format='json').status_code, 404)
 
     def test_old_call_is_hidden(self):
         call_id = self.start_call()

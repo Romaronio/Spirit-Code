@@ -59,14 +59,18 @@ def stored_size(field_file):
         return 0
 
 
-def check_student_quota(student, new_files, deleted_ids=()):
+def check_student_quota(student, new_files, deleted_ids=(), deleted_call_ids=()):
     """Не даёт ученику занять больше STUDENT_STORAGE_QUOTA"""
-    from .models import StudentHomeworkFile
+    from .models import CallAnswerFile, StudentHomeworkFile
 
+    # deleted_ids — файлы ответа к заданию урока; deleted_call_ids — файлы ответа на уроке в созвоне
     used = sum(
         stored_size(f.file)
         for f in StudentHomeworkFile.objects.filter(student_homework__student=student)
         .exclude(id__in=deleted_ids)
+    ) + sum(
+        stored_size(f.file)
+        for f in CallAnswerFile.objects.filter(answer__student=student).exclude(id__in=deleted_call_ids)
     )
     total = used + sum(f.size for f in new_files)
     quota = settings.STUDENT_STORAGE_QUOTA

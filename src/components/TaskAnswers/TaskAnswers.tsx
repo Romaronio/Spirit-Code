@@ -9,8 +9,9 @@ import type { StudentHomework } from '../../types'
 // Ключ задания как в StudentHomework.task_answers: 'cw-5', 'hw-3', 'classwork', 'homework'
 
 // Ответ ученика к одному заданию: текст и файлы
-export function TaskAnswerContent({ answer, taskKey }: { answer: StudentHomework; taskKey: string }) {
-  const text = answer.task_answers?.[taskKey]
+// liveText — то, что ученик печатает прямо сейчас (в созвоне), вместо сохранённого текста
+export function TaskAnswerContent({ answer, taskKey, liveText }: { answer: StudentHomework; taskKey: string; liveText?: string }) {
+  const text = liveText ?? answer.task_answers?.[taskKey]
   const files = (answer.files ?? []).filter((f) => f.task_key === taskKey)
   return (
     <>
@@ -30,20 +31,55 @@ export function TaskAnswerContent({ answer, taskKey }: { answer: StudentHomework
   )
 }
 
-// Учителю под заданием — ответы всех учеников к нему
-export function TaskAnswersList({ answers, taskKey }: { answers: StudentHomework[]; taskKey: string }) {
-  const answered = answers.filter((sh) => hasTaskAnswer(sh, taskKey))
+// Набираемый учеником ответ, ещё не сохранённый
+export interface LiveAnswer {
+  student: number
+  name: string
+  text: string
+}
+
+function Typing() {
+  return <span className={styles.typing}>✎ печатает…</span>
+}
+
+// Учителю под заданием — ответы всех учеников к нему; live — что ученики печатают сейчас (в созвоне)
+// showStatus: false — ответы на уроке в созвоне, их не проверяют
+export function TaskAnswersList({
+  answers,
+  taskKey,
+  live = [],
+  showStatus = true,
+}: {
+  answers: StudentHomework[]
+  taskKey: string
+  live?: LiveAnswer[]
+  showStatus?: boolean
+}) {
+  const liveBy = new Map(live.map((l) => [l.student, l]))
+  const answered = answers.filter((sh) => hasTaskAnswer(sh, taskKey) || (sh.student != null && liveBy.has(sh.student)))
+  const onlyLive = live.filter((l) => !answers.some((sh) => sh.student === l.student))
   return (
     <section className={styles.taskAnswerBox}>
       <h3>Ответы учеников</h3>
-      {answered.length > 0 ? (
+      {answered.length + onlyLive.length > 0 ? (
         <ul className={styles.studentHomeworks}>
-          {answered.map((sh) => (
-            <li key={sh.id} className={styles.studentHomeworkCard}>
+          {answered.map((sh) => {
+            const typing = sh.student != null ? liveBy.get(sh.student) : undefined
+            return (
+              <li key={sh.id} className={styles.studentHomeworkCard}>
+                <span className={styles.studentName}>
+                  {sh.student_name} {typing ? <Typing /> : showStatus && <StatusBadge status={sh.status} />}
+                </span>
+                <TaskAnswerContent answer={sh} taskKey={taskKey} liveText={typing?.text} />
+              </li>
+            )
+          })}
+          {onlyLive.map((l) => (
+            <li key={`live-${l.student}`} className={styles.studentHomeworkCard}>
               <span className={styles.studentName}>
-                {sh.student_name} <StatusBadge status={sh.status} />
+                {l.name} <Typing />
               </span>
-              <TaskAnswerContent answer={sh} taskKey={taskKey} />
+              {l.text && <p className={styles.answerText}>{l.text}</p>}
             </li>
           ))}
         </ul>
@@ -58,6 +94,8 @@ interface TaskAnswerFormProps {
   answer?: StudentHomework
   taskKey: string
   onSave: (task: string, text: string, files: File[], deleteFileIds: Array<number | string>) => Promise<void>
+  // Текст по мере набора, ещё до сохранения (в созвоне — учителю вживую)
+  onDraft?: (task: string, text: string) => void
 }
 
 // Пауза после ввода, после которой ответ сохраняется сам
@@ -67,7 +105,7 @@ type SaveState = 'idle' | 'saving' | 'saved' | 'error'
 
 // Ученику под заданием — ответ к этому заданию: текст и файлы.
 // Кнопки «Сохранить» нет: текст сохраняется после паузы в вводе, файлы — сразу
-export function TaskAnswerForm({ answer, taskKey, onSave }: TaskAnswerFormProps) {
+export function TaskAnswerForm({ answer, taskKey, onSave, onDraft }: TaskAnswerFormProps) {
   const [text, setText] = useState(answer?.task_answers?.[taskKey] ?? '')
   const [uploading, setUploading] = useState<FileEntry[]>([])
   const [deletedIds, setDeletedIds] = useState<Array<number | string>>([])
@@ -126,6 +164,7 @@ export function TaskAnswerForm({ answer, taskKey, onSave }: TaskAnswerFormProps)
   function handleTextChange(value: string) {
     textRef.current = value
     setText(value)
+    onDraft?.(taskKey, value)
   }
 
   async function handleFilesChange(e: React.ChangeEvent<HTMLInputElement>) {

@@ -1,8 +1,8 @@
 from rest_framework import serializers
 from .media import signed_url
-from .models import MAX_LATEX_LENGTH, MAX_TOTAL_LATEX_LENGTH, Account, AnswerComment, Assignment, Call, Subject, LessonFile, Homework, HomeworkFile, Payment, StudentHomework, StudentHomeworkFile, TypingResult
+from .models import MAX_LATEX_LENGTH, MAX_TOTAL_LATEX_LENGTH, Account, AnswerComment, Assignment, Call, CallAnswer, CallAnswerFile, Subject, LessonFile, Homework, HomeworkFile, Payment, StudentHomework, StudentHomeworkFile, TypingResult
 
-MIN_PASSWORD_LENGTH = 8
+MIN_PASSWORD_LENGTH = 5
 
 
 class AccountSerializer(serializers.ModelSerializer):
@@ -366,3 +366,24 @@ class CallSerializer(serializers.ModelSerializer):
         if attrs.get('student'):
             attrs['subject'] = ''  # личный урок — предмет не нужен
         return attrs
+
+
+class CallAnswerFileSerializer(serializers.ModelSerializer):
+    url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = CallAnswerFile
+        fields = ['id', 'name', 'url', 'created_at']
+
+    def get_url(self, obj):
+        return signed_url(self.context.get('request'), obj.file) if obj.file else None
+
+
+class CallAnswerSerializer(serializers.ModelSerializer):
+    """Ответ ученика на уроке в созвоне — не ДЗ, без статуса проверки"""
+    student_name = serializers.CharField(source='student.name', read_only=True)
+    files = CallAnswerFileSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = CallAnswer
+        fields = ['id', 'assignment', 'student', 'student_name', 'task', 'text', 'files', 'updated_at']

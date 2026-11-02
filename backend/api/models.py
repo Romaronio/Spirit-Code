@@ -411,3 +411,59 @@ class Call(models.Model):
     @property
     def room_name(self):
         return f'spirit-call-{self.id}'
+
+
+class CallAnswer(models.Model):
+    """Ответ ученика к заданию прямо на уроке в созвоне.
+
+    Хранится отдельно от работы ученика по уроку (StudentHomework): в ДЗ не идёт
+    и проверки учителя не ждёт. Видят его сам ученик и учитель.
+    """
+    call = models.ForeignKey(Call, on_delete=models.CASCADE, related_name='answers')
+    assignment = models.ForeignKey(Assignment, on_delete=models.CASCADE, related_name='call_answers')
+    student = models.ForeignKey(Account, on_delete=models.CASCADE, related_name='call_answers')
+    task = models.CharField(max_length=20)  # ключ как в StudentHomework.task_answers
+    text = models.TextField(blank=True, default='')
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['updated_at']
+        constraints = [
+            models.UniqueConstraint(fields=['call', 'assignment', 'student', 'task'], name='unique_call_answer'),
+        ]
+
+    def __str__(self):
+        return f"Ответ на уроке {self.student.name} · {self.task}"
+
+
+class CallAnswerFile(models.Model):
+    """Файл к ответу на уроке"""
+    answer = models.ForeignKey(CallAnswer, on_delete=models.CASCADE, related_name='files')
+    name = models.CharField(max_length=255)
+    file = models.FileField(upload_to='call_answer_files/', null=True, blank=True, validators=[validate_upload])
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+
+class DataVersion(models.Model):
+    """Номер версии данных: растёт при любом изменении уроков, ДЗ, ответов, переписки и учеников.
+
+    Страницы раз в несколько секунд спрашивают только этот номер (GET /api/updates/) и
+    перезагружают данные, когда он сменился, — так новое видно без обновления страницы.
+    Одна строка в БД, а не кэш: у gunicorn несколько процессов, кэш в памяти у каждого свой.
+    """
+    value = models.PositiveBigIntegerField(default=0)
+
+    @classmethod
+    def bump(cls):
+        if not cls.objects.filter(pk=1).update(value=models.F('value') + 1):
+            cls.objects.get_or_create(pk=1, defaults={'value': 1})
+
+    @classmethod
+    def current(cls):
+        return cls.objects.filter(pk=1).values_list('value', flat=True).first() or 0

@@ -292,3 +292,24 @@
 .attachments a {
   color: var(--text);
 }
+
+/* Учитель ведёт учеников: открытое задание сразу у всех */
+.follow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+/* Сколько учеников ответили на задание */
+.chipCount {
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--success);
+  color: #fff;
+  font-size: 12px;
+  line-height: 18px;
+  text-align: center;
+}

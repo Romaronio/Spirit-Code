@@ -119,3 +119,17 @@
   line-height: 1.5;
   margin: 6px 0;
 }
+
+/* Ученик печатает ответ прямо сейчас (в созвоне) */
+.typing {
+  color: var(--accent-text);
+  font-size: 13px;
+  font-weight: 500;
+  animation: typingPulse 1.4s ease-in-out infinite;
+}
+
+@keyframes typingPulse {
+  50% {
+    opacity: 0.45;
+  }
+}

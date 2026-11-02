@@ -10,6 +10,9 @@ import type { Account, AnswerComment, Assignment, AssignmentChanges, CommentActi
 import * as api from './services/api'
 import { clearSession, loadUser } from './utils/session'
 
+// Как часто спрашиваем сервер, не изменилось ли что-то (крошечный запрос — только номер версии)
+const UPDATES_POLL_MS = 4000
+
 // Страница созвона тянет LiveKit (сотни КБ) — грузим её, только когда открывают урок
 const CallPage = lazy(() => import('./pages/CallPage/CallPage'))
 
@@ -49,6 +52,52 @@ function App() {
 
     return () => {
       cancelled = true
+    }
+  }, [user])
+
+  // Новые уроки, ответы и сообщения приходят сами, без обновления страницы:
+  // раз в несколько секунд сверяем номер версии данных и, если он сменился, перезагружаем
+  useEffect(() => {
+    if (!user) return
+    let cancelled = false
+    let busy = false
+    let known: number | null = null
+
+    async function check() {
+      if (busy || document.hidden) return
+      busy = true
+      try {
+        const version = await api.getUpdatesVersion()
+        if (cancelled) return
+        if (known !== null && version !== known) {
+          const [accountsData, assignmentsData, subjectsData] = await Promise.all([
+            user!.role === 'teacher' ? api.getAllAccounts() : api.getMe().then((me) => [me]),
+            api.getAllAssignments(),
+            user!.role === 'teacher' ? api.getSubjects() : Promise.resolve([]),
+          ])
+          if (cancelled) return
+          setAccounts(accountsData)
+          setItems(assignmentsData)
+          setSubjects(subjectsData)
+        }
+        known = version
+      } catch {
+        // нет сети или сервер перезапускается — проверим в следующий раз
+      } finally {
+        busy = false
+      }
+    }
+
+    void check()
+    const timer = window.setInterval(check, UPDATES_POLL_MS)
+    const onVisible = () => void check() // вернулись на вкладку — сразу проверяем
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('focus', onVisible)
+    return () => {
+      cancelled = true
+      window.clearInterval(timer)
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('focus', onVisible)
     }
   }, [user])
 

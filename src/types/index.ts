@@ -213,6 +213,18 @@ export interface Call {
   ended_at: string | null
 }
 
+// Ответ ученика к заданию на уроке в созвоне — хранится отдельно от ДЗ и проверки не ждёт
+export interface CallAnswer {
+  id: number
+  assignment: number
+  student: number
+  student_name: string
+  task: string
+  text: string
+  files: Array<{ id: number; name: string; url: string | null }>
+  updated_at: string
+}
+
 export type NewCall = Pick<Call, 'title' | 'subject' | 'student' | 'assignment'>
 
 // Пропуск в комнату: токен LiveKit и адрес сервера (пусто — этот же сайт, путь /livekit)

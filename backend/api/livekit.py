@@ -46,6 +46,9 @@ def make_token(*, identity: str, name: str, room: str, is_admin: bool) -> str:
         'iss': settings.LIVEKIT_API_KEY,
         'sub': identity,
         'name': name,
+        # Метка учителя: по ней ученики шлют черновики ответов только ему.
+        # Свои метаданные участник менять не может (canUpdateOwnMetadata по умолчанию выключено)
+        'metadata': 'teacher' if is_admin else '',
         'nbf': now - 10,
         'exp': now + TOKEN_TTL_SECONDS,
         'video': {
