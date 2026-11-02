@@ -38,6 +38,14 @@ const MIME_TYPES = [
   'video/webm',
 ]
 
+// Экран урока — это в основном текст и код: нужен битрейт повыше, иначе буквы мылятся
+const VIDEO_BITS_PER_SECOND = 5_000_000
+const AUDIO_BITS_PER_SECOND = 128_000
+// Chrome сам ставит опорный кадр только в начале записи — без них перемотка показывает
+// серую «размазню» из полос. Просим опорный кадр каждые 2 с (Chrome/Edge; другие браузеры
+// незнакомое поле просто пропускают)
+const KEY_FRAME_INTERVAL_MS = 2000
+
 function pickMimeType() {
   return MIME_TYPES.find((type) => MediaRecorder.isTypeSupported(type)) ?? ''
 }
@@ -280,6 +288,10 @@ function RecordButton({ fileName, onError }: Props) {
       return false
     }
 
+    // На экране текст — браузеру важнее чёткость, чем плавность
+    const screenTrack = display.getVideoTracks()[0]
+    if (screenTrack) screenTrack.contentHint = 'detail'
+
     const audio = new AudioContext()
     const output = audio.createMediaStreamDestination()
     const stream = new MediaStream([...display.getVideoTracks(), ...output.stream.getAudioTracks()])
@@ -292,7 +304,13 @@ function RecordButton({ fileName, onError }: Props) {
     let recorder: MediaRecorder
     let out: Output
     try {
-      recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined)
+      const options: MediaRecorderOptions & { videoKeyFrameIntervalDuration?: number } = {
+        videoBitsPerSecond: VIDEO_BITS_PER_SECOND,
+        audioBitsPerSecond: AUDIO_BITS_PER_SECOND,
+        videoKeyFrameIntervalDuration: KEY_FRAME_INTERVAL_MS,
+      }
+      if (mimeType) options.mimeType = mimeType
+      recorder = new MediaRecorder(stream, options)
       const type = recorder.mimeType || mimeType || 'video/webm'
       const name = safeName(`${fileName} ${timestamp()}`) + (type.startsWith('video/mp4') ? '.mp4' : '.webm')
       out = target ? await folderOutput(target, name, onError) : downloadOutput(name, type)
