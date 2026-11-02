@@ -155,21 +155,6 @@ function AnswersPanel({ items, accounts, onReview, activeAnswerId, onOpenChat, r
                   </ul>
                 )}
 
-                {notSubmitted.length > 0 && (
-                  <div className={styles.pending}>
-                    <p className={styles.label}>Ещё не прислано:</p>
-                    <ul className={styles.pendingList}>
-                      {notSubmitted.map((a) => (
-                        <li key={a.id}>
-                          <Link to={`/assignment/${a.id}`} className={styles.link}>
-                            {a.title}
-                          </Link>
-                          {a.deadline && <span className={styles.date}> · до {a.deadline}</span>}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
               </>
             )}
           </>

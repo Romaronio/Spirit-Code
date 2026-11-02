@@ -117,11 +117,6 @@ function LessonsPage({ user, items, subjects, onUpdate, onAddSubject }: Props) {
         ← На главную
       </Link>
       <h1 className={styles.title}>База уроков</h1>
-      <p className={styles.subtitle}>
-        Все уроки по предметам. Перетащите урок мышкой в другой предмет или выберите предмет в списке у урока.
-        Из Математики, Информатики и Русского языка урок добавляется в новый предмет и остаётся на месте,
-        из остальных — переносится. Урок видят ученики, у которых есть любой из его предметов.
-      </p>
 
       <div className={styles.toolbar}>
         <input

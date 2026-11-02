@@ -23,13 +23,7 @@
 }
 
 .title {
-  margin-bottom: 4px;
-}
-
-.subtitle {
-  max-width: 820px;
   margin-bottom: 20px;
-  color: var(--muted);
 }
 
 .toolbar {
