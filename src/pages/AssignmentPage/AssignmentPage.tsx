@@ -10,6 +10,7 @@ import { TaskAnswerContent, TaskAnswerForm, TaskAnswersList } from '../../compon
 import { answerKeyTitle, hasTaskAnswer } from '../../utils/lessonTasks'
 import { ACCEPT, EMPTY_TASK_FILES, pickFiles, taskFileChanges, type FileEntry, type TaskFilesDraft } from '../../utils/uploads'
 import { taskNumberTitle } from '../../utils/taskNumbers'
+import { normalizeRecordingUrl, vkEmbedUrl } from '../../utils/vkVideo'
 import LatexEditor from '../../components/LatexEditor/LatexEditor'
 import NumberedTasksEditor from '../../components/NumberedTasksEditor/NumberedTasksEditor'
 import TasksViewer from '../../components/TasksViewer/TasksViewer'
@@ -310,10 +311,14 @@ function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStud
                 <input
                   className={styles.input}
                   type="url"
-                  placeholder="https://..."
+                  placeholder="https://vkvideo.ru/video-… или код для вставки"
                   value={recordingUrl}
-                  onChange={(e) => setRecordingUrl(e.target.value)}
+                  onChange={(e) => setRecordingUrl(normalizeRecordingUrl(e.target.value))}
                 />
+                <span className={styles.hint}>
+                  Видео VK покажется прямо в уроке. Если видео с доступом «по ссылке» не
+                  показывается — вставь сюда «Поделиться → Код для вставки».
+                </span>
               </label>
 
               <label className={styles.label}>
@@ -403,7 +408,27 @@ function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStud
 
               <section className={styles.section}>
                 <h2>Запись урока</h2>
-                {assignment.recording_url ? (
+                {assignment.recording_url && vkEmbedUrl(assignment.recording_url) ? (
+                  <>
+                    <div className={styles.player}>
+                      <iframe
+                        src={vkEmbedUrl(assignment.recording_url)!}
+                        title="Запись урока"
+                        allow="autoplay; encrypted-media; fullscreen; picture-in-picture; screen-wake-lock"
+                        allowFullScreen
+                        referrerPolicy="strict-origin-when-cross-origin"
+                      />
+                    </div>
+                    <a
+                      className={styles.link}
+                      href={assignment.recording_url}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Открыть в VK Видео
+                    </a>
+                  </>
+                ) : assignment.recording_url ? (
                   <a
                     className={styles.link}
                     href={assignment.recording_url}

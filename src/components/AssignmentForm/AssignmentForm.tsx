@@ -4,6 +4,7 @@ import { EMPTY_TASK_FILES, taskFileChanges, type TaskFilesDraft } from '../../ut
 import NumberedTasksEditor from '../NumberedTasksEditor/NumberedTasksEditor'
 import { normalize } from '../../utils/subjects'
 import type { NewAssignment, NumberedTask, Subject } from '../../types'
+import { normalizeRecordingUrl } from '../../utils/vkVideo'
 
 interface AssignmentFormProps {
   onAdd: (data: NewAssignment) => Promise<void> | void
@@ -185,9 +186,9 @@ function AssignmentForm({ onAdd, subjects, onDeleteSubject }: AssignmentFormProp
             Ссылка на запись урока
             <input
               type="url"
-              placeholder="https://..."
+              placeholder="https://vkvideo.ru/video-… или код для вставки"
               value={recordingUrl}
-              onChange={(e) => setRecordingUrl(e.target.value)}
+              onChange={(e) => setRecordingUrl(normalizeRecordingUrl(e.target.value))}
             />
           </label>
 
