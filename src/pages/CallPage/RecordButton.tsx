@@ -3,6 +3,7 @@ import { useTracks } from '@livekit/components-react'
 import { Track } from 'livekit-client'
 import styles from './CallPage.module.css'
 import { canPickFolder, ensureWriteAccess, loadFolder, pickFolder, type FolderHandle } from '../../utils/recordFolder'
+import { createRecorder } from './recorders'
 
 interface Props {
   // Начало имени файла записи, например «Урок · Биология»
@@ -18,36 +19,12 @@ interface Output {
 }
 
 interface Recording {
-  recorder: MediaRecorder
+  // Останавливает запись и сохраняет файл; повторный вызов ничего не делает
+  stop: () => void
   audio: AudioContext
   output: MediaStreamAudioDestinationNode
   // Звуковые дорожки созвона, подключённые к записи
   sources: Map<MediaStreamTrack, MediaStreamAudioSourceNode>
-}
-
-// Первый формат, который умеет браузер. MP4 (H.264) — в первую очередь: webm из браузера без длительности,
-// и «Медиаплеер» Windows показывает в нём застывшую картинку при живом звуке. Chrome/Edge пишут mp4
-// с версии 126, Safari — всегда; Firefox умеет только webm.
-const MIME_TYPES = [
-  'video/mp4;codecs=avc1.640028,mp4a.40.2',
-  'video/mp4;codecs=avc1.42E01F,mp4a.40.2',
-  'video/mp4;codecs=avc1,opus',
-  'video/mp4',
-  'video/webm;codecs=vp9,opus',
-  'video/webm;codecs=vp8,opus',
-  'video/webm',
-]
-
-// Экран урока — это в основном текст и код: нужен битрейт повыше, иначе буквы мылятся
-const VIDEO_BITS_PER_SECOND = 5_000_000
-const AUDIO_BITS_PER_SECOND = 128_000
-// Chrome сам ставит опорный кадр только в начале записи — без них перемотка показывает
-// серую «размазню» из полос. Просим опорный кадр каждые 2 с (Chrome/Edge; другие браузеры
-// незнакомое поле просто пропускают)
-const KEY_FRAME_INTERVAL_MS = 2000
-
-function pickMimeType() {
-  return MIME_TYPES.find((type) => MediaRecorder.isTypeSupported(type)) ?? ''
 }
 
 function timestamp() {
@@ -204,8 +181,7 @@ function RecordButton({ fileName, onError }: Props) {
   // Вышли из урока во время записи — останавливаем и сохраняем
   useEffect(
     () => () => {
-      const rec = recordingRef.current
-      if (rec && rec.recorder.state !== 'inactive') rec.recorder.stop()
+      recordingRef.current?.stop()
     },
     [],
   )
@@ -226,8 +202,7 @@ function RecordButton({ fileName, onError }: Props) {
   }
 
   function stop() {
-    const rec = recordingRef.current
-    if (rec && rec.recorder.state !== 'inactive') rec.recorder.stop()
+    recordingRef.current?.stop()
   }
 
   async function changeFolder() {
@@ -290,56 +265,63 @@ function RecordButton({ fileName, onError }: Props) {
 
     // На экране текст — браузеру важнее чёткость, чем плавность
     const screenTrack = display.getVideoTracks()[0]
-    if (screenTrack) screenTrack.contentHint = 'detail'
+    screenTrack.contentHint = 'detail'
 
     const audio = new AudioContext()
     const output = audio.createMediaStreamDestination()
-    const stream = new MediaStream([...display.getVideoTracks(), ...output.stream.getAudioTracks()])
     const cleanup = () => {
       display.getTracks().forEach((t) => t.stop())
       void audio.close()
     }
 
-    const mimeType = pickMimeType()
-    let recorder: MediaRecorder
+    let finishing = false
+    // Запись сломалась посреди урока — сохраняем, что успело записаться
+    const fail = (err: unknown) => {
+      onError(`Запись прервалась: ${err instanceof Error ? err.message : err}. Записанное до этого сохранено.`)
+      finish()
+    }
+    let finish = () => {}
+
     let out: Output
+    let recorder: Awaited<ReturnType<typeof createRecorder>>
     try {
-      const options: MediaRecorderOptions & { videoKeyFrameIntervalDuration?: number } = {
-        videoBitsPerSecond: VIDEO_BITS_PER_SECOND,
-        audioBitsPerSecond: AUDIO_BITS_PER_SECOND,
-        videoKeyFrameIntervalDuration: KEY_FRAME_INTERVAL_MS,
-      }
-      if (mimeType) options.mimeType = mimeType
-      recorder = new MediaRecorder(stream, options)
-      const type = recorder.mimeType || mimeType || 'video/webm'
-      const name = safeName(`${fileName} ${timestamp()}`) + (type.startsWith('video/mp4') ? '.mp4' : '.webm')
-      out = target ? await folderOutput(target, name, onError) : downloadOutput(name, type)
+      recorder = await createRecorder(screenTrack, output.stream.getAudioTracks()[0], (err) => fail(err))
+      const name = safeName(`${fileName} ${timestamp()}`) + '.' + recorder.extension
+      out = target ? await folderOutput(target, name, onError) : downloadOutput(name, recorder.mimeType)
       if (target) setSavedTo(`Запись сохраняется в папку «${target.name}»: ${name}`)
+      await recorder.start((chunk) => out.write(chunk))
     } catch (err) {
       cleanup()
       onError(err instanceof Error ? `Не удалось начать запись: ${err.message}` : 'Не удалось начать запись')
       return false
     }
 
-    const rec: Recording = { recorder, audio, output, sources: new Map() }
-    recorder.ondataavailable = (event) => {
-      if (event.data.size > 0) out.write(event.data)
+    const rec: Recording = {
+      stop: () => finish(),
+      audio,
+      output,
+      sources: new Map(),
     }
-    recorder.onstop = () => {
-      rec.sources.forEach((source) => source.disconnect())
-      cleanup()
+    finish = () => {
+      if (finishing) return
+      finishing = true
       recordingRef.current = null
       setRecording(false)
-      void out.finish().then((saved) => {
-        setSavedTo(target && saved ? `Запись сохранена в папку «${target.name}»` : '')
-      })
+      void recorder
+        .stop()
+        .then(() => {
+          rec.sources.forEach((source) => source.disconnect())
+          cleanup()
+          return out.finish()
+        })
+        .then((saved) => {
+          setSavedTo(target && saved ? `Запись сохранена в папку «${target.name}»` : '')
+        })
     }
     // Нажали «Закрыть доступ» на панели браузера — запись тоже заканчивается
-    display.getVideoTracks()[0]?.addEventListener('ended', stop)
+    screenTrack.addEventListener('ended', () => finish())
 
     recordingRef.current = rec
-    // Куски раз в секунду: в папку они уходят по ходу урока, а не одним файлом в конце
-    recorder.start(1000)
     setSeconds(0)
     setRecording(true)
     return true
