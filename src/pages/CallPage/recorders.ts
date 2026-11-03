@@ -23,10 +23,33 @@ export interface LessonRecorder {
   mimeType: string
   // Чем пишет — для сообщений об ошибках и проверки
   kind: 'software' | 'mediarecorder'
-  // Куски файла приходят в write строго по порядку — их можно дописывать в конец файла
-  start: (write: (chunk: Blob) => void) => Promise<void>
+  // Куски файла приходят в write по порядку. position — куда положить кусок; нет — в конец файла.
+  // Назад запись возвращается только в самом конце: поправить размер данных в начале MP4
+  start: (write: (chunk: Blob, position?: number) => void) => Promise<void>
   // Останавливает запись и отдаёт хвост файла; после этого write больше не вызывается
   stop: () => Promise<void>
+}
+
+// Файл в памяти, куда можно писать и поверх уже записанного. Blob не копирует байты при склейке и нарезке
+export function memoryFile(type: string) {
+  let parts: Blob[] = []
+  let size = 0
+  return {
+    write(chunk: Blob, position = size) {
+      if (position === size) {
+        parts.push(chunk)
+      } else {
+        const whole = new Blob(parts)
+        const gap = new Blob([new ArrayBuffer(Math.max(0, position - size))])
+        parts = [whole.slice(0, position), gap, chunk, whole.slice(position + chunk.size)]
+      }
+      size = Math.max(size, position + chunk.size)
+    },
+    get size() {
+      return size
+    },
+    blob: () => new Blob(parts, { type }),
+  }
 }
 
 // Сначала программный кодировщик, не вышло — MediaRecorder. onFail — запись сломалась посреди урока.
@@ -157,22 +180,19 @@ async function softwareRecorder(
     mimeType: 'video/mp4',
     kind: 'software',
     start: async (write) => {
-      let written = 0
       const target = new mb.StreamTarget(
         new WritableStream({
           write(chunk) {
-            // Во фрагментированном MP4 всё пишется подряд — иначе дописывать в конец файла было бы нельзя
-            if (chunk.position !== written) throw new Error(`запись не по порядку: ${chunk.position} ≠ ${written}`)
-            written += chunk.data.byteLength
             // Blob копирует байты — mediabunny может переиспользовать свой буфер
-            write(new Blob([chunk.data]))
+            write(new Blob([chunk.data]), chunk.position)
           },
         }),
         // Куски по 2 МБ: меньше мелких записей на диск, а при сбое браузера теряется не больше пары секунд
         { chunked: true, chunkSize: 2 * 1024 * 1024 },
       )
-      // Фрагментированный MP4: файл годен для просмотра, даже если браузер закрылся посреди урока
-      output = new mb.Output({ format: new mb.Mp4OutputFormat({ fastStart: 'fragmented' }), target })
+      // Обычный MP4: оглавление кадров пишется в конец файла при остановке. Фрагментированный не годится:
+      // оглавления в нём нет, плеер долго открывает файл и не перематывает
+      output = new mb.Output({ format: new mb.Mp4OutputFormat({ fastStart: false }), target })
       const videoSource = new mb.VideoSampleSource({
         codec: 'avc',
         ...videoOptions,

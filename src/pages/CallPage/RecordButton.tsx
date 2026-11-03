@@ -3,7 +3,7 @@ import { useTracks } from '@livekit/components-react'
 import { Track } from 'livekit-client'
 import styles from './CallPage.module.css'
 import { canPickFolder, ensureWriteAccess, loadFolder, pickFolder, type FolderHandle } from '../../utils/recordFolder'
-import { createRecorder } from './recorders'
+import { createRecorder, memoryFile } from './recorders'
 
 interface Props {
   // Начало имени файла записи, например «Урок · Биология»
@@ -13,7 +13,8 @@ interface Props {
 
 // Куда идут куски записи: сразу в файл в выбранной папке или в память, а в конце — скачивание
 interface Output {
-  write: (chunk: Blob) => void
+  // position — куда положить кусок; нет — в конец файла
+  write: (chunk: Blob, position?: number) => void
   // false — сохранить не удалось (ошибку уже показали)
   finish: () => Promise<boolean>
 }
@@ -50,11 +51,11 @@ function download(blob: Blob, name: string) {
 }
 
 function downloadOutput(name: string, type: string): Output {
-  const chunks: Blob[] = []
+  const file = memoryFile(type)
   return {
-    write: (chunk) => chunks.push(chunk),
+    write: (chunk, position) => file.write(chunk, position),
     finish: async () => {
-      if (chunks.length > 0) download(new Blob(chunks, { type }), name)
+      if (file.size > 0) download(file.blob(), name)
       return true
     },
   }
@@ -72,8 +73,10 @@ async function folderOutput(folder: FolderHandle, name: string, onError: Props['
     onError(`Не удалось сохранить запись в папку «${folder.name}»: ${err instanceof Error ? err.message : err}`)
   }
   return {
-    write: (chunk) => {
-      queue = queue.then(() => writable.write(chunk)).catch(fail)
+    write: (chunk, position) => {
+      queue = queue
+        .then(() => writable.write(position === undefined ? chunk : { type: 'write', data: chunk, position }))
+        .catch(fail)
     },
     finish: async () => {
       await queue
@@ -289,7 +292,7 @@ function RecordButton({ fileName, onError }: Props) {
       const name = safeName(`${fileName} ${timestamp()}`) + '.' + recorder.extension
       out = target ? await folderOutput(target, name, onError) : downloadOutput(name, recorder.mimeType)
       if (target) setSavedTo(`Запись сохраняется в папку «${target.name}»: ${name}`)
-      await recorder.start((chunk) => out.write(chunk))
+      await recorder.start((chunk, position) => out.write(chunk, position))
     } catch (err) {
       cleanup()
       onError(err instanceof Error ? `Не удалось начать запись: ${err.message}` : 'Не удалось начать запись')
