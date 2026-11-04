@@ -197,14 +197,23 @@ function Stage() {
     .filter(isTrackReference)
     .find((t) => t.publication.source === Track.Source.ScreenShare)
   const cameras = tracks.filter((t) => t.source === Track.Source.Camera)
+  const [showCameras, setShowCameras] = useState(true) // лента камер рядом с экраном; звук остаётся
 
   return (
     <div className={styles.stage}>
+      {screen && (
+        <label className={styles.camerasToggle}>
+          <input type="checkbox" checked={showCameras} onChange={(e) => setShowCameras(e.target.checked)} />
+          Показывать участников
+        </label>
+      )}
       {screen ? (
-        <FocusLayoutContainer className={styles.fill}>
-          <CarouselLayout tracks={cameras}>
-            <ParticipantTile />
-          </CarouselLayout>
+        <FocusLayoutContainer className={`${styles.fill} ${showCameras ? '' : styles.noCameras}`}>
+          {showCameras && (
+            <CarouselLayout tracks={cameras}>
+              <ParticipantTile />
+            </CarouselLayout>
+          )}
           <ScreenView trackRef={screen} />
         </FocusLayoutContainer>
       ) : (
