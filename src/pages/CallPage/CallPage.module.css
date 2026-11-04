@@ -77,6 +77,7 @@
 }
 
 .stage {
+  position: relative;
   flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
@@ -85,6 +86,36 @@
 
 .fill {
   height: 100%;
+}
+
+/* Стрелка над нижней панелью, по центру: убирает и возвращает кнопки */
+.controlsHandle {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 10px 10px 0 0;
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  transform: translateX(-50%);
+}
+
+.controlsHandle span {
+  transform: rotate(-90deg);
+}
+
+.controlsHandle:hover {
+  background: rgba(0, 0, 0, 0.85);
 }
 
 /* Стрелка справа от ленты камер, по центру: убирает и возвращает ленту */
@@ -127,6 +158,13 @@
 
   .camerasHandle span {
     transform: rotate(-90deg);
+  }
+
+  /* Внизу по центру здесь стрелка камер */
+  .controlsHandle {
+    right: 12px;
+    left: auto;
+    transform: none;
   }
 }
 
@@ -196,6 +234,18 @@
   justify-content: center;
   gap: 8px;
   padding: 12px 16px 16px;
+}
+
+/* Плашка автозаписи закреплена на экране и остаётся видна */
+.controlsHidden {
+  height: 0;
+  padding: 0;
+  overflow: hidden;
+  visibility: hidden;
+}
+
+.controlsHidden .autoRecord {
+  visibility: visible;
 }
 
 /* Включённые кнопки LiveKit сам красит в --lk-control-active-bg (оранжевый) */

@@ -46,6 +46,7 @@ function CallPage({ user }: Props) {
   const [deviceError, setDeviceError] = useState('')
   const [call, setCall] = useState<Call | null>(null) // урок и показанное задание меняются по ходу созвона
   const [tasksOpen, setTasksOpen] = useState(false)
+  const [controlsShown, setControlsShown] = useState(true)
   const openTasks = useCallback(() => setTasksOpen(true), [])
 
   useEffect(() => {
@@ -135,7 +136,7 @@ function CallPage({ user }: Props) {
 
         <div className={styles.main}>
           <LayoutContextProvider>
-            <Stage />
+            <Stage controlsShown={controlsShown} onToggleControls={() => setControlsShown((v) => !v)} />
           </LayoutContextProvider>
           <CallTasks
             call={call}
@@ -149,7 +150,8 @@ function CallPage({ user }: Props) {
 
         {deviceError && <p className={styles.deviceError}>{deviceError}</p>}
 
-        <div className={styles.controls}>
+        {/* Панель только прячем, а не убираем: внутри неё идёт запись урока */}
+        <div className={`${styles.controls} ${controlsShown ? '' : styles.controlsHidden}`}>
           <TrackToggle source={Track.Source.Microphone} className={styles.control}>
             Микрофон
           </TrackToggle>
@@ -185,7 +187,7 @@ function CallPage({ user }: Props) {
 }
 
 // Видео: если кто-то показывает экран — экран крупно, камеры лентой сбоку; иначе сетка камер
-function Stage() {
+function Stage({ controlsShown, onToggleControls }: { controlsShown: boolean; onToggleControls: () => void }) {
   const tracks = useTracks(
     [
       { source: Track.Source.Camera, withPlaceholder: true },
@@ -215,6 +217,16 @@ function Stage() {
           <ParticipantTile />
         </GridLayout>
       )}
+      <button
+        type="button"
+        className={styles.controlsHandle}
+        aria-expanded={controlsShown}
+        aria-label={controlsShown ? 'Убрать кнопки' : 'Показать кнопки'}
+        title={controlsShown ? 'Убрать кнопки' : 'Показать кнопки'}
+        onClick={onToggleControls}
+      >
+        <span aria-hidden="true">{controlsShown ? '‹' : '›'}</span>
+      </button>
     </div>
   )
 }
