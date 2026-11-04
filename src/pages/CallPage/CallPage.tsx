@@ -201,12 +201,6 @@ function Stage() {
 
   return (
     <div className={styles.stage}>
-      {screen && (
-        <label className={styles.camerasToggle}>
-          <input type="checkbox" checked={showCameras} onChange={(e) => setShowCameras(e.target.checked)} />
-          Показывать участников
-        </label>
-      )}
       {screen ? (
         <FocusLayoutContainer className={`${styles.fill} ${showCameras ? '' : styles.noCameras}`}>
           {showCameras && (
@@ -214,7 +208,7 @@ function Stage() {
               <ParticipantTile />
             </CarouselLayout>
           )}
-          <ScreenView trackRef={screen} />
+          <ScreenView trackRef={screen} camerasShown={showCameras} onToggleCameras={() => setShowCameras((v) => !v)} />
         </FocusLayoutContainer>
       ) : (
         <GridLayout tracks={cameras} className={styles.fill}>
@@ -227,7 +221,16 @@ function Stage() {
 
 // Демонстрация экрана с кнопкой «Во весь экран»: разворачивается только сам экран,
 // без шапки, кнопок и камер. Выйти — Esc, кнопка «Свернуть» или двойной клик.
-function ScreenView({ trackRef }: { trackRef: TrackReference }) {
+// Стрелка у края экрана, по центру, убирает и возвращает ленту камер.
+function ScreenView({
+  trackRef,
+  camerasShown,
+  onToggleCameras,
+}: {
+  trackRef: TrackReference
+  camerasShown: boolean
+  onToggleCameras: () => void
+}) {
   const boxRef = useRef<HTMLDivElement>(null)
   const [full, setFull] = useState(false)
 
@@ -254,6 +257,19 @@ function ScreenView({ trackRef }: { trackRef: TrackReference }) {
   return (
     <div ref={boxRef} className={`${styles.screenView} ${full ? styles.screenFull : ''}`} onDoubleClick={toggle}>
       <FocusLayout trackRef={trackRef} />
+      {!full && (
+        <button
+          type="button"
+          className={styles.camerasHandle}
+          aria-expanded={camerasShown}
+          aria-label={camerasShown ? 'Убрать участников' : 'Показать участников'}
+          title={camerasShown ? 'Убрать участников' : 'Показать участников'}
+          onClick={onToggleCameras}
+          onDoubleClick={(e) => e.stopPropagation()} // быстрые нажатия — не «во весь экран»
+        >
+          <span aria-hidden="true">{camerasShown ? '‹' : '›'}</span>
+        </button>
+      )}
       <button type="button" className={`lk-button ${styles.fullButton}`} onClick={toggle}>
         {full ? 'Свернуть' : 'Во весь экран'}
       </button>
