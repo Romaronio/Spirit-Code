@@ -20,7 +20,6 @@ function AssignmentForm({ onAdd, subjects, onDeleteSubject }: AssignmentFormProp
   const [title, setTitle] = useState('')
   const [subject, setSubject] = useState('')
   const [newSubject, setNewSubject] = useState('')
-  const [description, setDescription] = useState('')
   const [deadline, setDeadline] = useState('')
   const [recordingUrl, setRecordingUrl] = useState('')
   const [numberedTasks, setNumberedTasks] = useState<NumberedTask[]>([])
@@ -49,7 +48,6 @@ function AssignmentForm({ onAdd, subjects, onDeleteSubject }: AssignmentFormProp
       await onAdd({
         title: title.trim(),
         subject: finalSubject,
-        description: description.trim(),
         deadline: deadline || undefined,
         recording_url: recordingUrl.trim() || undefined,
         numbered_tasks: numberedTasks,
@@ -67,7 +65,6 @@ function AssignmentForm({ onAdd, subjects, onDeleteSubject }: AssignmentFormProp
       setTitle('')
       setSubject('')
       setNewSubject('')
-      setDescription('')
       setDeadline('')
       setRecordingUrl('')
       setNumberedTasks([])
@@ -167,12 +164,6 @@ function AssignmentForm({ onAdd, subjects, onDeleteSubject }: AssignmentFormProp
             </div>
           </div>
 
-          <textarea
-            placeholder="Описание урока"
-            rows={3}
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-          />
           <label className={styles.label}>
             Срок сдачи (необязательно)
             <input

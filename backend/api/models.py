@@ -131,6 +131,7 @@ class Assignment(models.Model):
     extra_subjects = models.JSONField(blank=True, default=list)
     deadline = models.DateField(blank=True, null=True)
     recording_url = models.URLField(blank=True, null=True)
+    # Описание урока больше нигде не показывается и не приходит в API; старые тексты лежат здесь
     description = models.TextField(blank=True, null=True)
     # Задания по номерам (например, номера заданий ЕГЭ): [{"number": 5, "latex": "...", "answer": "..."}].
     # Ответ видит только учитель.

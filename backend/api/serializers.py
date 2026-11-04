@@ -211,7 +211,7 @@ class AssignmentSerializer(serializers.ModelSerializer):
         model = Assignment
         fields = [
             'id', 'title', 'subject', 'extra_subjects', 'deadline',
-            'recording_url', 'description', 'numbered_tasks', 'tasks_latex', 'files', 'homework',
+            'recording_url', 'numbered_tasks', 'tasks_latex', 'files', 'homework',
             'student_homeworks', 'created_at', 'updated_at'
         ]
 

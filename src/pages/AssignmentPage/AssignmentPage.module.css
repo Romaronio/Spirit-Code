@@ -60,6 +60,33 @@
   font-size: 28px;
 }
 
+.heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  min-width: 0;
+}
+
+.heading .title {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.editButton {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 14px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.editButton:hover {
+  color: var(--accent);
+}
+
 .deadline {
   color: var(--muted);
 }

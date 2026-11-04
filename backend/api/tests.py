@@ -745,6 +745,46 @@ class TypingResultTests(AuthTestCase):
         self.assertEqual(len(results), 2)
 
 
+class LessonEditTests(AuthTestCase):
+    def patch(self, data):
+        return self.client.patch(f'/api/assignments/{self.bio.id}/', data, format='multipart')
+
+    def test_teacher_renames_lesson(self):
+        self.login_as(self.teacher)
+        response = self.patch({'title': 'Дыхание растений'})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['title'], 'Дыхание растений')
+
+    def test_title_cannot_be_blank(self):
+        self.login_as(self.teacher)
+        self.assertEqual(self.patch({'title': '   '}).status_code, 400)
+        self.bio.refresh_from_db()
+        self.assertEqual(self.bio.title, 'Фотосинтез')
+
+    def test_teacher_changes_and_clears_recording_url(self):
+        self.login_as(self.teacher)
+        url = 'https://vkvideo.ru/video-1_2'
+        self.assertEqual(self.patch({'recording_url': url}).data['recording_url'], url)
+        self.assertEqual(self.patch({'recording_url': 'https://vkvideo.ru/video-3_4'}).status_code, 200)
+        self.assertEqual(self.patch({'recording_url': ''}).data['recording_url'], '')
+
+    def test_rename_keeps_other_fields(self):
+        self.login_as(self.teacher)
+        self.patch({'recording_url': 'https://vkvideo.ru/video-1_2', 'tasks_latex': 'x'})
+        response = self.patch({'title': 'Новое'})
+        self.assertEqual(response.data['recording_url'], 'https://vkvideo.ru/video-1_2')
+        self.assertEqual(response.data['tasks_latex'], 'x')
+
+    def test_lesson_description_not_in_api(self):
+        self.bio.description = 'старое описание'
+        self.bio.save()
+        self.login_as(self.teacher)
+        self.assertNotIn('description', self.client.get(f'/api/assignments/{self.bio.id}/').data)
+        self.patch({'description': 'новое'})
+        self.bio.refresh_from_db()
+        self.assertEqual(self.bio.description, 'старое описание')
+
+
 class TasksLatexTests(AuthTestCase):
     LATEX = r'\zadacha{1} Найдите $x$, если $x^2 = 4$.'
 

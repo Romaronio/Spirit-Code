@@ -85,7 +85,6 @@ export interface Assignment {
   extra_subjects?: string[] // ещё предметы, в которых есть этот же урок (не копия)
   deadline?: string | null // формат 'ГГГГ-ММ-ДД', может быть не задан
   recording_url?: string
-  description?: string
   numbered_tasks?: NumberedTask[] // задания по номерам — у каждого своя кнопка
   tasks_latex?: string // задания классной работы в LaTeX без номера
   files?: LessonFile[]
@@ -113,7 +112,6 @@ export type NewAssignment = {
   title: string
   subject: string
   deadline?: string
-  description?: string
   recording_url?: string
   numbered_tasks?: NumberedTask[]
   tasks_latex?: string

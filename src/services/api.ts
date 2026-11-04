@@ -161,9 +161,6 @@ export async function createAssignment(data: NewAssignment): Promise<Assignment>
   if (data.deadline) {
     formData.append('deadline', data.deadline);
   }
-  if (data.description) {
-    formData.append('description', data.description);
-  }
   if (data.recording_url) {
     formData.append('recording_url', data.recording_url);
   }
@@ -195,7 +192,6 @@ export async function updateAssignment(
     subject?: string
     extra_subjects?: string[]
     deadline?: string | null
-    description?: string
     recording_url?: string
     numbered_tasks?: NumberedTask[]
     tasks_latex?: string
@@ -209,7 +205,6 @@ export async function updateAssignment(
   if (data.subject !== undefined) formData.append('subject', data.subject);
   if (data.extra_subjects !== undefined) formData.append('extra_subjects', JSON.stringify(data.extra_subjects));
   if (data.deadline) formData.append('deadline', data.deadline);
-  if (data.description !== undefined) formData.append('description', data.description || '');
   if (data.recording_url !== undefined) formData.append('recording_url', data.recording_url || '');
   if (data.numbered_tasks !== undefined) formData.append('numbered_tasks', JSON.stringify(data.numbered_tasks));
   if (data.tasks_latex !== undefined) formData.append('tasks_latex', data.tasks_latex);

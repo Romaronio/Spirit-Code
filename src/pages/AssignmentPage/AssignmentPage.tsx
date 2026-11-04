@@ -15,6 +15,8 @@ import LatexEditor from '../../components/LatexEditor/LatexEditor'
 import NumberedTasksEditor from '../../components/NumberedTasksEditor/NumberedTasksEditor'
 import TasksViewer from '../../components/TasksViewer/TasksViewer'
 
+const MAX_TITLE_LENGTH = 255 // как Assignment.title на сервере
+
 // Что открыто в панели заданий: номер классной работы, задания без номера или номер ДЗ ('hw-5')
 type TasksKey = number | 'classwork' | 'homework' | `hw-${number}`
 
@@ -91,8 +93,8 @@ function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStud
   const canEdit = user.role === 'teacher'
 
   const [isEditing, setIsEditing] = useState(false)
-  const [recordingUrl, setRecordingUrl] = useState(assignment.recording_url ?? '')
-  const [description, setDescription] = useState(assignment.description ?? '')
+  const [isEditingTitle, setIsEditingTitle] = useState(false)
+  const [isEditingRecording, setIsEditingRecording] = useState(false)
   const [numberedTasks, setNumberedTasks] = useState<NumberedTask[]>(assignment.numbered_tasks ?? [])
   const [tasksLatex, setTasksLatex] = useState(assignment.tasks_latex ?? '')
   const [taskFiles, setTaskFiles] = useState<TaskFilesDraft>(EMPTY_TASK_FILES)
@@ -235,8 +237,6 @@ function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStud
     setEditError('')
     try {
       await onUpdate(assignment.id!, {
-        recording_url: recordingUrl,
-        description,
         numbered_tasks: numberedTasks,
         tasks_latex: tasksLatex,
         ...taskFileChanges(taskFiles, numberedTasks.map((t) => t.number)),
@@ -251,13 +251,23 @@ function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStud
   }
 
   function handleCancel() {
-    setRecordingUrl(assignment.recording_url ?? '')
-    setDescription(assignment.description ?? '')
     setNumberedTasks(assignment.numbered_tasks ?? [])
     setTasksLatex(assignment.tasks_latex ?? '')
     setTaskFiles(EMPTY_TASK_FILES)
     setEditError('')
     setIsEditing(false)
+  }
+
+  async function handleSaveTitle(value: string) {
+    const title = value.trim()
+    if (!title) throw new Error('Введите название урока')
+    await onUpdate(assignment.id!, { title })
+    setIsEditingTitle(false)
+  }
+
+  async function handleSaveRecording(value: string) {
+    await onUpdate(assignment.id!, { recording_url: value.trim() })
+    setIsEditingRecording(false)
   }
 
   async function handleSaveHomework() {
@@ -301,36 +311,28 @@ function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStud
       <div className={styles.layout}>
         <div className={styles.card}>
           <span className={styles.subject}>{assignment.subject}</span>
-          <h1 className={styles.title}>{assignment.title}</h1>
+          {isEditingTitle ? (
+            <FieldEditor
+              label="Название урока"
+              initialValue={assignment.title}
+              maxLength={MAX_TITLE_LENGTH}
+              onSave={handleSaveTitle}
+              onCancel={() => setIsEditingTitle(false)}
+            />
+          ) : (
+            <div className={styles.heading}>
+              <h1 className={styles.title}>{assignment.title}</h1>
+              {canEdit && (
+                <button type="button" className={styles.editButton} onClick={() => setIsEditingTitle(true)}>
+                  Изменить название
+                </button>
+              )}
+            </div>
+          )}
           {assignment.deadline && <p className={styles.deadline}>Сдать до: {assignment.deadline}</p>}
 
           {isEditing ? (
             <div className={styles.editor}>
-              <label className={styles.label}>
-                Ссылка на запись урока
-                <input
-                  className={styles.input}
-                  type="url"
-                  placeholder="https://vkvideo.ru/video-… или код для вставки"
-                  value={recordingUrl}
-                  onChange={(e) => setRecordingUrl(normalizeRecordingUrl(e.target.value))}
-                />
-                <span className={styles.hint}>
-                  Видео VK покажется прямо в уроке. Если видео с доступом «по ссылке» не
-                  показывается — вставь сюда «Поделиться → Код для вставки».
-                </span>
-              </label>
-
-              <label className={styles.label}>
-                Описание
-                <textarea
-                  className={styles.textarea}
-                  rows={5}
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                />
-              </label>
-
               <NumberedTasksEditor
                 value={numberedTasks}
                 onChange={setNumberedTasks}
@@ -398,17 +400,26 @@ function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStud
           ) : (
             <>
               <section className={styles.section}>
-                <h2>Описание</h2>
-                {assignment.description ? (
-                  <p>{assignment.description}</p>
-                ) : (
-                  <p className={styles.empty}>Описание пока не добавлено</p>
-                )}
-              </section>
-
-              <section className={styles.section}>
-                <h2>Запись урока</h2>
-                {assignment.recording_url && vkEmbedUrl(assignment.recording_url) ? (
+                <div className={styles.heading}>
+                  <h2>Запись урока</h2>
+                  {canEdit && !isEditingRecording && (
+                    <button type="button" className={styles.editButton} onClick={() => setIsEditingRecording(true)}>
+                      {assignment.recording_url ? 'Изменить ссылку' : 'Добавить ссылку'}
+                    </button>
+                  )}
+                </div>
+                {isEditingRecording ? (
+                  <FieldEditor
+                    label="Ссылка на запись урока"
+                    type="url"
+                    placeholder="https://vkvideo.ru/video-… или код для вставки"
+                    hint="Видео VK покажется прямо в уроке. Если видео с доступом «по ссылке» не показывается — вставь сюда «Поделиться → Код для вставки». Чтобы убрать запись, очисти поле."
+                    initialValue={assignment.recording_url ?? ''}
+                    normalizeValue={normalizeRecordingUrl}
+                    onSave={handleSaveRecording}
+                    onCancel={() => setIsEditingRecording(false)}
+                  />
+                ) : assignment.recording_url && vkEmbedUrl(assignment.recording_url) ? (
                   <>
                     <div className={styles.player}>
                       <iframe
@@ -833,6 +844,65 @@ function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStud
         )}
       </div>
     </div>
+  )
+}
+
+interface FieldEditorProps {
+  label: string
+  initialValue: string
+  type?: 'text' | 'url'
+  placeholder?: string
+  hint?: string
+  maxLength?: number
+  normalizeValue?: (value: string) => string
+  onSave: (value: string) => Promise<void>
+  onCancel: () => void
+}
+
+// Правка одного поля урока на месте: сохраняется отдельно от материалов.
+// При ошибке форма остаётся открытой и показывает сообщение
+function FieldEditor({ label, initialValue, type = 'text', placeholder, hint, maxLength, normalizeValue, onSave, onCancel }: FieldEditorProps) {
+  const [value, setValue] = useState(initialValue)
+  const [isSaving, setIsSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    setIsSaving(true)
+    setError('')
+    try {
+      await onSave(value)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Не удалось сохранить изменения')
+      setIsSaving(false)
+    }
+  }
+
+  return (
+    <form className={styles.editor} onSubmit={handleSubmit}>
+      <label className={styles.label}>
+        {label}
+        <input
+          className={styles.input}
+          type={type}
+          placeholder={placeholder}
+          maxLength={maxLength}
+          value={value}
+          autoFocus
+          onChange={(e) => setValue(normalizeValue ? normalizeValue(e.target.value) : e.target.value)}
+        />
+        {hint && <span className={styles.hint}>{hint}</span>}
+      </label>
+      {error && <p className={styles.error}>{error}</p>}
+      <div className={styles.actions}>
+        <button type="submit" className={styles.primary} disabled={isSaving}>
+          {isSaving ? 'Сохранение...' : 'Сохранить'}
+        </button>
+        <button type="button" className={styles.secondary} onClick={onCancel} disabled={isSaving}>
+          Отмена
+        </button>
+      </div>
+    </form>
   )
 }
 
