@@ -18,7 +18,8 @@ interface Props {
   emptyText?: string
 }
 
-// Кнопки-шаблоны для формул. caret — куда встанет курсор после вставки
+// Кнопки-шаблоны для формул. caret — куда встанет курсор после вставки.
+// У π и ∞ курсор перед символом: сразу пишем 2π или −∞
 const MATH_TEMPLATES = [
   { label: '$…$', title: 'Формула в тексте', snippet: '', caret: 0 },
   { label: 'a/b', title: 'Дробь', snippet: '\\frac{}{}', caret: 6 },
@@ -30,8 +31,8 @@ const MATH_TEMPLATES = [
   { label: '≤', title: 'Меньше или равно', snippet: '\\le ', caret: 4 },
   { label: '≥', title: 'Больше или равно', snippet: '\\ge ', caret: 4 },
   { label: '≠', title: 'Не равно', snippet: '\\ne ', caret: 4 },
-  { label: 'π', title: 'Пи', snippet: '\\pi ', caret: 4 },
-  { label: '∞', title: 'Бесконечность', snippet: '\\infty ', caret: 7 },
+  { label: 'π', title: 'Пи', snippet: '\\pi ', caret: 0 },
+  { label: '∞', title: 'Бесконечность', snippet: '\\infty ', caret: 0 },
   { label: '°', title: 'Градус', snippet: '^\\circ', caret: 6 },
 ]
 
