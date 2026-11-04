@@ -4,7 +4,7 @@
   flex: 0 0 min(460px, 42vw);
   flex-direction: column;
   min-width: 0;
-  margin: 12px 12px 0 0;
+  margin: 12px 12px calc(12px + var(--lk-grid-gap, 0.5rem)) 0; /* низ вровень с окном видео: отступ .stage и сетки LiveKit */
   border-radius: 16px;
   background: var(--surface);
   color: var(--text);
