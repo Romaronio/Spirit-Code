@@ -153,6 +153,7 @@ function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStud
   const myAnswer = assignment.student_homeworks?.find((sh) => sh.student === studentId)
   const [studentDescription, setStudentDescription] = useState(myAnswer?.description ?? '')
   const [deletedSavedFileIds, setDeletedSavedFileIds] = useState<Array<number | string>>([])
+  const [answerFiles, setAnswerFiles] = useState<FileEntry[]>([]) // новые файлы ко всему уроку
   const [submitError, setSubmitError] = useState('')
   const [submitSuccess, setSubmitSuccess] = useState(false)
 
@@ -201,6 +202,13 @@ function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStud
     setDeletedSavedFileIds((prev) => [...prev, id])
   }
 
+  function handleAnswerFilesChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const { entries, error } = pickFiles(e.target.files)
+    setAnswerFiles((prev) => [...prev, ...entries])
+    setSubmitError(error)
+    e.target.value = ''
+  }
+
   async function handleSubmitAnswer() {
     if (!assignment.id) return
     if (!studentId) {
@@ -216,6 +224,7 @@ function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStud
       await api.submitStudentHomework({
         assignmentId: assignment.id,
         description: studentDescription,
+        files: answerFiles.map((f) => f.file),
         deleteFileIds: deletedSavedFileIds,
       })
       // Перезагружаем задание, чтобы сохранённый ответ подтянулся с сервера
@@ -223,6 +232,7 @@ function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStud
         await onSubmitStudentHomework(assignment.id)
       }
       setDeletedSavedFileIds([])
+      setAnswerFiles([])
       setSubmitSuccess(true)
       setTimeout(() => setSubmitSuccess(false), 3000)
     } catch (err) {
@@ -754,8 +764,28 @@ function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStud
                   onChange={(e) => setStudentDescription(e.target.value)}
                 />
               </label>
-              {/* Новые файлы прикрепляются к заданиям; здесь только ранее отправленные — их можно убрать */}
-              {savedFiles.length > 0 && <span className={styles.label}>Файлы с ответом</span>}
+              {/* Файлы ко всему уроку; к отдельному заданию они прикрепляются в его окне */}
+              <span className={styles.label}>Файлы ко всему уроку</span>
+              <label className={styles.fileButton}>
+                📎 Прикрепить файлы
+                <input type="file" multiple accept={ACCEPT} className={styles.hiddenInput} onChange={handleAnswerFilesChange} />
+              </label>
+              {answerFiles.length > 0 && (
+                <ul className={styles.files}>
+                  {answerFiles.map((f) => (
+                    <li key={f.id}>
+                      <span>{f.name}</span>
+                      <button
+                        type="button"
+                        className={styles.linkButton}
+                        onClick={() => setAnswerFiles((prev) => prev.filter((x) => x.id !== f.id))}
+                      >
+                        Удалить
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
               {savedFiles.length > 0 && (
                 <ul className={styles.files}>
                   {savedFiles.map((f) => (
