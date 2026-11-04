@@ -211,14 +211,15 @@ class AssignmentViewSet(viewsets.ModelViewSet):
         user = self.request.user
         if not getattr(user, 'is_teacher', False):
             subjects = {str(s).strip().casefold() for s in (getattr(user, 'subjects', None) or []) if str(s).strip()}
-            if not subjects:
-                return queryset.none()
             # Урок виден, если любой из его предметов есть у ученика. Сравниваем в Python:
             # дополнительные предметы лежат в JSON, а iexact в SQLite не понимает регистр русских букв
             ids = [
                 a.id for a in Assignment.objects.only('id', 'subject', 'extra_subjects')
                 if any(str(s).strip().casefold() in subjects for s in a.all_subjects)
             ]
+            # В общем созвоне учитель может открыть урок и не из предметов этого ученика
+            if self.action == 'retrieve':
+                ids += [c.assignment_id for c in _student_calls(user) if c.assignment_id]
             queryset = queryset.filter(id__in=ids)
         return queryset
 
@@ -688,11 +689,37 @@ def _calls_open_for(user):
     return '*' in allowed or user.name.casefold() in allowed
 
 
+def _live_calls():
+    return Call.objects.select_related('started_by', 'student', 'assignment').filter(
+        ended_at__isnull=True,
+        started_at__gte=timezone.now() - Call.MAX_DURATION,
+    )
+
+
+def _student_calls(user):
+    """Идущие созвоны, в которые может войти ученик"""
+    queryset = _live_calls()
+    # Личный урок учитель начал сам для этого ученика — он виден и при закрытых CALLS_STUDENTS
+    personal = queryset.filter(student=user)
+    if not _calls_open_for(user):
+        return personal
+    # Сравниваем в Python: iexact в SQLite не понимает регистр русских букв.
+    # Идущих созвонов единицы, так что это дёшево
+    subjects = {str(s).strip().casefold() for s in (getattr(user, 'subjects', None) or [])}
+    ids = [
+        c.id for c in queryset
+        if c.student_id == user.id or (
+            not c.student_id and (not c.subject or any(s.casefold() in subjects for s in c.all_subjects))
+        )
+    ]
+    return queryset.filter(id__in=ids)
+
+
 class CallViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     """Созвоны-уроки (LiveKit).
 
     GET /calls/ — идущие созвоны: учителю все, ученику — личные с ним и по его предметам (и общие, без предмета).
-    POST /calls/ — учитель начинает созвон {subject, title} или личный {student, title}.
+    POST /calls/ — учитель начинает созвон {subject, extra_subjects, title} или личный {student, title}.
     POST /calls/{id}/join/ — токен LiveKit для входа в комнату.
     POST /calls/{id}/end/ — учитель завершает созвон для всех.
     POST /calls/{id}/show/ — учитель выбирает урок и задание, которое видят ученики {assignment, task}.
@@ -711,25 +738,8 @@ class CallViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retriev
         return [IsAuthenticated()]
 
     def get_queryset(self):
-        queryset = Call.objects.select_related('started_by', 'student', 'assignment').filter(
-            ended_at__isnull=True,
-            started_at__gte=timezone.now() - Call.MAX_DURATION,
-        )
         user = self.request.user
-        if getattr(user, 'is_teacher', False):
-            return queryset
-        # Личный урок учитель начал сам для этого ученика — он виден и при закрытых CALLS_STUDENTS
-        personal = queryset.filter(student=user)
-        if not _calls_open_for(user):
-            return personal
-        # Сравниваем в Python: iexact в SQLite не понимает регистр русских букв.
-        # Идущих созвонов единицы, так что это дёшево
-        subjects = {str(s).strip().casefold() for s in (getattr(user, 'subjects', None) or [])}
-        ids = [
-            c.id for c in queryset
-            if c.student_id == user.id or (not c.student_id and (not c.subject or c.subject.casefold() in subjects))
-        ]
-        return queryset.filter(id__in=ids)
+        return _live_calls() if getattr(user, 'is_teacher', False) else _student_calls(user)
 
     def perform_create(self, serializer):
         serializer.save(started_by=self.request.user)

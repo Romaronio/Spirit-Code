@@ -1104,6 +1104,36 @@ class CallTests(AuthTestCase):
         self.assertEqual([c['id'] for c in self.client.get('/api/calls/').data], [common_id])
         self.assertEqual(self.client.post(f'/api/calls/{call_id}/join/').status_code, 404)
 
+    def test_call_for_several_subjects(self):
+        self.login_as(self.teacher)
+        response = self.client.post('/api/calls/', {
+            'subject': 'Биология', 'extra_subjects': ['биология', ' Английский '], 'assignment': self.bio.id,
+        }, format='json')
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data['extra_subjects'], ['Английский'])
+        call_id = response.data['id']
+        other = self.make_account('olga', 'student', ['Химия'])
+        for student in (self.anna, self.ivan):
+            self.login_as(student)
+            self.assertEqual([c['id'] for c in self.client.get('/api/calls/').data], [call_id])
+            self.assertEqual(self.client.post(f'/api/calls/{call_id}/join/').status_code, 200)
+        self.login_as(other)
+        self.assertEqual(self.client.get('/api/calls/').data, [])
+        self.assertEqual(self.client.post(f'/api/calls/{call_id}/join/').status_code, 404)
+
+    def test_call_lesson_opens_for_student_of_other_subject(self):
+        self.login_as(self.teacher)
+        call_id = self.client.post('/api/calls/', {
+            'subject': 'Биология', 'extra_subjects': ['Английский'], 'assignment': self.bio.id,
+        }, format='json').data['id']
+        self.login_as(self.ivan)
+        self.assertEqual(self.client.get(f'/api/assignments/{self.bio.id}/').status_code, 200)
+        self.assertNotIn(self.bio.id, [a['id'] for a in self.client.get('/api/assignments/').data['results']])
+        self.login_as(self.teacher)
+        self.client.post(f'/api/calls/{call_id}/end/')
+        self.login_as(self.ivan)
+        self.assertEqual(self.client.get(f'/api/assignments/{self.bio.id}/').status_code, 404)
+
     def test_student_cannot_start_or_end(self):
         call_id = self.start_call()
         self.login_as(self.anna)

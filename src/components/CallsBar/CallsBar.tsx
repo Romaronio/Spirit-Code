@@ -4,7 +4,7 @@ import styles from './CallsBar.module.css'
 import * as api from '../../services/api'
 import type { Account, Assignment, Call } from '../../types'
 import { callName } from '../../utils/calls'
-import { hasSubject, lessonForSubjects, lessonSubjects } from '../../utils/subjects'
+import { hasSubject, lessonForSubjects, normalize, uniqueSubjects } from '../../utils/subjects'
 
 // Как часто проверяем, не начался ли урок. Запрос лёгкий, а постоянное соединение
 // заняло бы один из двух обработчиков gunicorn — поэтому частый опрос
@@ -17,14 +17,15 @@ interface Props {
   lessons?: Assignment[] // уроки, задания которых можно открыть в созвоне
 }
 
-const STUDENT_PREFIX = 'student:' // значение в списке «Для кого»: предмет или student:<id>
+const STUDENT_PREFIX = 'student:' // значение в списке «Для кого»: предмет, ALL_INFORMATICS или student:<id>
+const ALL_INFORMATICS = 'group:informatics' // все предметы со словом «информатика» в любом падеже
 
 // Созвоны на главной: учитель начинает урок и видит идущие,
 // ученик видит плашку «Идёт урок — подключиться» (если урока нет — ничего)
 function CallsBar({ isTeacher, subjects, students, lessons = [] }: Props) {
   const navigate = useNavigate()
   const [calls, setCalls] = useState<Call[]>([])
-  const [audience, setAudience] = useState('') // '' — все, предмет или student:<id>
+  const [audience, setAudience] = useState('') // '' — все, предмет, ALL_INFORMATICS или student:<id>
   const [title, setTitle] = useState('')
   const [lessonId, setLessonId] = useState('') // '' — без урока
   const [error, setError] = useState('')
@@ -75,7 +76,14 @@ function CallsBar({ isTeacher, subjects, students, lessons = [] }: Props) {
     try {
       const student = audience.startsWith(STUDENT_PREFIX) ? Number(audience.slice(STUDENT_PREFIX.length)) : null
       const assignment = lessonOptions.some((l) => String(l.id) === lessonId) ? Number(lessonId) : null
-      const call = await api.startCall({ subject: student ? '' : audience, student, title: title.trim(), assignment })
+      const isGroup = audience === ALL_INFORMATICS
+      const call = await api.startCall({
+        subject: student ? '' : isGroup ? 'Информатика' : audience,
+        extra_subjects: isGroup ? informatics : [],
+        student,
+        title: title.trim(),
+        assignment,
+      })
       navigate(`/call/${call.id}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Не удалось начать урок')
@@ -99,8 +107,14 @@ function CallsBar({ isTeacher, subjects, students, lessons = [] }: Props) {
   const personal = audience.startsWith(STUDENT_PREFIX)
     ? students.find((s) => `${STUDENT_PREFIX}${s.id}` === audience)
     : undefined
+  // Предметы берём и у учеников: убранный из списка предмет у них мог остаться
+  const informatics = uniqueSubjects([...subjects, ...students.flatMap((s) => s.subjects ?? [])]).filter((s) =>
+    normalize(s).includes('информатик'),
+  )
+  const countFor = (list: string[]) => students.filter((s) => list.some((x) => hasSubject(s.subjects, x))).length
+  const audienceSubjects = personal ? personal.subjects : audience === ALL_INFORMATICS ? informatics : [audience]
   const lessonOptions = [...lessons]
-    .filter((l) => (personal ? lessonForSubjects(personal.subjects, l) : !audience || hasSubject(lessonSubjects(l), audience)))
+    .filter((l) => !audience || lessonForSubjects(audienceSubjects, l))
     .sort((a, b) => (b.id ?? 0) - (a.id ?? 0))
 
   return (
@@ -134,9 +148,12 @@ function CallsBar({ isTeacher, subjects, students, lessons = [] }: Props) {
               <option value="">Все ученики</option>
               {subjects.length > 0 && (
                 <optgroup label="По предмету">
+                  {informatics.length > 0 && (
+                    <option value={ALL_INFORMATICS}>Вся информатика · учеников: {countFor(informatics)}</option>
+                  )}
                   {subjects.map((s) => (
                     <option key={s} value={s}>
-                      {s}
+                      {s} · учеников: {countFor([s])}
                     </option>
                   ))}
                 </optgroup>

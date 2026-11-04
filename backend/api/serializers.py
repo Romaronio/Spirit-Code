@@ -126,6 +126,23 @@ def clean_numbered_tasks(value):
     return [tasks[n] for n in sorted(tasks)]
 
 
+def clean_subject_list(value):
+    """Список названий предметов без пустых и повторов (без учёта регистра)"""
+    if value in (None, ''):
+        return []
+    if not isinstance(value, list) or len(value) > 20 or not all(isinstance(s, str) for s in value):
+        raise serializers.ValidationError('Ожидается список предметов')
+    result, seen = [], set()
+    for name in value:
+        name = ' '.join(name.split())
+        if len(name) > 100:
+            raise serializers.ValidationError('Название предмета — до 100 знаков')
+        if name and name.casefold() not in seen:
+            seen.add(name.casefold())
+            result.append(name)
+    return result
+
+
 def without_answers(tasks):
     """Номера заданий для ученика: ответы к ним видит только учитель"""
     return [{k: v for k, v in t.items() if k != 'answer'} for t in tasks or []]
@@ -219,20 +236,7 @@ class AssignmentSerializer(serializers.ModelSerializer):
         return clean_numbered_tasks(value)
 
     def validate_extra_subjects(self, value):
-        """Список названий без пустых и повторов (без учёта регистра)"""
-        if value in (None, ''):
-            return []
-        if not isinstance(value, list) or len(value) > 20 or not all(isinstance(s, str) for s in value):
-            raise serializers.ValidationError('Ожидается список предметов')
-        result, seen = [], set()
-        for name in value:
-            name = ' '.join(name.split())
-            if len(name) > 100:
-                raise serializers.ValidationError('Название предмета — до 100 знаков')
-            if name and name.casefold() not in seen:
-                seen.add(name.casefold())
-                result.append(name)
-        return result
+        return clean_subject_list(value)
 
     def validate(self, attrs):
         # Основной предмет в дополнительных не повторяем
@@ -351,7 +355,8 @@ class CallSerializer(serializers.ModelSerializer):
     class Meta:
         model = Call
         fields = [
-            'id', 'title', 'subject', 'student', 'student_name', 'assignment', 'assignment_title', 'shown_task',
+            'id', 'title', 'subject', 'extra_subjects', 'student', 'student_name', 'assignment', 'assignment_title',
+            'shown_task',
             'started_by_name', 'started_at', 'ended_at',
         ]
         read_only_fields = ['started_at', 'ended_at', 'shown_task']
@@ -362,9 +367,17 @@ class CallSerializer(serializers.ModelSerializer):
     def validate_subject(self, value):
         return value.strip()
 
+    def validate_extra_subjects(self, value):
+        return clean_subject_list(value)
+
     def validate(self, attrs):
         if attrs.get('student'):
             attrs['subject'] = ''  # личный урок — предмет не нужен
+        subject = attrs.get('subject', '')
+        # Без основного предмета созвон и так для всех
+        attrs['extra_subjects'] = [
+            s for s in attrs.get('extra_subjects', []) if subject and s.casefold() != subject.casefold()
+        ]
         return attrs
 
 

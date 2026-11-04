@@ -371,7 +371,8 @@ class TypingResult(models.Model):
 class Call(models.Model):
     """Созвон-урок в LiveKit. Идёт, пока учитель не завершит его (или не истечёт MAX_DURATION).
 
-    Подключиться могут учитель и ученики с предметом созвона; пустой предмет — все ученики.
+    Подключиться могут учитель и ученики с предметом созвона или одним из extra_subjects;
+    пустой предмет — все ученики.
     Если выбран student — это личный урок: из учеников его видит только он.
     assignment — урок, задания которого открыты в созвоне; shown_task — задание, которое учитель
     показал ученикам (ключ как в StudentHomework.task_answers: cw-5, hw-3, classwork, homework).
@@ -380,6 +381,7 @@ class Call(models.Model):
 
     title = models.CharField(max_length=255, blank=True, default='')
     subject = models.CharField(max_length=100, blank=True, default='')
+    extra_subjects = models.JSONField(blank=True, default=list)
     student = models.ForeignKey(
         Account,
         on_delete=models.CASCADE,
@@ -408,6 +410,10 @@ class Call(models.Model):
 
     def __str__(self):
         return f"Созвон #{self.id} {self.student or self.subject or 'все'}"
+
+    @property
+    def all_subjects(self):
+        return [self.subject, *(self.extra_subjects or [])]
 
     @property
     def room_name(self):

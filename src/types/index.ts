@@ -201,6 +201,7 @@ export interface Call {
   id: number
   title: string
   subject: string // пусто — для всех учеников
+  extra_subjects: string[] // ещё предметы: созвон сразу для их учеников
   student: number | null // личный урок с одним учеником
   student_name: string | null
   assignment: number | null // урок, задания которого открыты в созвоне
@@ -223,7 +224,7 @@ export interface CallAnswer {
   updated_at: string
 }
 
-export type NewCall = Pick<Call, 'title' | 'subject' | 'student' | 'assignment'>
+export type NewCall = Pick<Call, 'title' | 'subject' | 'extra_subjects' | 'student' | 'assignment'>
 
 // Пропуск в комнату: токен LiveKit и адрес сервера (пусто — этот же сайт, путь /livekit)
 export interface CallJoin {
