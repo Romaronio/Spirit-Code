@@ -1,7 +1,9 @@
-import { useMemo } from 'react'
+import { useContext, useMemo } from 'react'
 import styles from './LatexDocument.module.css'
 import { imageKey, parseLatex, type Block, type Inline, type ListKind } from '../../utils/latex'
 import { renderMath, useKatex, type Katex } from '../../utils/katex'
+import type { TikzFigure } from '../../types'
+import { FiguresContext } from './FiguresContext'
 
 export interface DocFile {
   name: string
@@ -19,6 +21,8 @@ interface Props {
 function LatexDocument({ source, files = [], taskNumber }: Props) {
   const doc = useMemo(() => parseLatex(source), [source])
   const katex = useKatex(useMemo(() => hasMath(doc.blocks), [doc]))
+  const figureList = useContext(FiguresContext)
+  const figures = useMemo(() => new Map(figureList.map((f) => [f.source, f])), [figureList])
   const images = useMemo(() => {
     const map = new Map<string, string>()
     for (const f of files) if (f.url) map.set(imageKey(f.name), f.url)
@@ -29,13 +33,14 @@ function LatexDocument({ source, files = [], taskNumber }: Props) {
   const taskTitles = taskNumber === undefined
     ? undefined
     : Array.from({ length: doc.tasks }, (_, i) => (doc.tasks > 1 ? `Задание ${taskNumber}.${i + 1}` : `Задание ${taskNumber}`))
-  const ctx: Ctx = { katex, images, taskTitles, taskIndex: { value: 0 } }
+  const ctx: Ctx = { katex, images, figures, taskTitles, taskIndex: { value: 0 } }
   return <div className={styles.doc}>{renderBlocks(doc.blocks, ctx)}</div>
 }
 
 interface Ctx {
   katex: Katex | null
   images: Map<string, string>
+  figures: Map<string, TikzFigure>
   taskTitles?: string[]
   taskIndex: { value: number } // плашки нумеруются по порядку вывода — он совпадает с порядком в документе
 }
@@ -118,9 +123,20 @@ function renderBlock(b: Block, key: number, ctx: Ctx): React.ReactNode {
       return <blockquote key={key} className={styles.quote}>{renderBlocks(b.c, ctx)}</blockquote>
     case 'frame':
       return <div key={key} className={styles.frame}>{renderBlocks(b.c, ctx)}</div>
-    case 'figure':
-      return <p key={key} className={styles.missing}>Здесь рисунок TikZ — на сайте его не показать, вставьте его картинкой</p>
+    case 'figure': {
+      const figure = b.source ? ctx.figures.get(b.source) : undefined
+      if (figure?.url) return <img key={key} className={styles.img} src={figure.url} alt="Рисунок" />
+      return <p key={key} className={styles.missing}>{figureNote(b.source, figure)}</p>
+    }
   }
+}
+
+// Что написать вместо рисунка, пока его нет
+function figureNote(source: string | undefined, figure: TikzFigure | undefined) {
+  if (!source) return 'Здесь рисунок — на сайте его не показать, вставьте его картинкой'
+  if (!figure) return 'Рисунок появится после сохранения задания'
+  if (figure.status === 'pending') return 'Рисунок готовится…'
+  return figure.error ? `Рисунок не собрался: ${figure.error}` : 'Рисунок пока недоступен'
 }
 
 function renderInlines(items: Inline[], ctx: Ctx): React.ReactNode[] {

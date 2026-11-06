@@ -90,8 +90,16 @@ export interface Assignment {
   files?: LessonFile[]
   homework?: Homework
   student_homeworks?: StudentHomework[]
+  figures?: TikzFigure[] // рисунки TikZ из заданий, их собирает сервер
   created_at?: string
   updated_at?: string
+}
+
+export interface TikzFigure {
+  source: string // текст рисунка: по нему документ находит свой рисунок
+  status: 'pending' | 'ok' | 'error'
+  url?: string
+  error?: string // почему не собрался, приходит только учителю
 }
 
 // Задание с номером (например, номер задания ЕГЭ) и его текст в LaTeX

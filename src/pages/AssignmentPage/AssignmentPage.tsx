@@ -8,6 +8,7 @@ import { ReviewButtons, StatusBadge } from '../../components/AnswerStatus/Answer
 import CommentThread from '../../components/CommentThread/CommentThread'
 import { TaskAnswerContent, TaskAnswerForm, TaskAnswersList } from '../../components/TaskAnswers/TaskAnswers'
 import { answerKeyTitle, hasTaskAnswer } from '../../utils/lessonTasks'
+import { FiguresContext } from '../../components/LatexDocument/FiguresContext'
 import { ACCEPT, EMPTY_TASK_FILES, pickFiles, taskFileChanges, type FileEntry, type TaskFilesDraft } from '../../utils/uploads'
 import { taskNumberTitle } from '../../utils/taskNumbers'
 import { normalizeRecordingUrl, vkEmbedUrl } from '../../utils/vkVideo'
@@ -35,6 +36,8 @@ interface PageProps {
   commentActions?: CommentActions
   onOpen?: (assignmentId: number) => Promise<void> | void
 }
+
+const NO_FIGURES: NonNullable<Assignment['figures']> = []
 
 function AssignmentPage({ user, items, accounts, onUpdate, onSubmitStudentHomework, onReview, commentActions, onOpen }: PageProps) {
   const { id } = useParams()
@@ -67,15 +70,17 @@ function AssignmentPage({ user, items, accounts, onUpdate, onSubmitStudentHomewo
   }
 
   return (
-    <AssignmentDetails
-      assignment={assignment}
-      user={user}
-      studentId={account?.id}
-      onUpdate={onUpdate}
-      onSubmitStudentHomework={onSubmitStudentHomework}
-      onReview={onReview}
-      commentActions={commentActions}
-    />
+    <FiguresContext.Provider value={assignment.figures ?? NO_FIGURES}>
+      <AssignmentDetails
+        assignment={assignment}
+        user={user}
+        studentId={account?.id}
+        onUpdate={onUpdate}
+        onSubmitStudentHomework={onSubmitStudentHomework}
+        onReview={onReview}
+        commentActions={commentActions}
+      />
+    </FiguresContext.Provider>
   )
 }
 

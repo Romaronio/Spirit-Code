@@ -26,7 +26,7 @@ export type Block =
   | { t: 'align'; align: 'center' | 'left' | 'right'; c: Block[] }
   | { t: 'quote'; c: Block[] }
   | { t: 'frame'; c: Block[] }
-  | { t: 'figure' } // tikz и прочие рисунки, которые нарисовать нельзя
+  | { t: 'figure'; source?: string } // рисунок: source есть у TikZ (его собирает сервер), у прочих рисунков нет
 
 export type ListKind = 'ul' | '1' | 'a' | 'A' | 'i' | 'I' | 'desc'
 
@@ -98,6 +98,12 @@ export function documentBody(src: string): string {
   const from = start + '\\begin{document}'.length
   const end = src.indexOf('\\end{document}', from)
   return src.slice(from, end === -1 ? undefined : end)
+}
+
+// Текст рисунка TikZ, по которому он ищется среди собранных сервером.
+// Держать в согласии с extract_figures в backend/api/tikz.py
+function figureKey(body: string): string {
+  return String.raw`\begin{tikzpicture}${body}\end{tikzpicture}`.replace(/\s+/g, ' ').trim()
 }
 
 // Убирает комментарии %…, не трогая \% и содержимое окружений с кодом
@@ -650,9 +656,8 @@ function parseEnvironment(env: string, body: string): Item | Item[] | null {
     return parseTable(name, body)
   }
 
-  if (name === 'tikzpicture' || name === 'pspicture' || name === 'picture') {
-    return { t: 'figure' }
-  }
+  if (name === 'tikzpicture') return { t: 'figure', source: figureKey(body) }
+  if (name === 'pspicture' || name === 'picture') return { t: 'figure' }
 
   if (/^(tcolorbox|mdframed|framed|shaded|boxed)$/.test(name)) {
     const inner = body.replace(/^\s*\[[^\]]*\]/, '')

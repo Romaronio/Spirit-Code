@@ -457,6 +457,26 @@ class CallAnswerFile(models.Model):
         return self.name
 
 
+class TikzFigure(models.Model):
+    """Рисунок TikZ из задания, собранный в SVG (см. api/tikz.py).
+
+    Ищется по хэшу текста рисунка, а не привязан к уроку: при копировании задания
+    или повторном сохранении ничего не собирается заново.
+    """
+    PENDING, READY, ERROR = 'pending', 'ok', 'error'
+    STATUSES = [(PENDING, 'Ждёт сборки'), (READY, 'Готов'), (ERROR, 'Ошибка')]
+
+    key = models.CharField(max_length=64, unique=True)
+    source = models.TextField()
+    status = models.CharField(max_length=10, choices=STATUSES, default=PENDING)
+    svg = models.FileField(upload_to='tikz/', blank=True)
+    error = models.TextField(blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f'{self.key[:8]} ({self.status})'
+
+
 class DataVersion(models.Model):
     """Номер версии данных: растёт при любом изменении уроков, ДЗ, ответов, переписки и учеников.
 

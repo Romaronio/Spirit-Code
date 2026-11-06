@@ -6,8 +6,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 # Tesseract с русским языком — распознаёт текст с фото заданий (api/photo_latex.py)
+# TeX и pdftocairo — собирают рисунки TikZ из заданий в SVG (api/tikz.py)
 RUN apt-get update \
     && apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-rus \
+       texlive-xetex texlive-pictures texlive-latex-recommended lmodern poppler-utils fonts-dejavu-core \
     && rm -rf /var/lib/apt/lists/*
 
 COPY backend/requirements.txt .

@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from .media import signed_url
-from .models import MAX_LATEX_LENGTH, MAX_TOTAL_LATEX_LENGTH, Account, AnswerComment, Assignment, Call, CallAnswer, CallAnswerFile, Subject, LessonFile, Homework, HomeworkFile, Payment, StudentHomework, StudentHomeworkFile, TypingResult
+from .models import MAX_LATEX_LENGTH, MAX_TOTAL_LATEX_LENGTH, Account, AnswerComment, Assignment, Call, CallAnswer, CallAnswerFile, Subject, LessonFile, Homework, HomeworkFile, Payment, StudentHomework, StudentHomeworkFile, TikzFigure, TypingResult
+from .tikz import assignment_sources, source_key
 
 MIN_PASSWORD_LENGTH = 5
 
@@ -223,13 +224,14 @@ class AssignmentSerializer(serializers.ModelSerializer):
     files = LessonFileSerializer(many=True, read_only=True)
     homework = HomeworkSerializer(read_only=True, required=False)
     student_homeworks = serializers.SerializerMethodField()
+    figures = serializers.SerializerMethodField()
 
     class Meta:
         model = Assignment
         fields = [
             'id', 'title', 'subject', 'extra_subjects', 'deadline',
             'recording_url', 'numbered_tasks', 'tasks_latex', 'files', 'homework',
-            'student_homeworks', 'created_at', 'updated_at'
+            'student_homeworks', 'figures', 'created_at', 'updated_at'
         ]
 
     def validate_numbered_tasks(self, value):
@@ -254,6 +256,24 @@ class AssignmentSerializer(serializers.ModelSerializer):
             if data.get('homework'):
                 data['homework']['numbered_tasks'] = without_answers(data['homework'].get('numbered_tasks'))
         return data
+
+    def get_figures(self, obj):
+        """Рисунки TikZ заданий; страница находит свой рисунок по его тексту (source).
+        Почему рисунок не собрался, видит только учитель"""
+        sources = assignment_sources(obj)
+        if not sources:
+            return []
+        request = self.context.get('request')
+        is_teacher = getattr(getattr(request, 'user', None), 'is_teacher', False)
+        result = []
+        for figure in TikzFigure.objects.filter(key__in=[source_key(s) for s in sources]):
+            item = {'source': figure.source, 'status': figure.status}
+            if figure.status == TikzFigure.READY:
+                item['url'] = signed_url(request, figure.svg)
+            elif figure.status == TikzFigure.ERROR and is_teacher:
+                item['error'] = figure.error
+            result.append(item)
+        return result
 
     def get_student_homeworks(self, obj):
         """Учитель видит все ответы, ученик — только свой"""

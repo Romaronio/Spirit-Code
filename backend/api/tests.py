@@ -6,6 +6,7 @@ import os
 import shutil
 import tempfile
 from datetime import timedelta
+from unittest.mock import patch
 from urllib.parse import urlsplit
 
 from django.core.cache import cache
@@ -14,7 +15,8 @@ from django.test import override_settings
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
-from .models import Account, Assignment, AuthToken, Call, Subject, LessonFile, StudentHomework, StudentHomeworkFile, TypingResult
+from .models import Account, Assignment, AuthToken, Call, DataVersion, Homework, Subject, LessonFile, StudentHomework, StudentHomeworkFile, TikzFigure, TypingResult
+from .tikz import MAX_SOURCE_LENGTH, TikzError, _in_points, _run as tikz_run, compile_svg, extract_figures, render_pending
 
 
 class AuthTestCase(APITestCase):
@@ -1257,3 +1259,82 @@ class CallTests(AuthTestCase):
     def test_not_configured(self):
         call_id = self.start_call()
         self.assertEqual(self.client.post(f'/api/calls/{call_id}/join/').status_code, 503)
+
+
+FIGURE = r"""\begin{tikzpicture}
+  \draw (0,0) -- (1,1); % диагональ
+  \node {50\%};
+\end{tikzpicture}"""
+FIGURE_KEY = r'\begin{tikzpicture} \draw (0,0) -- (1,1); \node {50\%}; \end{tikzpicture}'
+
+
+class TikzFiguresTests(AuthTestCase):
+    def lesson(self, **fields):
+        return Assignment.objects.create(title='Урок', subject='Биология', **fields)
+
+    def figures(self, account, lesson):
+        self.login_as(account)
+        return self.client.get(f'/api/assignments/{lesson.pk}/').data['figures']
+
+    def test_extract_matches_frontend_key(self):
+        self.assertEqual(extract_figures(f'Текст {FIGURE} и снова {FIGURE}'), [FIGURE_KEY])
+
+    def test_commented_figure_is_skipped(self):
+        self.assertEqual(extract_figures('% ' + r'\begin{tikzpicture}\end{tikzpicture}' + '\nТекст'), [])
+
+    def test_saving_queues_figures_from_all_task_fields_once(self):
+        lesson = self.lesson(tasks_latex=FIGURE, numbered_tasks=[{'number': 1, 'latex': FIGURE}])
+        Homework.objects.create(assignment=lesson, description='', tasks_latex=r'\begin{tikzpicture}\draw (0,0);\end{tikzpicture}')
+        self.assertEqual(TikzFigure.objects.filter(status=TikzFigure.PENDING).count(), 2)
+
+    def test_rendering_starts_after_commit(self):
+        with patch('api.tikz.start_rendering') as start, self.captureOnCommitCallbacks(execute=True):
+            self.lesson(tasks_latex=FIGURE)
+        start.assert_called_once()
+
+    def test_ready_figure_is_not_rendered_again(self):
+        self.lesson(tasks_latex=FIGURE)
+        TikzFigure.objects.update(status=TikzFigure.READY)
+        with patch('api.tikz.start_rendering') as start, self.captureOnCommitCallbacks(execute=True):
+            self.lesson(tasks_latex=FIGURE)
+        start.assert_not_called()
+        self.assertEqual(TikzFigure.objects.count(), 1)
+
+    def test_ready_figure_has_signed_url(self):
+        lesson = self.lesson(tasks_latex=FIGURE)
+        with tempfile.TemporaryDirectory() as media, override_settings(MEDIA_ROOT=media):
+            with patch('api.tikz.compile_svg', return_value=b'<svg/>'):
+                render_pending()
+            [figure] = self.figures(self.anna, lesson)
+        self.assertEqual(figure['source'], FIGURE_KEY)
+        self.assertEqual(figure['status'], 'ok')
+        self.assertIn('/media/tikz/', figure['url'])
+        self.assertIn('?s=', figure['url'])
+
+    def test_error_is_shown_only_to_teacher(self):
+        lesson = self.lesson(tasks_latex=FIGURE)
+        with patch('api.tikz.compile_svg', side_effect=TikzError('Undefined control sequence')):
+            render_pending()
+        self.assertEqual(self.figures(self.teacher, lesson)[0]['error'], 'Undefined control sequence')
+        self.assertNotIn('error', self.figures(self.anna, lesson)[0])
+
+    def test_finished_figure_refreshes_open_pages(self):
+        self.lesson(tasks_latex=FIGURE)
+        before = DataVersion.current()
+        with patch('api.tikz.compile_svg', side_effect=TikzError('нет')):
+            render_pending()
+        self.assertGreater(DataVersion.current(), before)
+
+    def test_tex_gets_no_secrets_from_environment(self):
+        with patch.dict(os.environ, {'GIGACHAT_KEY': 'secret'}), patch('api.tikz.subprocess.run') as run:
+            tikz_run(['xelatex'], '.')
+        env = run.call_args.kwargs['env']
+        self.assertNotIn('GIGACHAT_KEY', env)
+        self.assertEqual((env['openin_any'], env['shell_escape']), ('p', 'f'))
+
+    def test_too_long_figure_is_rejected(self):
+        with self.assertRaises(TikzError):
+            compile_svg('x' * (MAX_SOURCE_LENGTH + 1))
+
+    def test_svg_size_is_set_in_points(self):
+        self.assertIn('width="10.5pt" height="20pt"', _in_points('<svg xmlns="a" width="10.5" height="20" viewBox="0 0 1 1">'))

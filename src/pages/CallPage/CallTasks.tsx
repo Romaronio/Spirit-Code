@@ -5,6 +5,7 @@ import * as api from '../../services/api'
 import LatexDocument from '../../components/LatexDocument/LatexDocument'
 import { TaskAnswerForm, TaskAnswersList } from '../../components/TaskAnswers/TaskAnswers'
 import { answerKeyTitle, hasTaskAnswer, lessonTasks, type LessonTask } from '../../utils/lessonTasks'
+import { FiguresContext } from '../../components/LatexDocument/FiguresContext'
 import type { Assignment, Call, CallAnswer, StudentHomework } from '../../types'
 
 // Сообщения по каналу данных LiveKit. Сами данные в них не передаём:
@@ -452,7 +453,11 @@ function CallTasks({ call, isTeacher, open, onOpen, onClose, onCallChange }: Pro
                 ))}
               </ul>
             )}
-            {current.source.trim() && <LatexDocument source={current.source} files={current.files} taskNumber={current.number} />}
+            {current.source.trim() && (
+              <FiguresContext.Provider value={lesson?.figures ?? []}>
+                <LatexDocument source={current.source} files={current.files} taskNumber={current.number} />
+              </FiguresContext.Provider>
+            )}
             {isTeacher ? (
               <TaskAnswersList answers={answers} taskKey={current.key} live={live} showStatus={false} />
             ) : !answersReady ? (

@@ -14,7 +14,9 @@ from .models import (
     StudentHomework,
     StudentHomeworkFile,
     Subject,
+    TikzFigure,
 )
+from .tikz import queue_figures
 from .uploads import delete_file_on_commit
 
 
@@ -28,9 +30,17 @@ def delete_file_from_disk(sender, instance, **kwargs):
     delete_file_on_commit(instance.file)
 
 
+# Рисунки TikZ собираются при любом сохранении заданий, откуда бы оно ни пришло
+@receiver(post_save, sender=Assignment)
+@receiver(post_save, sender=Homework)
+def queue_tikz_figures(sender, instance, raw=False, **kwargs):
+    if not raw:
+        queue_figures(instance)
+
+
 # Что показывают страницы без перезагрузки: изменилось — растёт номер версии данных (GET /api/updates/)
 WATCHED = (Account, Assignment, Homework, LessonFile, HomeworkFile, StudentHomework, StudentHomeworkFile,
-           AnswerComment, Payment, Subject)
+           AnswerComment, Payment, Subject, TikzFigure)
 
 
 def bump_data_version(sender, **kwargs):
