@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from .answer_check import task_checks
 from .media import signed_url
 from .models import MAX_LATEX_LENGTH, MAX_TOTAL_LATEX_LENGTH, Account, AnswerComment, Assignment, Call, CallAnswer, CallAnswerFile, Subject, LessonFile, Homework, HomeworkFile, Payment, StudentHomework, StudentHomeworkFile, TikzFigure, TypingResult
 from .tikz import assignment_sources, source_key
@@ -97,11 +98,12 @@ class HomeworkFileWriteSerializer(serializers.ModelSerializer):
 MAX_TASK_ANSWER_LENGTH = 500
 
 
-def clean_numbered_tasks(value):
+def clean_numbered_tasks(value, allow_required=True):
     """Список {number, latex, answer, short_only}: номера от 1 до 999 без повторов, по возрастанию.
     Ответ необязателен — пустой не сохраняем. short_only — ученик присылает только краткий ответ
     (без программы и файлов); detailed_required — без программы или файла к номеру ученик
-    не отправит ДЗ. Флаги хранятся, только если включены, и вместе не бывают"""
+    не отправит ДЗ (бывает только у номеров ДЗ: allow_required=False для классной работы).
+    Флаги хранятся, только если включены, и вместе не бывают"""
     if value in (None, ''):
         return []
     if not isinstance(value, list) or len(value) > 50:
@@ -126,7 +128,7 @@ def clean_numbered_tasks(value):
             tasks[number]['answer'] = answer.strip()
         if item.get('short_only') is True:
             tasks[number]['short_only'] = True
-        elif item.get('detailed_required') is True:
+        elif allow_required and item.get('detailed_required') is True:
             tasks[number]['detailed_required'] = True
     if sum(len(t['latex']) for t in tasks.values()) > MAX_TOTAL_LATEX_LENGTH:
         raise serializers.ValidationError(f'Все задания вместе длиннее {MAX_TOTAL_LATEX_LENGTH} знаков')
@@ -208,14 +210,20 @@ class StudentHomeworkSerializer(serializers.ModelSerializer):
     files = StudentHomeworkFileSerializer(many=True, read_only=True)
     comments = AnswerCommentSerializer(many=True, read_only=True)
     student_name = serializers.CharField(source='student.name', read_only=True)
+    task_checks = serializers.SerializerMethodField()
 
     class Meta:
         model = StudentHomework
         fields = [
-            'id', 'assignment', 'student', 'student_name', 'description', 'task_answers', 'files',
-            'submitted_at', 'status', 'checked_at', 'comments',
+            'id', 'assignment', 'student', 'student_name', 'description', 'task_answers', 'task_checks',
+            'files', 'submitted_at', 'status', 'checked_at', 'comments',
         ]
         read_only_fields = ['status', 'checked_at', 'task_answers']
+
+    def get_task_checks(self, obj):
+        """Автопроверка кратких ответов: {'hw-5': True, 'hw-6': False}"""
+        user = getattr(self.context.get('request'), 'user', None)
+        return task_checks(obj, for_teacher=getattr(user, 'is_teacher', False))
 
 
 class StudentHomeworkCreateSerializer(serializers.ModelSerializer):
@@ -241,7 +249,8 @@ class AssignmentSerializer(serializers.ModelSerializer):
         ]
 
     def validate_numbered_tasks(self, value):
-        return clean_numbered_tasks(value)
+        # Классную работу можно не решать — развёрнутый ответ к ней не бывает обязательным
+        return clean_numbered_tasks(value, allow_required=False)
 
     def validate_extra_subjects(self, value):
         return clean_subject_list(value)

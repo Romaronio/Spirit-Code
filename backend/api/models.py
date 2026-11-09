@@ -248,6 +248,9 @@ class StudentHomework(models.Model):
     # Ответы к отдельным заданиям: {"cw-5": "текст", "hw-3": "...", "classwork": "...", "homework": "..."}
     # cw-N — номер классной работы, hw-N — номер ДЗ, classwork/homework — задания без номера
     task_answers = models.JSONField(blank=True, default=dict)
+    # Краткие ответы на момент «Отправить ответ»: {"hw-5": "42"}. Результат автопроверки ученик
+    # видит только по ним — и только пока не изменил ответ (см. answer_check.task_checks)
+    submitted_answers = models.JSONField(blank=True, default=dict)
     submitted_at = models.DateTimeField(auto_now_add=True)
     # Отметка учителя после проверки
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')

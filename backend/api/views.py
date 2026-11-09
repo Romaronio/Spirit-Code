@@ -14,6 +14,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.views import APIView
+from .answer_check import snapshot_answers
 from .models import MAX_LATEX_LENGTH, Account, AnswerComment, Assignment, AuthToken, Call, CallAnswer, CallAnswerFile, DataVersion, LessonFile, Subject, Homework, HomeworkFile, Payment, StudentHomework, StudentHomeworkFile, TypingResult
 from . import livekit
 from .permissions import IsStudent, IsTeacher
@@ -77,21 +78,20 @@ def _has_detailed_answer(sh, key):
 
 
 def _missing_detailed_answers(assignment, sh):
-    """Номера с обязательным развёрнутым ответом, к которым ученик его не прикрепил.
-    Номер без текста и файлов ученик не видит — его не требуем"""
-    missing = []
-    groups = [('cw', 'класс', assignment.numbered_tasks, assignment.files)]
+    """Номера ДЗ с обязательным развёрнутым ответом, к которым ученик его не прикрепил.
+    Классную работу можно не решать, чтобы отправить урок. Номер без текста и файлов
+    ученик не видит — его не требуем"""
     homework = getattr(assignment, 'homework', None)
-    if homework is not None:
-        groups.append(('hw', 'дз', homework.numbered_tasks, homework.files))
-    for prefix, label, tasks, files in groups:
-        for t in tasks or []:
-            if not t.get('detailed_required'):
-                continue
-            number = t['number']
-            shown = (t.get('latex') or '').strip() or files.filter(task_number=number).exists()
-            if shown and not _has_detailed_answer(sh, f'{prefix}-{number}'):
-                missing.append(f'{number} ({label})')
+    if homework is None:
+        return []
+    missing = []
+    for t in homework.numbered_tasks or []:
+        if not t.get('detailed_required') or t.get('short_only'):
+            continue
+        number = t['number']
+        shown = (t.get('latex') or '').strip() or homework.files.filter(task_number=number).exists()
+        if shown and not _has_detailed_answer(sh, f'hw-{number}'):
+            missing.append(f'{number} (дз)')
     return missing
 
 
@@ -406,6 +406,10 @@ class AssignmentViewSet(viewsets.ModelViewSet):
         if _is_empty_answer(sh):
             sh.delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
+
+        # Отправленные краткие ответы — по ним ученик теперь видит результат автопроверки
+        sh.submitted_answers = snapshot_answers(sh)
+        sh.save(update_fields=['submitted_answers'])
 
         sh.refresh_from_db()
         serializer = StudentHomeworkSerializer(sh, context=self.get_serializer_context())

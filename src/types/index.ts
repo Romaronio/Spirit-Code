@@ -71,6 +71,7 @@ export interface StudentHomework {
   // Ответы к отдельным заданиям: 'cw-5' — номер классной работы, 'hw-5' — номер ДЗ,
   // 'classwork' / 'homework' — задания без номера
   task_answers?: Record<string, string>
+  task_checks?: Record<string, boolean> // автопроверка кратких ответов: true — верно (учителю — всегда, ученику — после отправки)
   files?: StudentHomeworkFile[]
   submitted_at?: string
   status?: ReviewStatus // отметка учителя после проверки

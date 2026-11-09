@@ -346,6 +346,12 @@
   font-weight: 600;
 }
 
+/* Итог автопроверки кратких ответов у учителя */
+.autoCheck {
+  margin: 8px 0 0;
+  font-weight: 600;
+}
+
 .taskAnswerCorrect {
   color: var(--muted);
   font-size: 13px;

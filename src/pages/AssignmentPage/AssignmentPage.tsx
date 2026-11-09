@@ -195,10 +195,11 @@ function AssignmentDetails({ assignment, user, studentId, students, onUpdate, on
         : undefined
   // Только краткий ответ (без программы и файлов) или обязательный развёрнутый — так решил учитель
   const isShortOnly = (key: TasksKey) => Boolean(numberedOf(key)?.short_only)
-  const isDetailedRequired = (key: TasksKey) => Boolean(numberedOf(key)?.detailed_required && !numberedOf(key)?.short_only)
+  // Обязательным развёрнутый ответ бывает только у номеров ДЗ — классную работу можно не решать
+  const isDetailedRequired = (key: TasksKey) =>
+    typeof key === 'string' && key.startsWith('hw-') && Boolean(numberedOf(key)?.detailed_required && !numberedOf(key)?.short_only)
   // Номера, к которым ученик ещё не прикрепил обязательный развёрнутый ответ, — без них ДЗ не отправить
   const missingDetailed = [
-    ...shownNumbered.map((t) => ({ key: t.number as TasksKey, title: `${taskNumberTitle(t.number)} (класс)` })),
     ...shownHomeworkNumbered.map((t) => ({ key: `hw-${t.number}` as TasksKey, title: `${taskNumberTitle(t.number)} (дз)` })),
   ].filter(({ key }) => isDetailedRequired(key) && !hasDetailedAnswer(myAnswer, answerKey(key)))
   const needsDetailed = (key: TasksKey) => user.role === 'student' && missingDetailed.some((m) => m.key === key)
@@ -511,6 +512,7 @@ function AssignmentDetails({ assignment, user, studentId, students, onUpdate, on
                         isOpen={openTasks === t.number}
                         answered={hasTaskAnswer(myAnswer, answerKey(t.number))}
                         needsDetailed={needsDetailed(t.number)}
+                        check={myAnswer?.task_checks?.[answerKey(t.number)]}
                         onOpen={() => setOpenTasks(t.number)}
                       />
                     ))}
@@ -573,6 +575,7 @@ function AssignmentDetails({ assignment, user, studentId, students, onUpdate, on
                 <NumberedTasksEditor
                   value={homeworkTasks}
                   onChange={setHomeworkTasks}
+                  homework
                   files={assignment.homework?.files}
                   pendingNames={homeworkFiles.map((f) => f.name)}
                   taskFiles={homeworkTaskFiles}
@@ -651,6 +654,7 @@ function AssignmentDetails({ assignment, user, studentId, students, onUpdate, on
                             isOpen={openTasks === `hw-${t.number}`}
                             answered={hasTaskAnswer(myAnswer, `hw-${t.number}`)}
                             needsDetailed={needsDetailed(`hw-${t.number}`)}
+                            check={myAnswer?.task_checks?.[`hw-${t.number}`]}
                             onOpen={() => setOpenTasks(`hw-${t.number}`)}
                           />
                         ))}
@@ -932,11 +936,12 @@ function FieldEditor({ label, initialValue, type = 'text', placeholder, hint, ma
 }
 
 // Кнопка задания: «N задание» или «Другие задания»
-function OpenTasksButton({ title, isOpen, answered, needsDetailed, onOpen }: {
+function OpenTasksButton({ title, isOpen, answered, needsDetailed, check, onOpen }: {
   title: string
   isOpen: boolean
   answered?: boolean
   needsDetailed?: boolean // развёрнутый ответ обязателен, а его ещё нет
+  check?: boolean // автопроверка отправленного краткого ответа
   onOpen: () => void
 }) {
   return (
@@ -951,6 +956,10 @@ function OpenTasksButton({ title, isOpen, answered, needsDetailed, onOpen }: {
         <span className={styles.openTasksTitle}>{title}</span>
         {needsDetailed ? (
           <span className={styles.openTasksMissing}>нужен развёрнутый ответ</span>
+        ) : check !== undefined ? (
+          <span className={check ? styles.openTasksAnswered : styles.openTasksMissing}>
+            {check ? '✓ ответ верный' : '✗ ответ неверный'}
+          </span>
         ) : (
           answered && <span className={styles.openTasksAnswered}>✓ ответ прикреплён</span>
         )}
@@ -1090,6 +1099,13 @@ function LessonAnswers({ assignment, students, answerOrder, correctAnswer, curre
                 <p className={panel.description}>{sh.description}</p>
               ) : (
                 <p className={panel.empty}>Без описания</p>
+              )}
+
+              {sh.task_checks && Object.keys(sh.task_checks).length > 0 && (
+                <p className={styles.autoCheck}>
+                  Автопроверка: верно {Object.values(sh.task_checks).filter(Boolean).length} из{' '}
+                  {Object.keys(sh.task_checks).length}
+                </p>
               )}
 
               {answerOrder.some((key) => hasTaskAnswer(sh, key)) && (

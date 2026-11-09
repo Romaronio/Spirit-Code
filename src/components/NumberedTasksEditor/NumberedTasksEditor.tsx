@@ -18,19 +18,21 @@ interface Props {
   inputClassName?: string
   taskFiles?: TaskFilesDraft // без него в окне нет раздела с файлами к номеру
   onTaskFilesChange?: (draft: TaskFilesDraft) => void
+  // Номера ДЗ: только у них развёрнутый ответ бывает обязательным — классную работу можно не решать
+  homework?: boolean
 }
 
 // В форме урока — только кнопка «Добавить номер» и плашки уже добавленных номеров.
 // Сами задания редактируются в отдельном окне: слева вкладки номеров, справа LaTeX.
 // Правки сразу уходят в форму, поэтому закрытие окна ничего не теряет
-function NumberedTasksEditor({ value, onChange, files, pendingNames, taskFiles, onTaskFilesChange }: Props) {
+function NumberedTasksEditor({ value, onChange, files, pendingNames, taskFiles, onTaskFilesChange, homework = false }: Props) {
   // null — окно закрыто, иначе номер открытой вкладки (0 — пока нет номеров)
   const [openNumber, setOpenNumber] = useState<number | null>(null)
 
   function openNew() {
     const number = suggestNumber(value)
     if (!value.some((t) => t.number === number)) {
-      onChange(sortTasks([...value, newTask(number)]))
+      onChange(sortTasks([...value, newTask(number, homework)]))
     }
     setOpenNumber(number)
   }
@@ -67,6 +69,7 @@ function NumberedTasksEditor({ value, onChange, files, pendingNames, taskFiles, 
           pendingNames={pendingNames}
           taskFiles={taskFiles}
           onTaskFilesChange={onTaskFilesChange}
+          homework={homework}
         />
       )}
     </div>
@@ -83,10 +86,11 @@ interface WindowProps {
   pendingNames?: string[]
   taskFiles?: TaskFilesDraft
   onTaskFilesChange?: (draft: TaskFilesDraft) => void
+  homework: boolean
 }
 
 function NumberedTasksWindow({
-  value, onChange, current, onSelect, onClose, files, pendingNames, taskFiles, onTaskFilesChange,
+  value, onChange, current, onSelect, onClose, files, pendingNames, taskFiles, onTaskFilesChange, homework,
 }: WindowProps) {
   const [newNumber, setNewNumber] = useState('')
   const [error, setError] = useState('')
@@ -117,7 +121,7 @@ function NumberedTasksWindow({
       onSelect(number)
       return
     }
-    onChange(sortTasks([...value, newTask(number)]))
+    onChange(sortTasks([...value, newTask(number, homework)]))
     onSelect(number)
     setNewNumber('')
     setError('')
@@ -246,12 +250,12 @@ function NumberedTasksWindow({
                 </label>
                 <fieldset className={styles.answerKind}>
                   <legend>Что присылает ученик</legend>
-                  {ANSWER_KINDS.map(({ kind, label }) => (
+                  {ANSWER_KINDS.filter(({ kind }) => homework || kind !== 'required').map(({ kind, label }) => (
                     <label key={kind}>
                       <input
                         type="radio"
                         name={`answer-kind-${task.number}`}
-                        checked={answerKind(task) === kind}
+                        checked={answerKind(task, homework) === kind}
                         onChange={() => handleAnswerKind(task.number, kind)}
                       />
                       {label}
@@ -285,13 +289,15 @@ const ANSWER_KINDS: { kind: AnswerKind; label: string }[] = [
   { kind: 'short', label: 'Только краткий ответ (число или слово)' },
 ]
 
-function answerKind(task: NumberedTask): AnswerKind {
-  return task.short_only ? 'short' : task.detailed_required ? 'required' : 'detailed'
+// У номера классной работы «обязателен» не бывает — старый флаг там ничего не значит
+function answerKind(task: NumberedTask, homework: boolean): AnswerKind {
+  return task.short_only ? 'short' : task.detailed_required && homework ? 'required' : 'detailed'
 }
 
-// Новый номер по умолчанию требует развёрнутый ответ; учитель может переключить в окне номера
-function newTask(number: number): NumberedTask {
-  return { number, latex: '', detailed_required: true }
+// Новый номер ДЗ по умолчанию требует развёрнутый ответ (учитель может переключить в окне номера),
+// номер классной работы — нет: её можно не решать, чтобы отправить урок
+function newTask(number: number, homework: boolean): NumberedTask {
+  return homework ? { number, latex: '', detailed_required: true } : { number, latex: '' }
 }
 
 function sortTasks(tasks: NumberedTask[]): NumberedTask[] {

@@ -205,3 +205,44 @@
   color: var(--text-2);
   font-size: 14px;
 }
+
+/* Автопроверка краткого ответа */
+.checkOk,
+.checkBad {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.checkOk {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.checkBad {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.checkResultOk,
+.checkResultBad {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.checkResultOk {
+  border-left: 3px solid var(--success);
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.checkResultBad {
+  border-left: 3px solid var(--danger);
+  background: var(--danger-soft);
+  color: var(--danger);
+}

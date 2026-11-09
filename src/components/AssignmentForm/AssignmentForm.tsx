@@ -206,6 +206,7 @@ function AssignmentForm({ onAdd, subjects, onDeleteSubject }: AssignmentFormProp
           <NumberedTasksEditor
             value={homeworkTasks}
             onChange={setHomeworkTasks}
+            homework
             taskFiles={homeworkTaskFiles}
             onTaskFilesChange={setHomeworkTaskFiles}
           />

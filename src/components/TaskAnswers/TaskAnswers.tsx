@@ -14,12 +14,21 @@ import type { StudentHomework } from '../../types'
 export function TaskAnswerContent({ answer, taskKey, liveText }: { answer: StudentHomework; taskKey: string; liveText?: string }) {
   const { answer: text, code } = splitTaskAnswer(liveText ?? answer.task_answers?.[taskKey])
   const files = (answer.files ?? []).filter((f) => f.task_key === taskKey)
+  // Пока ученик печатает, результат проверки относится к старому ответу — не показываем
+  const check = liveText === undefined ? answer.task_checks?.[taskKey] : undefined
   return (
     <>
-      {text.trim() && (
+      {text.trim() ? (
         <p className={styles.answerText}>
           <span className={styles.answerLabel}>Ответ:</span> <strong>{text}</strong>
+          {check !== undefined && <> <CheckMark ok={check} /></>}
         </p>
+      ) : (
+        check === false && (
+          <p className={styles.answerText}>
+            <CheckMark ok={false} label="краткого ответа нет" />
+          </p>
+        )
       )}
       {code.trim() && (
         <div className={styles.codeView}>
@@ -40,6 +49,13 @@ export function TaskAnswerContent({ answer, taskKey, liveText }: { answer: Stude
         </ul>
       )}
     </>
+  )
+}
+
+// Результат автопроверки краткого ответа
+export function CheckMark({ ok, label }: { ok: boolean; label?: string }) {
+  return (
+    <span className={ok ? styles.checkOk : styles.checkBad}>{ok ? '✓ верно' : `✗ ${label ?? 'неверно'}`}</span>
   )
 }
 
@@ -175,6 +191,11 @@ export function TaskAnswerForm({ answer, taskKey, shortOnly, detailedRequired, o
   // Закрыли задание или перешли к следующему, не дождавшись паузы, — сохраняем сразу
   useEffect(() => () => void save().catch(() => {}), [save])
 
+  // Результат автопроверки — после «Отправить ответ» и пока ученик не изменил краткий ответ
+  const check = answer?.task_checks?.[taskKey]
+  const showCheck =
+    check !== undefined && parts.answer.trim() === splitTaskAnswer(answer?.task_answers?.[taskKey]).answer.trim()
+
   const savedFiles = (answer?.files ?? []).filter(
     (f) => f.task_key === taskKey && (f.id === undefined || !deletedIds.includes(f.id))
   )
@@ -242,6 +263,11 @@ export function TaskAnswerForm({ answer, taskKey, shortOnly, detailedRequired, o
           onBlur={() => save().catch(() => {})}
         />
       </label>
+      {showCheck && (
+        <p className={check ? styles.checkResultOk : styles.checkResultBad}>
+          {check ? '✓ Ответ верный' : '✗ Ответ неверный — исправьте его и снова нажмите «Отправить ответ»'}
+        </p>
+      )}
       {/* Только краткий ответ — без программы и файлов (так решил учитель) */}
       {!shortOnly && (
         <>

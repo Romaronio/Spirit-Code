@@ -894,30 +894,34 @@ class TasksLatexTests(AuthTestCase):
         self.assertEqual(self.patch({'numbered_tasks': json.dumps(bad)}).status_code, 400)
 
     def test_detailed_required_task(self):
-        """Без программы или файла к обязательному номеру ученик не отправит ДЗ"""
+        """Без программы или файла к обязательному номеру ДЗ ученик не отправит урок.
+        Классную работу можно не решать — у её номеров флаг не сохраняется"""
         self.login_as(self.teacher)
         tasks = [{'number': 1, 'latex': 'x', 'detailed_required': True},
                  {'number': 2, 'latex': '', 'detailed_required': True},  # пустой номер ученик не видит
                  {'number': 3, 'latex': 'z', 'short_only': True, 'detailed_required': True}]
-        response = self.patch({'numbered_tasks': json.dumps(tasks)})
+        response = self.patch({'numbered_tasks': json.dumps(tasks), 'homework': json.dumps({'numbered_tasks': tasks})})
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data['numbered_tasks'][0], {'number': 1, 'latex': 'x', 'detailed_required': True})
-        self.assertEqual(response.data['numbered_tasks'][2], {'number': 3, 'latex': 'z', 'short_only': True})
+        self.assertEqual(response.data['numbered_tasks'][0], {'number': 1, 'latex': 'x'})  # класс — без флага
+        homework = response.data['homework']['numbered_tasks']
+        self.assertEqual(homework[0], {'number': 1, 'latex': 'x', 'detailed_required': True})
+        self.assertEqual(homework[2], {'number': 3, 'latex': 'z', 'short_only': True})
 
         self.login_as(self.anna)
         submit = f'/api/assignments/{self.bio.id}/submit/'
         task = f'/api/assignments/{self.bio.id}/submit-task/'
         response = self.client.post(submit, {'description': 'готово'})
         self.assertEqual(response.status_code, 400)
-        self.assertIn('1 (класс)', str(response.data))
-        self.assertNotIn('2 (класс)', str(response.data))
+        self.assertIn('1 (дз)', str(response.data))
+        self.assertNotIn('2 (дз)', str(response.data))
+        self.assertNotIn('класс', str(response.data))
 
         # Только краткий ответ — не развёрнутый
-        self.client.post(task, {'task': 'cw-1', 'text': '42'})
+        self.client.post(task, {'task': 'hw-1', 'text': '42'})
         self.assertEqual(self.client.post(submit, {'description': 'готово'}).status_code, 400)
 
-        # Программа (переводы строк как у браузера) — можно отправлять
-        self.client.post(task, {'task': 'cw-1', 'text': '42\r\n```\r\nprint(42)\r\n```'})
+        # Программа (переводы строк как у браузера) — можно отправлять, классная работа не решена
+        self.client.post(task, {'task': 'hw-1', 'text': '42\r\n```\r\nprint(42)\r\n```'})
         self.assertIn(self.client.post(submit, {'description': 'готово'}).status_code, (200, 201))
 
     def test_short_only_task(self):
@@ -935,6 +939,54 @@ class TasksLatexTests(AuthTestCase):
         data = self.client.get(f'/api/assignments/{self.bio.id}/').data
         self.assertEqual(data['numbered_tasks'][0], {'number': 1, 'latex': 'x', 'short_only': True})
 
+
+    def test_answers_match(self):
+        """Сравнение краткого ответа с верным: не важны пробелы, регистр, запятая в дроби, 7 и 7.0"""
+        from .answer_check import answers_match, short_answer
+        for student, correct in [('42', '42'), (' 42 ', '42'), ('7.0', '7'), ('2,5', '2.5'), ('Ёлка', 'елка'),
+                                 ('12 34', '12 34'), ('12,34', '12 34'), ('12; 34', '12 34'), ('12  34', '12, 34'),
+                                 ('yes', 'ДА|YES'), ('-3', '−3')]:
+            self.assertTrue(answers_match(student, correct), (student, correct))
+        for student, correct in [('41', '42'), ('', '42'), ('34 12', '12 34'), ('12', '12 34'), ('42', '')]:
+            self.assertFalse(answers_match(student, correct), (student, correct))
+        self.assertEqual(short_answer('42\r\n```\r\nprint(42)\r\n```'), '42')
+
+    def test_auto_check(self):
+        """Учитель сразу видит ✓/✗ по номерам с верным ответом; ученик — после «Отправить ответ»
+        и только пока не изменил ответ"""
+        self.login_as(self.teacher)
+        tasks = [{'number': 1, 'latex': 'x', 'answer': '42'}, {'number': 2, 'latex': 'y', 'answer': '7'},
+                 {'number': 3, 'latex': 'z'}]
+        self.assertEqual(self.patch({'numbered_tasks': json.dumps(tasks)}).status_code, 200)
+
+        self.login_as(self.anna)
+        url = f'/api/assignments/{self.bio.id}/'
+        task = url + 'submit-task/'
+        mine = lambda: self.client.get(url).data['student_homeworks'][0]  # noqa: E731
+        self.client.post(task, {'task': 'cw-1', 'text': '42\n```\nprint(42)\n```'})
+        self.client.post(task, {'task': 'cw-2', 'text': '8'})
+        self.client.post(task, {'task': 'cw-3', 'text': 'что-то'})
+        self.assertEqual(mine()['task_checks'], {})  # ещё не отправил
+
+        self.assertIn(self.client.post(url + 'submit/', {'description': ''}).status_code, (200, 201))
+        self.assertEqual(mine()['task_checks'], {'cw-1': True, 'cw-2': False})
+        self.assertNotIn('42', json.dumps(self.client.get(url).data['numbered_tasks']))  # верный ответ не утёк
+
+        # Исправил ответ — результата по номеру нет, пока не отправит снова
+        self.client.post(task, {'task': 'cw-2', 'text': '7'})
+        self.assertEqual(mine()['task_checks'], {'cw-1': True})
+        self.client.post(url + 'submit/', {'description': ''})
+        self.assertEqual(mine()['task_checks'], {'cw-1': True, 'cw-2': True})
+
+        # Учитель видит текущие ответы и номер без ответа ученика — как неверный
+        self.client.post(task, {'task': 'cw-2', 'text': ''})
+        self.login_as(self.teacher)
+        sh = self.client.get(url).data['student_homeworks'][0]
+        self.assertEqual(sh['task_checks'], {'cw-1': True, 'cw-2': False})
+        # Учитель исправил верный ответ — проверка пересчитывается
+        tasks[0]['answer'] = '43'
+        self.patch({'numbered_tasks': json.dumps(tasks)})
+        self.assertFalse(self.client.get(url).data['student_homeworks'][0]['task_checks']['cw-1'])
 
 class TaskFilesTests(AuthTestCase):
     def setUp(self):
