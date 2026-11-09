@@ -12,6 +12,7 @@ interface Props {
   taskNumber?: number // номер задания — им подписаны плашки задач в документе
   onClose: () => void
   onNext?: () => void // открыть следующее задание; нет — значит, это последнее
+  nextLabel?: string // подпись кнопки «дальше», по умолчанию «Следующее задание →»
   children?: ReactNode // под заданием: форма ответа ученика или ответы учеников для учителя
 }
 
@@ -19,7 +20,7 @@ interface Props {
 const FULLSCREEN_QUERY = '(max-width: 1000px)'
 
 // Задания в панели справа от задания — вместо скачивания PDF
-function TasksViewer({ title, subtitle, source, files, attachments = [], answer, taskNumber, onClose, onNext, children }: Props) {
+function TasksViewer({ title, subtitle, source, files, attachments = [], answer, taskNumber, onClose, onNext, nextLabel = 'Следующее задание →', children }: Props) {
   const closeRef = useRef<HTMLButtonElement>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
 
@@ -42,7 +43,7 @@ function TasksViewer({ title, subtitle, source, files, attachments = [], answer,
     return () => {
       document.body.style.overflow = overflow
     }
-  }, [source])
+  }, [source, title])
 
   return (
     <aside className={styles.panel} aria-label={title}>
@@ -77,7 +78,7 @@ function TasksViewer({ title, subtitle, source, files, attachments = [], answer,
         {children}
         {onNext && (
           <button type="button" className={styles.next} onClick={onNext}>
-            Следующее задание →
+            {nextLabel}
           </button>
         )}
       </div>

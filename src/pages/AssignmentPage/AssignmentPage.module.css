@@ -389,6 +389,13 @@
   margin-top: 0;
 }
 
+/* Ответ ученика в панели справа вместо задания */
+.answerPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
 /* Не прикреплён обязательный развёрнутый ответ — ДЗ не отправить */
 .missingDetailed {
   display: flex;

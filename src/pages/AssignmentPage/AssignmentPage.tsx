@@ -139,6 +139,17 @@ function AssignmentDetails({ assignment, user, studentId, students, onUpdate, on
   const commonLessonFiles = lessonFiles.filter((f) => f.task_number == null)
   const commonHomeworkFiles = homeworkFilesSaved.filter((f) => f.task_number == null)
   const closeTasks = useCallback(() => setOpenTasks(null), [])
+  // Учитель открыл ответ ученика — он показывается в панели справа вместо задания
+  const [openAnswerOf, setOpenAnswerOf] = useState<number | null>(null)
+  const closeAnswer = useCallback(() => setOpenAnswerOf(null), [])
+  function openTask(key: TasksKey) {
+    setOpenAnswerOf(null)
+    setOpenTasks(key)
+  }
+  function openAnswer(studentId: number) {
+    setOpenTasks(null)
+    setOpenAnswerOf(studentId)
+  }
   // Задания в том же порядке, что и кнопки в списках, — для кнопки «Следующее задание»
   const classworkOrder: TasksKey[] = [
     ...shownNumbered.map((t) => t.number),
@@ -155,7 +166,7 @@ function AssignmentDetails({ assignment, user, studentId, students, onUpdate, on
     }
     return undefined
   })()
-  const openNext = nextTasks === undefined ? undefined : () => setOpenTasks(nextTasks)
+  const openNext = nextTasks === undefined ? undefined : () => openTask(nextTasks)
 
   // Форма отправки ответа учеником
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -514,7 +525,7 @@ function AssignmentDetails({ assignment, user, studentId, students, onUpdate, on
                         answered={hasTaskAnswer(myAnswer, answerKey(t.number))}
                         needsDetailed={needsDetailed(t.number)}
                         check={myAnswer?.task_checks?.[answerKey(t.number)]}
-                        onOpen={() => setOpenTasks(t.number)}
+                        onOpen={() => openTask(t.number)}
                       />
                     ))}
                     {assignment.tasks_latex?.trim() && (
@@ -522,7 +533,7 @@ function AssignmentDetails({ assignment, user, studentId, students, onUpdate, on
                         title={shownNumbered.length ? 'Другие задания' : 'Задания'}
                         isOpen={openTasks === 'classwork'}
                         answered={hasTaskAnswer(myAnswer, 'classwork')}
-                        onOpen={() => setOpenTasks('classwork')}
+                        onOpen={() => openTask('classwork')}
                       />
                     )}
                   </TasksMenu>
@@ -656,7 +667,7 @@ function AssignmentDetails({ assignment, user, studentId, students, onUpdate, on
                             answered={hasTaskAnswer(myAnswer, `hw-${t.number}`)}
                             needsDetailed={needsDetailed(`hw-${t.number}`)}
                             check={myAnswer?.task_checks?.[`hw-${t.number}`]}
-                            onOpen={() => setOpenTasks(`hw-${t.number}`)}
+                            onOpen={() => openTask(`hw-${t.number}`)}
                           />
                         ))}
                         {assignment.homework.tasks_latex?.trim() && (
@@ -664,7 +675,7 @@ function AssignmentDetails({ assignment, user, studentId, students, onUpdate, on
                             title={shownHomeworkNumbered.length ? 'Другие задания' : 'Домашнее задание'}
                             isOpen={openTasks === 'homework'}
                             answered={hasTaskAnswer(myAnswer, 'homework')}
-                            onOpen={() => setOpenTasks('homework')}
+                            onOpen={() => openTask('homework')}
                           />
                         )}
                       </TasksMenu>
@@ -702,11 +713,8 @@ function AssignmentDetails({ assignment, user, studentId, students, onUpdate, on
             <LessonAnswers
               assignment={assignment}
               students={students}
-              answerOrder={answerOrder}
-              correctAnswer={correctAnswer}
-              currentUserId={user.id}
-              onReview={onReview}
-              commentActions={commentActions}
+              openId={openAnswerOf}
+              onOpen={openAnswer}
             />
           )}
 
@@ -793,7 +801,7 @@ function AssignmentDetails({ assignment, user, studentId, students, onUpdate, on
                     {missingDetailed.map((m, i) => (
                       <span key={String(m.key)}>
                         {i > 0 && ', '}
-                        <button type="button" className={styles.missingLink} onClick={() => setOpenTasks(m.key)}>
+                        <button type="button" className={styles.missingLink} onClick={() => openTask(m.key)}>
                           {m.title}
                         </button>
                       </span>
@@ -818,6 +826,20 @@ function AssignmentDetails({ assignment, user, studentId, students, onUpdate, on
           )}
         </div>
 
+        {openAnswerOf !== null && canEdit && (
+          <StudentAnswerPanel
+            assignment={assignment}
+            students={students}
+            studentId={openAnswerOf}
+            answerOrder={answerOrder}
+            correctAnswer={correctAnswer}
+            currentUserId={user.id}
+            onReview={onReview}
+            commentActions={commentActions}
+            onOpen={openAnswer}
+            onClose={closeAnswer}
+          />
+        )}
         {openNumbered && (
           <TasksViewer
             title={`${assignment.title} · ${taskNumberTitle(openNumbered.number)}`}
@@ -1008,41 +1030,42 @@ function TasksIcon() {
 
 
 export default AssignmentPage
-interface LessonAnswersProps {
-  assignment: Assignment
-  students: Account[]
-  answerOrder: string[]
-  correctAnswer: (key: string) => string | undefined
-  currentUserId?: number
-  onReview?: (assignmentId: number, answerId: number, status: ReviewStatus) => Promise<void>
-  commentActions?: CommentActions
+
+interface LessonStudent {
+  id: number
+  name: string
 }
+
+// Ученики урока, плюс приславшие ответ, если предмет у них с тех пор сменился
+function lessonStudents(assignment: Assignment, students: Account[]): LessonStudent[] {
+  const list = students.map((s) => ({ id: s.id!, name: s.name }))
+  for (const a of assignment.student_homeworks ?? []) {
+    if (a.student !== undefined && !list.some((s) => s.id === a.student)) {
+      list.push({ id: a.student, name: a.student_name ?? 'Ученик' })
+    }
+  }
+  return list
+}
+
+const answerOfStudent = (assignment: Assignment, id: number): StudentHomework | undefined =>
+  assignment.student_homeworks?.find((a) => a.student === id)
 
 function formatAnswerDate(value?: string) {
   return value ? new Date(value).toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'short' }) : ''
 }
 
-// Ответы учеников к уроку — как панель «Ответы учеников» на главной:
-// сверху ученики с отметками, ниже карточка ответа выбранного ученика
-function LessonAnswers({ assignment, students, answerOrder, correctAnswer, currentUserId, onReview, commentActions }: LessonAnswersProps) {
-  const [selectedId, setSelectedId] = useState<number | null>(null)
-  const [isChatOpen, setIsChatOpen] = useState(false)
+interface LessonAnswersProps {
+  assignment: Assignment
+  students: Account[]
+  openId: number | null // чей ответ открыт в панели справа
+  onOpen: (studentId: number) => void
+}
 
+// «Ответы учеников» в уроке: ученики с отметками и сводка. Ответ ученика открывается
+// по нажатию в панели справа — там же, где задания
+function LessonAnswers({ assignment, students, openId, onOpen }: LessonAnswersProps) {
   const answers = assignment.student_homeworks ?? []
-  const answerOf = (id: number): StudentHomework | undefined => answers.find((a) => a.student === id)
-
-  // Ученики урока, плюс приславшие ответ, если предмет у них с тех пор сменился
-  const list = students.map((s) => ({ id: s.id!, name: s.name }))
-  for (const a of answers) {
-    if (a.student !== undefined && !list.some((s) => s.id === a.student)) {
-      list.push({ id: a.student, name: a.student_name ?? 'Ученик' })
-    }
-  }
-
-  // Пока никого не выбрали — первый ученик, приславший ответ
-  const selected = list.find((s) => s.id === selectedId) ?? list.find((s) => answerOf(s.id)) ?? list[0]
-  const sh = selected ? answerOf(selected.id) : undefined
-
+  const list = lessonStudents(assignment, students)
   const acceptedCount = answers.filter((a) => a.status === 'accepted').length
   const pendingCount = answers.filter(awaitsReview).length
 
@@ -1060,17 +1083,15 @@ function LessonAnswers({ assignment, students, answerOrder, correctAnswer, curre
         <>
           <div className={panel.students}>
             {list.map((s) => {
-              const a = answerOf(s.id)
+              const a = answerOfStudent(assignment, s.id)
               const mark = !a ? '—' : a.status === 'accepted' ? '✓' : a.status === 'rejected' ? '✗' : awaitsReview(a) ? '•' : '○'
               return (
                 <button
                   key={s.id}
                   type="button"
-                  className={`${panel.student} ${s.id === selected?.id ? panel.active : ''}`}
-                  onClick={() => {
-                    setSelectedId(s.id)
-                    setIsChatOpen(false)
-                  }}
+                  className={`${panel.student} ${s.id === openId ? panel.active : ''}`}
+                  aria-pressed={s.id === openId}
+                  onClick={() => onOpen(s.id)}
                 >
                   {s.name}
                   <span className={panel.badge}>{mark}</span>
@@ -1082,93 +1103,131 @@ function LessonAnswers({ assignment, students, answerOrder, correctAnswer, curre
           <p className={panel.summary}>
             Прислали {answers.length} из {list.length} · сдано {acceptedCount} · ждут проверки {pendingCount}
           </p>
-
-          {selected && !sh && <p className={panel.empty}>{selected.name} пока ничего не прислал(а)</p>}
-
-          {sh && (
-            <div className={panel.card}>
-              <div className={panel.cardHeader}>
-                <span className={panel.title}>{sh.student_name ?? selected?.name}</span>
-                <span className={panel.date}>{formatAnswerDate(sh.submitted_at)}</span>
-              </div>
-              <div className={panel.meta}>
-                <span className={panel.subject}>{assignment.subject}</span>
-                <StatusBadge answer={sh} />
-              </div>
-
-              {sh.description ? (
-                <p className={panel.description}>{sh.description}</p>
-              ) : (
-                <p className={panel.empty}>Без описания</p>
-              )}
-
-              {sh.task_checks && Object.keys(sh.task_checks).length > 0 && (
-                <p className={styles.autoCheck}>
-                  Автопроверка: верно {Object.values(sh.task_checks).filter(Boolean).length} из{' '}
-                  {Object.keys(sh.task_checks).length}
-                </p>
-              )}
-
-              {answerOrder.some((key) => hasTaskAnswer(sh, key)) && (
-                <ul className={styles.taskAnswers}>
-                  {answerOrder
-                    .filter((key) => hasTaskAnswer(sh, key))
-                    .map((key) => (
-                      <li key={key}>
-                        <span className={styles.taskAnswerTitle}>{answerKeyTitle(key)}</span>
-                        {correctAnswer(key) && (
-                          <span className={styles.taskAnswerCorrect}> · верный ответ: {correctAnswer(key)}</span>
-                        )}
-                        <TaskAnswerContent answer={sh} taskKey={key} />
-                      </li>
-                    ))}
-                </ul>
-              )}
-
-              {sh.files?.some((f) => !f.task_key) && (
-                <ul className={panel.files}>
-                  {sh.files.filter((f) => !f.task_key).map((f) => (
-                    <li key={f.id}>
-                      <a className={panel.link} href={f.url} download={f.name}>
-                        📎 {f.name}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              )}
-
-              {onReview && (
-                <ReviewButtons status={sh.status} onChange={(value) => onReview(assignment.id!, sh.id!, value)} />
-              )}
-
-              {commentActions && (
-                <>
-                  <button
-                    type="button"
-                    className={`${panel.threadToggle} ${isChatOpen ? panel.threadActive : ''}`}
-                    onClick={() => setIsChatOpen((open) => !open)}
-                    aria-expanded={isChatOpen}
-                  >
-                    💬 Переписка ({sh.comments?.length ?? 0})
-                    <span className={panel.chevron}>{isChatOpen ? '▲' : '▼'}</span>
-                  </button>
-                  {isChatOpen && (
-                    <CommentThread
-                      comments={sh.comments}
-                      currentUserId={currentUserId}
-                      canDeleteAll
-                      placeholder="Ответить ученику..."
-                      onSend={(text) => commentActions.add(assignment.id!, sh.id!, text)}
-                      onEdit={(id, text) => commentActions.edit(assignment.id!, sh.id!, id, text)}
-                      onDelete={(id) => commentActions.remove(assignment.id!, sh.id!, id)}
-                    />
-                  )}
-                </>
-              )}
-            </div>
-          )}
+          {openId === null && <p className={panel.empty}>Нажмите на ученика — его ответ откроется справа</p>}
         </>
       )}
     </section>
+  )
+}
+
+interface StudentAnswerPanelProps {
+  assignment: Assignment
+  students: Account[]
+  studentId: number
+  answerOrder: string[]
+  correctAnswer: (key: string) => string | undefined
+  currentUserId?: number
+  onReview?: (assignmentId: number, answerId: number, status: ReviewStatus) => Promise<void>
+  commentActions?: CommentActions
+  onOpen: (studentId: number) => void
+  onClose: () => void
+}
+
+// Ответ одного ученика в панели справа: ответы по заданиям, файлы, проверка, переписка.
+// «Следующий ученик» открывает ответ следующего приславшего
+function StudentAnswerPanel({
+  assignment, students, studentId, answerOrder, correctAnswer, currentUserId, onReview, commentActions, onOpen, onClose,
+}: StudentAnswerPanelProps) {
+  const [chatOf, setChatOf] = useState<number | null>(null) // у какого ученика раскрыта переписка
+  const isChatOpen = chatOf === studentId
+  const list = lessonStudents(assignment, students)
+  const student = list.find((s) => s.id === studentId)
+  const sh = answerOfStudent(assignment, studentId)
+  const name = sh?.student_name ?? student?.name ?? 'Ученик'
+
+  const sent = list.filter((s) => answerOfStudent(assignment, s.id))
+  const i = sent.findIndex((s) => s.id === studentId)
+  const next = i === -1 ? sent[0] : sent[i + 1]
+
+  return (
+    <TasksViewer
+      title={`Ответ: ${name}`}
+      subtitle={assignment.title}
+      source=""
+      onClose={onClose}
+      onNext={next ? () => onOpen(next.id) : undefined}
+      nextLabel={next ? `Следующий ученик: ${next.name} →` : undefined}
+    >
+      {!sh ? (
+        <p className={panel.empty}>{name} пока ничего не прислал(а)</p>
+      ) : (
+        <div className={styles.answerPanel}>
+          <div className={panel.meta}>
+            <span className={panel.date}>{formatAnswerDate(sh.submitted_at)}</span>
+            <StatusBadge answer={sh} />
+          </div>
+
+          {sh.description ? (
+            <p className={panel.description}>{sh.description}</p>
+          ) : (
+            <p className={panel.empty}>Без описания</p>
+          )}
+
+          {sh.task_checks && Object.keys(sh.task_checks).length > 0 && (
+            <p className={styles.autoCheck}>
+              Автопроверка: верно {Object.values(sh.task_checks).filter(Boolean).length} из{' '}
+              {Object.keys(sh.task_checks).length}
+            </p>
+          )}
+
+          {answerOrder.some((key) => hasTaskAnswer(sh, key)) && (
+            <ul className={styles.taskAnswers}>
+              {answerOrder
+                .filter((key) => hasTaskAnswer(sh, key))
+                .map((key) => (
+                  <li key={key}>
+                    <span className={styles.taskAnswerTitle}>{answerKeyTitle(key)}</span>
+                    {correctAnswer(key) && (
+                      <span className={styles.taskAnswerCorrect}> · верный ответ: {correctAnswer(key)}</span>
+                    )}
+                    <TaskAnswerContent answer={sh} taskKey={key} />
+                  </li>
+                ))}
+            </ul>
+          )}
+
+          {sh.files?.some((f) => !f.task_key) && (
+            <ul className={panel.files}>
+              {sh.files.filter((f) => !f.task_key).map((f) => (
+                <li key={f.id}>
+                  <a className={panel.link} href={f.url} download={f.name}>
+                    📎 {f.name}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {onReview && (
+            <ReviewButtons status={sh.status} onChange={(value) => onReview(assignment.id!, sh.id!, value)} />
+          )}
+
+          {commentActions && (
+            <>
+              <button
+                type="button"
+                className={`${panel.threadToggle} ${isChatOpen ? panel.threadActive : ''}`}
+                onClick={() => setChatOf(isChatOpen ? null : studentId)}
+                aria-expanded={isChatOpen}
+              >
+                💬 Переписка ({sh.comments?.length ?? 0})
+                <span className={panel.chevron}>{isChatOpen ? '▲' : '▼'}</span>
+              </button>
+              {isChatOpen && (
+                <CommentThread
+                  comments={sh.comments}
+                  currentUserId={currentUserId}
+                  canDeleteAll
+                  placeholder="Ответить ученику..."
+                  onSend={(text) => commentActions.add(assignment.id!, sh.id!, text)}
+                  onEdit={(id, text) => commentActions.edit(assignment.id!, sh.id!, id, text)}
+                  onDelete={(id) => commentActions.remove(assignment.id!, sh.id!, id)}
+                />
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </TasksViewer>
   )
 }
