@@ -18,8 +18,11 @@ MAX_TOTAL_LATEX_LENGTH = 1_000_000
 
 class Account(models.Model):
     """Модель для учетных записей учителей и учеников"""
+    # Куратор проверяет ДЗ: видит все уроки и ответы учеников, ставит отметки и пишет в переписке,
+    # но не создаёт и не меняет уроки, не управляет учениками и оплатой, не ведёт созвоны
     ROLE_CHOICES = [
         ('teacher', 'Teacher'),
+        ('curator', 'Curator'),
         ('student', 'Student'),
     ]
 
@@ -27,6 +30,9 @@ class Account(models.Model):
     password = models.CharField(max_length=255)
     role = models.CharField(max_length=10, choices=ROLE_CHOICES)
     subjects = models.JSONField(default=list, blank=True)  # список предметов для ученика
+    # Создатель платформы: только он добавляет, меняет и удаляет учителей и кураторов
+    # (учеников может добавлять любой учитель). Ставится миграцией 0039, через API не меняется
+    is_owner = models.BooleanField(default=False)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -45,6 +51,15 @@ class Account(models.Model):
     @property
     def is_teacher(self):
         return self.role == 'teacher'
+
+    @property
+    def is_curator(self):
+        return self.role == 'curator'
+
+    @property
+    def can_review(self):
+        """Видит все уроки и ответы учеников и проверяет их: учитель и куратор"""
+        return self.role in ('teacher', 'curator')
 
     def set_password(self, raw_password):
         """Сохраняет пароль в виде хэша (PBKDF2), а не открытым текстом"""

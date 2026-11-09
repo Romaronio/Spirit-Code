@@ -14,6 +14,7 @@ import StudentsList from '../../components/StudentsList/StudentsList'
 import { promptInstall, useCanInstall } from '../../utils/install'
 import { lessonForSubjects, normalize } from '../../utils/subjects'
 import { awaitsReview } from '../../utils/studentStats'
+import { canReview } from '../../utils/roles'
 
 interface Props {
   user: User | null;
@@ -87,13 +88,15 @@ function HomePage({
   }
 
   const isTeacher = user.role === 'teacher'
+  // Куратор видит то же, что учитель, но без создания уроков, учеников, оплаты и созвонов
+  const isReviewer = canReview(user.role)
 
   // Предметы ученика берём из актуального списка аккаунтов,
   // чтобы изменения учителя применялись сразу
   const account = accounts.find((a) => normalize(a.name) === normalize(user.name))
   const mySubjects = account?.subjects ?? []
 
-  const visibleItems = isTeacher
+  const visibleItems = isReviewer
     ? items
     : items.filter((item) => lessonForSubjects(mySubjects, item))
 
@@ -117,7 +120,7 @@ function HomePage({
   // Предметы для учеников и созвонов — список с сервера (можно удалять в форме урока)
   const subjectList = subjects.map((s) => s.name)
 
-  const lead = isTeacher
+  const lead = isReviewer
     ? pendingReviewCount > 0
       ? `${plural(pendingReviewCount, 'ответ ждёт', 'ответа ждут', 'ответов ждут')} проверки.`
       : 'Все ответы учеников проверены.'
@@ -128,7 +131,7 @@ function HomePage({
   // Сортируем по ID в обратном порядке (последние добавленные первыми)
   const sortedItems = [...visibleItems].sort((a, b) => (b.id ?? 0) - (a.id ?? 0))
 
-  const emptyMessage = isTeacher
+  const emptyMessage = isReviewer
     ? 'Заданий пока нет'
     : mySubjects.length === 0
       ? 'Учитель пока не назначил вам предметы'
@@ -143,8 +146,8 @@ function HomePage({
   const assignmentsSection = (
     <section className={styles.assignmentsColumn}>
       {/* Заголовок слева, справа — выбор числа уроков в строке (только на ПК) */}
-      <div className={`${styles.headingRow} ${isTeacher ? styles.headingRowTeacher : ''}`}>
-        {!isTeacher && <h2 className={styles.heading}>Задания</h2>}
+      <div className={`${styles.headingRow} ${isReviewer ? styles.headingRowTeacher : ''}`}>
+        {!isReviewer && <h2 className={styles.heading}>Задания</h2>}
         {sortedItems.length > 0 && (
           <PerRowSwitch value={perRow} onChange={changePerRow} />
         )}
@@ -159,7 +162,7 @@ function HomePage({
           data-per-row={perRow}
         >
           {sortedItems.map((item) => (
-            <AssignmentCard key={item.id} assignment={item} user={user} onDelete={onDelete} />
+            <AssignmentCard key={item.id} assignment={item} user={user} onDelete={isTeacher ? onDelete : undefined} />
           ))}
         </div>
       )}
@@ -208,8 +211,8 @@ function HomePage({
           <div className={styles.welcome}>
             <h1 className={styles.greeting}>Добро пожаловать, {user.name}</h1>
             {/* Непроверенные ответы учеников — красным, чтобы учитель сразу заметил */}
-            <p className={`${styles.lead} ${isTeacher && pendingReviewCount > 0 ? styles.leadAlert : ''}`}>{lead}</p>
-            {isTeacher && (
+            <p className={`${styles.lead} ${isReviewer && pendingReviewCount > 0 ? styles.leadAlert : ''}`}>{lead}</p>
+            {isReviewer && (
               <button type="button" className={styles.allButton} onClick={() => setShowAll(true)}>
                 Посмотреть все задания
               </button>
@@ -231,17 +234,19 @@ function HomePage({
           )}
         </section>
 
-        <CallsBar
-          isTeacher={isTeacher}
-          subjects={subjectList}
-          students={accounts.filter((a) => a.role === 'student' && a.id != null)}
-          lessons={isTeacher ? items : []}
-        />
+        {user.role !== 'curator' ? (
+          <CallsBar
+            isTeacher={isTeacher}
+            subjects={subjectList}
+            students={accounts.filter((a) => a.role === 'student' && a.id != null)}
+            lessons={isTeacher ? items : []}
+          />
+        ) : null}
 
-        {isTeacher ? (
+        {isReviewer ? (
           // Учитель: форма | ответы и ученики | список учеников (уроки — кнопкой «Посмотреть все задания»)
           <div className={styles.tools}>
-            <AssignmentForm onAdd={onAdd} subjects={subjects} onDeleteSubject={onDeleteSubject} />
+            {isTeacher && <AssignmentForm onAdd={onAdd} subjects={subjects} onDeleteSubject={onDeleteSubject} />}
             <div className={styles.sideColumn}>
               <AnswersPanel
                 items={items}
@@ -250,14 +255,20 @@ function HomePage({
                 activeAnswerId={chat?.answer.id}
                 onOpenChat={(assignmentId, answerId) => setOpenChat({ assignmentId, answerId })}
               />
-              <PaymentsPanel accounts={accounts} />
-              <StudentsPanel
-                accounts={accounts}
-                availableSubjects={subjectList}
-                onAddStudent={onAddStudent}
-                onDeleteStudent={onDeleteStudent}
-                onSetSubjects={onSetSubjects}
-              />
+              {isTeacher && (
+                <>
+                  <PaymentsPanel accounts={accounts} />
+                  <StudentsPanel
+                    accounts={accounts}
+                    currentUserId={user.id}
+                    isOwner={Boolean(accounts.find((a) => a.id === user.id)?.is_owner)}
+                    availableSubjects={subjectList}
+                    onAddStudent={onAddStudent}
+                    onDeleteStudent={onDeleteStudent}
+                    onSetSubjects={onSetSubjects}
+                  />
+                </>
+              )}
             </div>
             {chat ? (
               <div className={styles.assignmentsColumn}>
@@ -314,7 +325,7 @@ function HomePage({
                   data-per-row={allPerRow}
                 >
                   {sortedItems.map((item) => (
-                    <AssignmentCard key={item.id} assignment={item} user={user} onDelete={onDelete} />
+                    <AssignmentCard key={item.id} assignment={item} user={user} onDelete={isTeacher ? onDelete : undefined} />
                   ))}
                 </div>
               )}

@@ -1,4 +1,4 @@
-export type Role = 'teacher' | 'student'
+export type Role = 'teacher' | 'curator' | 'student' // куратор проверяет ДЗ, но не меняет уроки
 
 export interface User {
   id?: number
@@ -10,6 +10,7 @@ export interface Account extends User {
   id?: number
   password: string
   subjects?: string[] // предметы, которые изучает ученик
+  is_owner?: boolean // создатель платформы: только он добавляет учителей и кураторов
   created_at?: string
   updated_at?: string
 }

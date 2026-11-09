@@ -17,6 +17,7 @@ import { normalizeRecordingUrl, vkEmbedUrl } from '../../utils/vkVideo'
 import LatexEditor from '../../components/LatexEditor/LatexEditor'
 import NumberedTasksEditor from '../../components/NumberedTasksEditor/NumberedTasksEditor'
 import TasksViewer from '../../components/TasksViewer/TasksViewer'
+import { canReview } from '../../utils/roles'
 
 const MAX_TITLE_LENGTH = 255 // как Assignment.title на сервере
 
@@ -59,7 +60,7 @@ function AssignmentPage({ user, items, accounts, onUpdate, onSubmitStudentHomewo
   const account = accounts.find((a) => normalize(a.name) === normalize(user.name))
   const allowed =
     found !== undefined &&
-    (user.role === 'teacher' || lessonForSubjects(account?.subjects, found))
+    (canReview(user.role) || lessonForSubjects(account?.subjects, found))
   const assignment = allowed ? found : undefined
 
   if (!assignment) {
@@ -99,7 +100,8 @@ interface DetailsProps {
 }
 
 function AssignmentDetails({ assignment, user, studentId, students, onUpdate, onSubmitStudentHomework, onReview, commentActions }: DetailsProps) {
-  const canEdit = user.role === 'teacher'
+  const canEdit = user.role === 'teacher' // менять урок может только учитель
+  const isReviewer = canReview(user.role) // учитель и куратор видят ответы учеников и проверяют их
 
   const [isEditing, setIsEditing] = useState(false)
   const [isEditingTitle, setIsEditingTitle] = useState(false)
@@ -228,7 +230,7 @@ function AssignmentDetails({ assignment, user, studentId, students, onUpdate, on
         detailedRequired={isDetailedRequired(key)}
         onSave={handleSaveTaskAnswer}
       />
-    ) : canEdit ? (
+    ) : isReviewer ? (
       <TaskAnswersList answers={assignment.student_homeworks ?? []} taskKey={answerKey(key)} />
     ) : null
 
@@ -386,7 +388,7 @@ function AssignmentDetails({ assignment, user, studentId, students, onUpdate, on
           {assignment.deadline && <p className={styles.deadline}>Сдать до: {assignment.deadline}</p>}
 
           {/* «Ответы учеников» — у учителя сразу под названием урока; ответ открывается справа */}
-          {user.role === 'teacher' && (
+          {isReviewer && (
             <LessonAnswers
               assignment={assignment}
               students={students}
@@ -811,7 +813,7 @@ function AssignmentDetails({ assignment, user, studentId, students, onUpdate, on
           )}
         </div>
 
-        {openAnswerOf !== null && canEdit && (
+        {openAnswerOf !== null && isReviewer && (
           <StudentAnswerPanel
             assignment={assignment}
             students={students}
@@ -833,7 +835,7 @@ function AssignmentDetails({ assignment, user, studentId, students, onUpdate, on
             source={openNumbered.latex}
             files={assignment.files}
             attachments={lessonFiles.filter((f) => f.task_number === openNumbered.number)}
-            answer={canEdit ? openNumbered.answer : undefined}
+            answer={isReviewer ? openNumbered.answer : undefined}
             taskNumber={openNumbered.number}
             onClose={closeTasks}
             onNext={openNext}
@@ -860,7 +862,7 @@ function AssignmentDetails({ assignment, user, studentId, students, onUpdate, on
             source={openHomeworkNumbered.latex}
             files={assignment.homework?.files}
             attachments={homeworkFilesSaved.filter((f) => f.task_number === openHomeworkNumbered.number)}
-            answer={canEdit ? openHomeworkNumbered.answer : undefined}
+            answer={isReviewer ? openHomeworkNumbered.answer : undefined}
             taskNumber={openHomeworkNumbered.number}
             onClose={closeTasks}
             onNext={openNext}

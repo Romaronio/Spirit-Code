@@ -23,6 +23,8 @@ class AuthTestCase(APITestCase):
     def setUp(self):
         cache.clear()  # сбрасываем лимит попыток входа между тестами
         self.teacher = self.make_account('roman', 'teacher')
+        self.teacher.is_owner = True  # создатель платформы, как на сервере (миграция 0039)
+        self.teacher.save(update_fields=['is_owner'])
         self.anna = self.make_account('anna', 'student', ['Биология'])
         self.ivan = self.make_account('ivan', 'student', ['Английский'])
         self.bio = Assignment.objects.create(title='Фотосинтез', subject='Биология', deadline='2026-11-01')
@@ -135,6 +137,113 @@ class PermissionTests(AuthTestCase):
     def test_teacher_cannot_delete_self(self):
         self.login_as(self.teacher)
         self.assertEqual(self.client.delete(f'/api/accounts/{self.teacher.id}/').status_code, 400)
+
+
+class CuratorTests(AuthTestCase):
+    """Куратор проверяет ДЗ, но не создаёт и не меняет уроки и не управляет учениками"""
+    def setUp(self):
+        super().setUp()
+        self.curator = self.make_account('olga', 'curator')
+        self.bio.numbered_tasks = [{'number': 5, 'latex': 'x', 'answer': '42'}]
+        self.bio.save()
+        self.sh = StudentHomework.objects.create(
+            assignment=self.bio, student=self.anna, description='ответ', task_answers={'cw-5': '42'},
+        )
+
+    def test_curator_sees_all_lessons_answers_and_correct_answers(self):
+        self.login_as(self.curator)
+        ids = {a['id'] for a in self.client.get('/api/assignments/').data['results']}
+        self.assertEqual(ids, {self.bio.id, self.eng.id})
+        data = self.client.get(f'/api/assignments/{self.bio.id}/').data
+        self.assertEqual(data['numbered_tasks'][0]['answer'], '42')
+        self.assertEqual([sh['id'] for sh in data['student_homeworks']], [self.sh.id])
+        self.assertEqual(data['student_homeworks'][0]['task_checks'], {'cw-5': True})
+        # Список учеников — чтобы видеть, кто прислал ответ
+        self.assertEqual(self.client.get('/api/accounts/').status_code, 200)
+        self.assertEqual(self.client.get('/api/subjects/').status_code, 200)
+
+    def test_curator_reviews_and_comments(self):
+        self.login_as(self.curator)
+        url = f'/api/student-homeworks/{self.sh.id}/'
+        response = self.client.post(url + 'review/', {'status': 'accepted'}, format='json')
+        self.assertEqual(response.status_code, 200)
+        self.sh.refresh_from_db()
+        self.assertEqual(self.sh.status, 'accepted')
+        response = self.client.post(url + 'comments/', {'text': 'Молодец'}, format='json')
+        self.assertEqual(response.status_code, 201)
+
+    def test_curator_cannot_edit_lessons_or_accounts(self):
+        self.login_as(self.curator)
+        self.assertEqual(self.client.post('/api/assignments/', {'title': 'x', 'subject': 'Биология'}).status_code, 403)
+        self.assertEqual(self.client.patch(f'/api/assignments/{self.bio.id}/', {'title': 'x'}).status_code, 403)
+        self.assertEqual(self.client.delete(f'/api/assignments/{self.bio.id}/').status_code, 403)
+        self.assertEqual(self.client.post('/api/subjects/', {'name': 'x'}, format='json').status_code, 403)
+        response = self.client.post('/api/accounts/', {'name': 'x', 'password': '12345678', 'role': 'student'}, format='json')
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(self.client.patch(f'/api/accounts/{self.anna.id}/', {'subjects': []}, format='json').status_code, 403)
+        self.assertEqual(self.client.delete(f'/api/accounts/{self.anna.id}/').status_code, 403)
+        self.assertEqual(self.client.post(f'/api/accounts/{self.anna.id}/reset_password/').status_code, 403)
+        self.assertEqual(self.client.get('/api/payments/').status_code, 403)
+        self.assertEqual(self.client.post('/api/calls/', {'title': 'x'}, format='json').status_code, 403)
+        # Сдавать ответы куратор тоже не может
+        self.assertEqual(self.client.post(f'/api/assignments/{self.bio.id}/submit/', {'description': 'x'}).status_code, 403)
+
+    def test_teacher_creates_curator(self):
+        self.login_as(self.teacher)
+        response = self.client.post(
+            '/api/accounts/', {'name': 'Мария', 'password': '12345678', 'role': 'curator'}, format='json',
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data['role'], 'curator')
+
+
+class OwnerTests(AuthTestCase):
+    """Учителей и кураторов добавляет и меняет только создатель, учеников — любой учитель"""
+    def setUp(self):
+        super().setUp()
+        self.petr = self.make_account('petr', 'teacher')
+        self.curator = self.make_account('olga', 'curator')
+
+    def create(self, name, role):
+        return self.client.post('/api/accounts/', {'name': name, 'password': '12345678', 'role': role}, format='json')
+
+    def test_owner_flag_in_api_and_read_only(self):
+        self.login_as(self.teacher)
+        self.assertTrue(self.client.get('/api/accounts/me/').data['is_owner'])
+        response = self.client.patch(f'/api/accounts/{self.petr.id}/', {'is_owner': True}, format='json')
+        self.assertEqual(response.status_code, 200)
+        self.petr.refresh_from_db()
+        self.assertFalse(self.petr.is_owner)
+
+    def test_owner_manages_teachers_and_curators(self):
+        self.login_as(self.teacher)
+        self.assertEqual(self.create('Новый учитель', 'teacher').status_code, 201)
+        self.assertEqual(self.create('Новый куратор', 'curator').status_code, 201)
+        self.assertEqual(self.client.post(f'/api/accounts/{self.curator.id}/reset_password/').status_code, 200)
+        self.assertEqual(self.client.post(f'/api/accounts/{self.petr.id}/reset_password/').status_code, 200)
+        self.assertEqual(self.client.delete(f'/api/accounts/{self.curator.id}/').status_code, 204)
+        self.assertEqual(self.client.delete(f'/api/accounts/{self.petr.id}/').status_code, 204)
+
+    def test_other_teacher_manages_only_students(self):
+        self.login_as(self.petr)
+        self.assertEqual(self.create('Новый ученик', 'student').status_code, 201)
+        self.assertEqual(self.client.post(f'/api/accounts/{self.anna.id}/reset_password/').status_code, 200)
+        self.assertEqual(self.client.delete(f'/api/accounts/{self.ivan.id}/').status_code, 204)
+        self.assertEqual(self.create('Учитель 2', 'teacher').status_code, 403)
+        self.assertEqual(self.create('Куратор 2', 'curator').status_code, 403)
+        self.assertEqual(self.client.post(f'/api/accounts/{self.curator.id}/reset_password/').status_code, 403)
+        self.assertEqual(self.client.delete(f'/api/accounts/{self.curator.id}/').status_code, 403)
+        self.assertEqual(self.client.delete(f'/api/accounts/{self.teacher.id}/').status_code, 403)
+        # Ученика в учителя не превратить
+        response = self.client.patch(f'/api/accounts/{self.anna.id}/', {'role': 'teacher'}, format='json')
+        self.assertEqual(response.status_code, 403)
+        self.anna.refresh_from_db()
+        self.assertEqual(self.anna.role, 'student')
+
+    def test_owner_cannot_be_demoted(self):
+        self.login_as(self.teacher)
+        response = self.client.patch(f'/api/accounts/{self.teacher.id}/', {'role': 'student'}, format='json')
+        self.assertEqual(response.status_code, 403)
 
 
 class SubmitTests(AuthTestCase):

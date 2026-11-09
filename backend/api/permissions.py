@@ -16,6 +16,14 @@ class IsTeacher(BasePermission):
         return _role(request) == 'teacher'
 
 
+class IsReviewer(BasePermission):
+    """Учитель или куратор: смотреть уроки и ответы учеников, проверять ДЗ"""
+    message = 'Действие доступно только учителю или куратору'
+
+    def has_permission(self, request, view):
+        return _role(request) in ('teacher', 'curator')
+
+
 class IsStudent(BasePermission):
     """Доступ только для вошедшего ученика"""
     message = 'Действие доступно только ученику'

@@ -4,8 +4,18 @@ import type { Account } from '../../types'
 import { hasSubject, toggleSubject, uniqueSubjects } from '../../utils/subjects'
 import * as api from '../../services/api'
 
+type NewRole = 'student' | 'curator' | 'teacher'
+
+const ROLE_OPTIONS: { role: NewRole; label: string; who: string }[] = [
+  { role: 'student', label: 'Ученик', who: 'ученика' },
+  { role: 'curator', label: 'Куратор', who: 'куратора' },
+  { role: 'teacher', label: 'Учитель', who: 'учителя' },
+]
+
 interface Props {
   accounts: Account[]
+  currentUserId?: number
+  isOwner: boolean // создатель: добавляет и удаляет учителей и кураторов, остальные учителя — только учеников
   availableSubjects: string[]
   onAddStudent: (student: Omit<Account, 'id'>) => Promise<void>
   onDeleteStudent: (id: number) => void
@@ -53,6 +63,8 @@ function SubjectPicker({ options, selected, onToggle }: PickerProps) {
 
 function StudentsPanel({
   accounts,
+  currentUserId,
+  isOwner,
   availableSubjects,
   onAddStudent,
   onDeleteStudent,
@@ -61,9 +73,11 @@ function StudentsPanel({
   const [name, setName] = useState('')
   const [password, setPassword] = useState('')
   const [newSubjects, setNewSubjects] = useState<string[]>([])
+  // Кого добавляем: ученика или куратора (куратор проверяет ДЗ, но не меняет уроки)
+  const [newRole, setNewRole] = useState<NewRole>('student')
   const [error, setError] = useState('')
   // Сервер хранит только хэш, поэтому пароль показываем один раз — сразу после добавления
-  const [created, setCreated] = useState<{ name: string; password: string } | null>(null)
+  const [created, setCreated] = useState<{ name: string; password: string; role: NewRole } | null>(null)
   const [isOpen, setIsOpen] = useState(false) // по умолчанию свёрнута
   const [isSaving, setIsSaving] = useState(false)
   // Сброс пароля: новый пароль тоже показываем один раз, под строкой ученика
@@ -71,13 +85,18 @@ function StudentsPanel({
   const [reset, setReset] = useState<{ id: number; password?: string; error?: string } | null>(null)
 
   const students = accounts.filter((a) => a.role === 'student')
+  // Учителей и кураторов видит и меняет только создатель
+  const staff = isOwner ? accounts.filter((a) => (a.role === 'curator' || a.role === 'teacher') && a.id !== currentUserId) : []
+  const curators = staff.filter((a) => a.role === 'curator')
+  const role: NewRole = isOwner ? newRole : 'student'
+  const who = ROLE_OPTIONS.find((o) => o.role === role)!.who
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     const trimmedName = name.trim()
 
     if (trimmedName === '') {
-      setError('Введите имя ученика')
+      setError(`Введите имя ${who}`)
       return
     }
     if (password.length < MIN_PASSWORD_LENGTH) {
@@ -97,16 +116,16 @@ function StudentsPanel({
       await onAddStudent({
         name: trimmedName,
         password,
-        role: 'student',
-        subjects: newSubjects,
+        role,
+        subjects: role === 'student' ? newSubjects : [],
       })
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Не удалось добавить ученика')
+      setError(err instanceof Error ? err.message : `Не удалось добавить ${who}`)
       return
     } finally {
       setIsSaving(false)
     }
-    setCreated({ name: trimmedName, password })
+    setCreated({ name: trimmedName, password, role })
     setName('')
     setPassword('')
     setNewSubjects([])
@@ -114,7 +133,7 @@ function StudentsPanel({
   }
 
   async function handleResetPassword(studentId: number, studentName: string) {
-    if (!window.confirm(`Сбросить пароль ученику «${studentName}»? Старый пароль перестанет работать.`)) {
+    if (!window.confirm(`Сбросить пароль «${studentName}»? Старый пароль перестанет работать.`)) {
       return
     }
     setResettingId(studentId)
@@ -130,7 +149,7 @@ function StudentsPanel({
   }
 
   function handleDelete(studentId: number, studentName: string) {
-    if (window.confirm(`Удалить ученика «${studentName}»?`)) {
+    if (window.confirm(`Удалить «${studentName}»?`)) {
       onDeleteStudent(studentId)
     }
   }
@@ -140,6 +159,10 @@ function StudentsPanel({
       <div className={styles.header}>
         <h2>
           Ученики <span className={styles.count}>({students.length})</span>
+          {curators.length > 0 && <span className={styles.count}> · кураторы ({curators.length})</span>}
+          {staff.length > curators.length && (
+            <span className={styles.count}> · учителя ({staff.length - curators.length})</span>
+          )}
         </h2>
         <button
           type="button"
@@ -154,9 +177,38 @@ function StudentsPanel({
       {isOpen && (
         <>
           <form className={styles.form} onSubmit={handleSubmit}>
+            {/* Учителей и кураторов добавляет только создатель платформы */}
+            {isOwner && (
+              <div className={styles.roleSwitch} role="group" aria-label="Кого добавить">
+                {ROLE_OPTIONS.map((o) => (
+                  <button
+                    key={o.role}
+                    type="button"
+                    aria-pressed={role === o.role}
+                    onClick={() => {
+                      setNewRole(o.role)
+                      setError('')
+                    }}
+                  >
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+            )}
+            {role === 'curator' && (
+              <p className={styles.hint}>
+                Куратор видит все уроки и ответы учеников, ставит «Сдано» / «Не сдано» и пишет ученикам.
+                Создавать и менять уроки, учеников, оплату и созвоны он не может.
+              </p>
+            )}
+            {role === 'teacher' && (
+              <p className={styles.hint}>
+                Учитель может всё то же, что и вы, кроме добавления учителей и кураторов: учеников он добавлять может.
+              </p>
+            )}
             <input
               type="text"
-              placeholder="Имя ученика"
+              placeholder={`Имя ${who}`}
               value={name}
               onChange={(e) => {
                 setName(e.target.value)
@@ -187,23 +239,27 @@ function StudentsPanel({
               </button>
             </div>
 
-            <p className={styles.label}>Предметы ученика</p>
-            <SubjectPicker
-              options={availableSubjects}
-              selected={newSubjects}
-              onToggle={(subject) => setNewSubjects((prev) => toggleSubject(prev, subject))}
-            />
+            {role === 'student' && (
+              <>
+                <p className={styles.label}>Предметы ученика</p>
+                <SubjectPicker
+                  options={availableSubjects}
+                  selected={newSubjects}
+                  onToggle={(subject) => setNewSubjects((prev) => toggleSubject(prev, subject))}
+                />
+              </>
+            )}
 
             {error && <p className={styles.error}>{error}</p>}
             {created && (
               <p className={styles.hint}>
-                Ученик «{created.name}» добавлен. Пароль: <b>{created.password}</b> — передайте
-                его ученику, позже посмотреть его будет нельзя.
+                {ROLE_OPTIONS.find((o) => o.role === created.role)!.label} «{created.name}» добавлен. Пароль:{' '}
+                <b>{created.password}</b> — передайте его, позже посмотреть его будет нельзя.
               </p>
             )}
 
             <button type="submit" className={styles.submit} disabled={isSaving}>
-              {isSaving ? 'Добавление...' : 'Добавить ученика'}
+              {isSaving ? 'Добавление...' : `Добавить ${who}`}
             </button>
           </form>
 
@@ -259,6 +315,44 @@ function StudentsPanel({
                 )
               })}
             </ul>
+          )}
+
+          {staff.length > 0 && (
+            <>
+              <p className={styles.label}>Учителя и кураторы</p>
+              <ul className={styles.list}>
+                {staff.map((c) => (
+                  <li key={c.id}>
+                    <div className={styles.studentRow}>
+                      <span className={styles.studentName}>
+                        {c.name} <span className={styles.count}>· {c.role === 'teacher' ? 'учитель' : 'куратор'}</span>
+                      </span>
+                      <button
+                        type="button"
+                        className={styles.reset}
+                        onClick={() => handleResetPassword(c.id!, c.name)}
+                        disabled={resettingId === c.id}
+                      >
+                        {resettingId === c.id ? 'Сброс...' : 'Сбросить пароль'}
+                      </button>
+                      <button type="button" className={styles.delete} onClick={() => handleDelete(c.id!, c.name)}>
+                        Удалить
+                      </button>
+                    </div>
+                    {reset && reset.id === c.id && (
+                      reset.error ? (
+                        <p className={styles.error}>{reset.error}</p>
+                      ) : (
+                        <p className={styles.hint}>
+                          Новый пароль: <b className={styles.newPassword}>{reset.password}</b> — передайте
+                          его, позже посмотреть его будет нельзя.
+                        </p>
+                      )
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </>
           )}
         </>
       )}

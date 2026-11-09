@@ -201,3 +201,26 @@
   font-family: var(--font-mono);
   user-select: all; /* выделяется целиком одним кликом — удобно копировать */
 }
+
+/* Кого добавляем: ученика или куратора */
+.roleSwitch {
+  display: flex;
+  gap: 6px;
+}
+
+.roleSwitch button {
+  padding: 4px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.roleSwitch button[aria-pressed='true'] {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}

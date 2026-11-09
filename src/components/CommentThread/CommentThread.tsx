@@ -3,6 +3,7 @@ import styles from './CommentThread.module.css'
 import type { AnswerComment } from '../../types'
 import MathText from '../MathText/MathText'
 import { hasMath } from '../../utils/math'
+import { canReview, ROLE_LABELS } from '../../utils/roles'
 
 interface Props {
   comments?: AnswerComment[]
@@ -253,7 +254,7 @@ function CommentThread({
                   key={c.id}
                   className={[
                     styles.message,
-                    c.author_role === 'teacher' ? styles.teacher : '',
+                    canReview(c.author_role) ? styles.teacher : '',
                     interactive ? styles.interactive : '',
                     menu?.comment.id === c.id ? styles.selected : '',
                   ].join(' ')}
@@ -270,7 +271,7 @@ function CommentThread({
                 >
                   <div className={styles.meta}>
                     <span className={styles.author}>
-                      {c.author_role === 'teacher' ? `Учитель · ${c.author_name}` : c.author_name}
+                      {canReview(c.author_role) ? `${ROLE_LABELS[c.author_role]} · ${c.author_name}` : c.author_name}
                     </span>
                     <span className={styles.time}>
                       {c.edited_at && <span className={styles.edited}>изменено · </span>}

@@ -26,7 +26,7 @@ function loadSession(): Session | null {
     if (
       typeof p?.token === 'string' &&
       u && typeof u.name === 'string' &&
-      (u.role === 'teacher' || u.role === 'student')
+      (u.role === 'teacher' || u.role === 'curator' || u.role === 'student')
     ) {
       return { token: p.token, user: { id: u.id, name: u.name, role: u.role } }
     }

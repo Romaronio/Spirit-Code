@@ -6,6 +6,7 @@ import * as api from '../../services/api'
 import TypingTrainer from '../../components/TypingTrainer/TypingTrainer'
 import TypingHistory from '../../components/TypingHistory/TypingHistory'
 import TypingResultsPanel from '../../components/TypingResultsPanel/TypingResultsPanel'
+import { canReview } from '../../utils/roles'
 
 interface Props {
   user: User | null
@@ -17,7 +18,7 @@ type SaveState =
   | { kind: 'error'; message: string }
 
 function TypingPage({ user }: Props) {
-  const isTeacher = user?.role === 'teacher'
+  const isTeacher = canReview(user?.role) // учитель и куратор видят результаты учеников
   const [history, setHistory] = useState<TypingResult[] | null>(null)
   const [saveState, setSaveState] = useState<SaveState | null>(null)
 
@@ -63,7 +64,7 @@ function TypingPage({ user }: Props) {
 
   let resultNote: React.ReactNode = null
   if (isTeacher) {
-    resultNote = 'Результаты учителя не сохраняются'
+    resultNote = 'Результаты учителя и куратора не сохраняются'
   } else if (saveState?.kind === 'saving') {
     resultNote = 'Сохраняем результат...'
   } else if (saveState?.kind === 'error') {

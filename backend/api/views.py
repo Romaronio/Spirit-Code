@@ -17,7 +17,7 @@ from rest_framework.views import APIView
 from .answer_check import snapshot_answers
 from .models import MAX_LATEX_LENGTH, Account, AnswerComment, Assignment, AuthToken, Call, CallAnswer, CallAnswerFile, DataVersion, LessonFile, Subject, Homework, HomeworkFile, Payment, StudentHomework, StudentHomeworkFile, TypingResult
 from . import livekit
-from .permissions import IsStudent, IsTeacher
+from .permissions import IsReviewer, IsStudent, IsTeacher
 from .photo_latex import PhotoLatexError, photo_to_latex
 from .uploads import check_student_quota, check_uploads
 from .serializers import (
@@ -135,6 +135,29 @@ class AccountViewSet(viewsets.ModelViewSet):
     permission_classes = [IsTeacher]
     throttle_scope = None  # лимит включается только для login (см. ниже)
 
+    def get_permissions(self):
+        # Куратору нужен список учеников, чтобы видеть, кто прислал ответ; менять аккаунты он не может
+        if self.action in ('list', 'retrieve'):
+            return [IsReviewer()]
+        return super().get_permissions()
+
+    def _check_owner(self, *roles):
+        """Учителей и кураторов добавляет, меняет и удаляет только создатель платформы,
+        учеников — любой учитель"""
+        if any(role != 'student' for role in roles) and not self.request.user.is_owner:
+            raise PermissionDenied('Учителей и кураторов может добавлять и менять только создатель платформы')
+
+    def perform_create(self, serializer):
+        self._check_owner(serializer.validated_data.get('role', ''))
+        serializer.save()
+
+    def perform_update(self, serializer):
+        account = serializer.instance
+        self._check_owner(account.role, serializer.validated_data.get('role', account.role))
+        if account.is_owner and serializer.validated_data.get('role', account.role) != account.role:
+            raise PermissionDenied('Создатель платформы остаётся учителем')
+        serializer.save()
+
     @action(
         detail=False,
         methods=['post'],
@@ -184,14 +207,15 @@ class AccountViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def reset_password(self, request, pk=None):
-        """Учитель сбрасывает пароль ученику: сервер придумывает новый,
-        возвращает его один раз и завершает все сессии ученика"""
+        """Учитель сбрасывает пароль ученику или куратору: сервер придумывает новый,
+        возвращает его один раз и завершает все сессии этого аккаунта"""
         account = self.get_object()
-        if account.role != 'student':
+        if account.pk == request.user.pk:
             return Response(
-                {'error': 'Сбросить пароль можно только ученику'},
+                {'error': 'Свой пароль сбросить нельзя'},
                 status=status.HTTP_400_BAD_REQUEST
             )
+        self._check_owner(account.role)
         password = ''.join(secrets.choice(PASSWORD_ALPHABET) for _ in range(GENERATED_PASSWORD_LENGTH))
         account.set_password(password)
         account.save(update_fields=['password', 'updated_at'])
@@ -199,11 +223,15 @@ class AccountViewSet(viewsets.ModelViewSet):
         return Response({'password': password})
 
     def destroy(self, request, *args, **kwargs):
-        if self.get_object().pk == request.user.pk:
+        account = self.get_object()
+        if account.pk == request.user.pk:
             return Response(
                 {'error': 'Нельзя удалить собственный аккаунт'},
                 status=status.HTTP_400_BAD_REQUEST
             )
+        self._check_owner(account.role)
+        if account.is_owner:
+            raise PermissionDenied('Аккаунт создателя платформы удалить нельзя')
         return super().destroy(request, *args, **kwargs)
 
 
@@ -238,7 +266,7 @@ class AssignmentViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(subject=subject)
 
         user = self.request.user
-        if not getattr(user, 'is_teacher', False):
+        if not getattr(user, 'can_review', False):
             subjects = {str(s).strip().casefold() for s in (getattr(user, 'subjects', None) or []) if str(s).strip()}
             # Урок виден, если любой из его предметов есть у ученика. Сравниваем в Python:
             # дополнительные предметы лежат в JSON, а iexact в SQLite не понимает регистр русских букв
@@ -506,13 +534,13 @@ class StudentHomeworkViewSet(viewsets.ModelViewSet):
     queryset = StudentHomework.objects.all()
     serializer_class = StudentHomeworkSerializer
     parser_classes = [MultiPartParser, FormParser, JSONParser]
-    permission_classes = [IsTeacher]
+    permission_classes = [IsReviewer]  # учитель и куратор проверяют ответы
 
     def get_queryset(self):
         queryset = super().get_queryset()
         user = self.request.user
         # Ученику (он попадает сюда только в переписку) доступны только свои ответы
-        if not getattr(user, 'is_teacher', False):
+        if not getattr(user, 'can_review', False):
             queryset = queryset.filter(student=user)
         return queryset
 
@@ -548,6 +576,11 @@ class SubjectViewSet(mixins.ListModelMixin, mixins.DestroyModelMixin, viewsets.G
     serializer_class = SubjectSerializer
     permission_classes = [IsTeacher]
     pagination_class = None
+
+    def get_permissions(self):
+        if self.action == 'list':  # куратору — только посмотреть список
+            return [IsReviewer()]
+        return super().get_permissions()
 
     def create(self, request):
         serializer = self.get_serializer(data=request.data)
@@ -609,7 +642,7 @@ class AnswerCommentViewSet(mixins.UpdateModelMixin, mixins.DestroyModelMixin, vi
     def get_queryset(self):
         queryset = AnswerComment.objects.select_related('author')
         user = self.request.user
-        if not getattr(user, 'is_teacher', False):
+        if not getattr(user, 'can_review', False):
             # ученику доступна только переписка по его собственным ответам
             queryset = queryset.filter(student_homework__student=user)
         return queryset
@@ -642,13 +675,13 @@ class TypingResultViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, viewse
         if self.action == 'create':
             return [IsStudent()]
         if self.action in ('summary', 'by_mode'):
-            return [IsTeacher()]
+            return [IsReviewer()]
         return super().get_permissions()
 
     def get_queryset(self):
         queryset = TypingResult.objects.select_related('student')
         user = self.request.user
-        if not user.is_teacher:
+        if not user.can_review:
             return queryset.filter(student=user)
         student = self.request.query_params.get('student')
         if student:
@@ -787,6 +820,8 @@ class CallViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retriev
 
     def get_queryset(self):
         user = self.request.user
+        if getattr(user, 'is_curator', False):
+            return Call.objects.none()  # созвоны ведёт учитель, куратор в них не участвует
         return _live_calls() if getattr(user, 'is_teacher', False) else _student_calls(user)
 
     def perform_create(self, serializer):

@@ -11,7 +11,8 @@ class AccountSerializer(serializers.ModelSerializer):
     """Сериализатор для Account"""
     class Meta:
         model = Account
-        fields = ['id', 'name', 'password', 'role', 'subjects', 'created_at', 'updated_at']
+        fields = ['id', 'name', 'password', 'role', 'subjects', 'is_owner', 'created_at', 'updated_at']
+        read_only_fields = ['is_owner']  # создателя через API не назначить
         extra_kwargs = {
             'password': {'write_only': True}  # пароль не возвращается при GET запросах
         }
@@ -242,7 +243,7 @@ class StudentHomeworkSerializer(serializers.ModelSerializer):
     def get_task_checks(self, obj):
         """Автопроверка кратких ответов: {'hw-5': True, 'hw-6': False}"""
         user = getattr(self.context.get('request'), 'user', None)
-        return task_checks(obj, for_teacher=getattr(user, 'is_teacher', False))
+        return task_checks(obj, for_teacher=getattr(user, 'can_review', False))
 
 
 class StudentHomeworkCreateSerializer(serializers.ModelSerializer):
@@ -289,7 +290,8 @@ class AssignmentSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         data = super().to_representation(instance)
         user = getattr(self.context.get('request'), 'user', None)
-        if not getattr(user, 'is_teacher', False):
+        # Верные ответы нужны для проверки — их видят учитель и куратор
+        if not getattr(user, 'can_review', False):
             data['numbered_tasks'] = without_answers(data.get('numbered_tasks'))
             if data.get('homework'):
                 data['homework']['numbered_tasks'] = without_answers(data['homework'].get('numbered_tasks'))
@@ -314,11 +316,11 @@ class AssignmentSerializer(serializers.ModelSerializer):
         return result
 
     def get_student_homeworks(self, obj):
-        """Учитель видит все ответы, ученик — только свой"""
+        """Учитель и куратор видят все ответы, ученик — только свой"""
         answers = obj.student_homeworks.all()
         request = self.context.get('request')
         user = getattr(request, 'user', None)
-        if not getattr(user, 'is_teacher', False):
+        if not getattr(user, 'can_review', False):
             user_id = getattr(user, 'id', None)
             answers = [sh for sh in answers if sh.student_id == user_id]
         return StudentHomeworkSerializer(answers, many=True, context=self.context).data

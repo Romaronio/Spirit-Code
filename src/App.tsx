@@ -9,6 +9,7 @@ import StudentPage from './pages/StudentPage/StudentPage'
 import type { Account, AnswerComment, Assignment, AssignmentChanges, CommentActions, NewAssignment, ReviewStatus, Subject, User } from './types'
 import * as api from './services/api'
 import { clearSession, loadUser } from './utils/session'
+import { canReview } from './utils/roles'
 
 // Как часто спрашиваем сервер, не изменилось ли что-то (крошечный запрос — только номер версии)
 const UPDATES_POLL_MS = 4000
@@ -34,9 +35,9 @@ function App() {
     async function loadData(role: User['role']) {
       try {
         const [accountsData, assignmentsData, subjectsData] = await Promise.all([
-          role === 'teacher' ? api.getAllAccounts() : api.getMe().then((me) => [me]),
+          canReview(role) ? api.getAllAccounts() : api.getMe().then((me) => [me]),
           api.getAllAssignments(),
-          role === 'teacher' ? api.getSubjects() : Promise.resolve([]),
+          canReview(role) ? api.getSubjects() : Promise.resolve([]),
         ])
         if (cancelled) return
         setAccounts(accountsData)
@@ -71,9 +72,9 @@ function App() {
         if (cancelled) return
         if (known !== null && version !== known) {
           const [accountsData, assignmentsData, subjectsData] = await Promise.all([
-            user!.role === 'teacher' ? api.getAllAccounts() : api.getMe().then((me) => [me]),
+            canReview(user!.role) ? api.getAllAccounts() : api.getMe().then((me) => [me]),
             api.getAllAssignments(),
-            user!.role === 'teacher' ? api.getSubjects() : Promise.resolve([]),
+            canReview(user!.role) ? api.getSubjects() : Promise.resolve([]),
           ])
           if (cancelled) return
           setAccounts(accountsData)

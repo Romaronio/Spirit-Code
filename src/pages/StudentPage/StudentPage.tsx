@@ -6,6 +6,7 @@ import ProgressDonut from '../../components/ProgressDonut/ProgressDonut'
 import { StatusBadge } from '../../components/AnswerStatus/AnswerStatus'
 import { formatActivity, studentStats, taskAnswerCount } from '../../utils/studentStats'
 import type { Account, Assignment, Payment, TypingLanguage, TypingModeSummary, User } from '../../types'
+import { canReview } from '../../utils/roles'
 
 interface Props {
   user: User | null
@@ -52,7 +53,8 @@ function StudentPage({ user, items, accounts }: Props) {
   const [allLessons, setAllLessons] = useState(false)
   const schoolYear = currentSchoolYear()
 
-  const isTeacher = user?.role === 'teacher'
+  const isTeacher = canReview(user?.role) // учитель и куратор
+  const seesPayments = user?.role === 'teacher' // оплату видит только учитель
   useEffect(() => {
     if (!isTeacher || !studentId) return
     let cancelled = false
@@ -60,14 +62,14 @@ function StudentPage({ user, items, accounts }: Props) {
       .getTypingByMode(studentId)
       .then((list) => !cancelled && setTyping(list))
       .catch(() => !cancelled && setTyping([]))
-    api
+    if (seesPayments) api
       .getPayments(schoolYear)
       .then((list) => !cancelled && setPayments(list.filter((p) => p.student === studentId)))
       .catch(() => !cancelled && setPayments([]))
     return () => {
       cancelled = true
     }
-  }, [isTeacher, studentId, schoolYear])
+  }, [isTeacher, seesPayments, studentId, schoolYear])
 
   if (!user) return <Navigate to="/" replace />
   if (!isTeacher) return <Navigate to="/home" replace />
@@ -200,7 +202,7 @@ function StudentPage({ user, items, accounts }: Props) {
           )}
         </section>
 
-        <section className={styles.card}>
+        {seesPayments && <section className={styles.card}>
           <h2 className={styles.cardTitle}>
             Оплата · {schoolYear}/{schoolYear + 1}
           </h2>
@@ -224,7 +226,7 @@ function StudentPage({ user, items, accounts }: Props) {
               </p>
             </>
           )}
-        </section>
+        </section>}
       </div>
     </div>
   )

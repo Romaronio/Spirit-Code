@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import type { Assignment, User } from '../../types'
 import styles from './Assingment.module.css'
 import { StatusBadge } from '../AnswerStatus/AnswerStatus'
+import { canReview } from '../../utils/roles'
 
 interface Props {
   assignment: Assignment
@@ -16,7 +17,7 @@ function formatDeadline(value: string) {
 }
 
 function AssignmentCard({ assignment, user, onDelete }: Props) {
-  const isTeacher = user.role === 'teacher'
+  const isTeacher = canReview(user.role) // учитель и куратор: карточка без своего ответа
   // Ученику сервер присылает только его собственный ответ
   const myAnswer = isTeacher ? undefined : assignment.student_homeworks?.[0]
 
