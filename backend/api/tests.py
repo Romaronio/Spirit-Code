@@ -188,14 +188,15 @@ class SubjectTests(AuthTestCase):
     def test_new_lesson_adds_subject(self):
         self.login_as(self.teacher)
         self.client.post('/api/assignments/', {'title': 'Законы Ньютона', 'subject': 'Физика'})
-        self.assertEqual(list(Subject.objects.values_list('name', flat=True)), ['Физика'])
+        # Урок нового курса попадает и в «Информатику»
+        self.assertEqual(list(Subject.objects.values_list('name', flat=True)), ['Информатика', 'Физика'])
 
     def test_moving_lesson_adds_subject(self):
         self.login_as(self.teacher)
         response = self.client.patch(f'/api/assignments/{self.bio.id}/', {'subject': 'ЕГЭ информатика'})
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['subject'], 'ЕГЭ информатика')
-        self.assertEqual(list(Subject.objects.values_list('name', flat=True)), ['ЕГЭ информатика'])
+        self.assertEqual(list(Subject.objects.values_list('name', flat=True)), ['ЕГЭ информатика', 'Информатика'])
 
     def test_lesson_in_several_subjects(self):
         self.login_as(self.teacher)
@@ -205,7 +206,7 @@ class SubjectTests(AuthTestCase):
         )
         self.assertEqual(response.status_code, 200)
         # Основной предмет и повторы отброшены
-        self.assertEqual(response.data['extra_subjects'], ['ЕГЭ биология'])
+        self.assertEqual(response.data['extra_subjects'], ['ЕГЭ биология', 'Информатика'])
         self.assertIn('ЕГЭ биология', Subject.objects.values_list('name', flat=True))
         # Ученик только с дополнительным предметом урок видит, с другим — нет
         self.ivan.subjects = ['егэ биология']
@@ -222,6 +223,28 @@ class SubjectTests(AuthTestCase):
         self.login_as(self.teacher)
         response = self.client.patch(f'/api/assignments/{self.bio.id}/', {'subject': 'ЕГЭ биология'})
         self.assertEqual(response.data['extra_subjects'], [])
+
+    def test_lesson_goes_to_informatics(self):
+        self.login_as(self.teacher)
+        created = self.client.post('/api/assignments/', {'title': 'Циклы', 'subject': 'ЕГЭ по информатике 2026/2027'})
+        self.assertEqual(created.status_code, 201)
+        self.assertEqual(created.data['extra_subjects'], ['Информатика'])
+        # Уроки Математики и Русского языка в «Информатику» не попадают
+        for subject in ('Математика', 'русский язык'):
+            response = self.client.post('/api/assignments/', {'title': 'Урок', 'subject': subject})
+            self.assertEqual(response.data['extra_subjects'], [])
+        # Урок «Информатики» второй раз её не получает
+        response = self.client.post('/api/assignments/', {'title': 'Урок', 'subject': 'информатика'})
+        self.assertEqual(response.data['extra_subjects'], [])
+        # Учитель убрал урок из «Информатики» — при следующих сохранениях она не возвращается
+        url = f"/api/assignments/{created.data['id']}/"
+        response = self.client.patch(url, {'extra_subjects': json.dumps([])})
+        self.assertEqual(response.data['extra_subjects'], [])
+        response = self.client.patch(url, {'title': 'Циклы 2', 'subject': 'ЕГЭ по информатике 2026/2027'})
+        self.assertEqual(response.data['extra_subjects'], [])
+        # Добавили в ещё один курс — урок снова попадает в «Информатику»
+        response = self.client.patch(url, {'extra_subjects': json.dumps(['Спецкурс'])})
+        self.assertEqual(response.data['extra_subjects'], ['Спецкурс', 'Информатика'])
 
     def test_delete_keeps_lessons_and_students(self):
         subject = Subject.objects.create(name='Биология')
@@ -276,9 +299,15 @@ class TaskAnswerTests(AuthTestCase):
         self.assertFalse(StudentHomework.objects.exists())
 
     def test_resubmit_resets_status(self):
+        Homework.objects.create(assignment=self.bio, numbered_tasks=[{'number': 3, 'latex': 'y'}])
         sh = StudentHomework.objects.create(assignment=self.bio, student=self.anna, status='accepted')
         self.login_as(self.anna)
+        # Классную работу учитель не проверяет — её правка отметку не снимает
         self.assertEqual(self.client.post(self.url, {'task': 'cw-5', 'text': '41'}).status_code, 200)
+        sh.refresh_from_db()
+        self.assertEqual(sh.status, 'accepted')
+        # Ответ к ДЗ изменился — снова на проверку
+        self.assertEqual(self.client.post(self.url, {'task': 'hw-3', 'text': '7'}).status_code, 200)
         sh.refresh_from_db()
         self.assertEqual(sh.status, 'pending')
 

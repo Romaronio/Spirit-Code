@@ -96,7 +96,7 @@ export function TaskAnswersList({
             return (
               <li key={sh.id} className={styles.studentHomeworkCard}>
                 <span className={styles.studentName}>
-                  {sh.student_name} {typing ? <Typing /> : showStatus && <StatusBadge status={sh.status} />}
+                  {sh.student_name} {typing ? <Typing /> : showStatus && <StatusBadge answer={sh} />}
                 </span>
                 <TaskAnswerContent answer={sh} taskKey={taskKey} liveText={typing?.text} />
               </li>

@@ -53,7 +53,7 @@ function ChatWindow({ assignment, answer, currentUserId, commentActions, onClose
               {assignment.title}
             </Link>
             <span className={styles.subject}>{assignment.subject}</span>
-            <StatusBadge status={answer.status} />
+            <StatusBadge answer={answer} />
           </div>
         </div>
         <button type="button" className={styles.close} onClick={onClose} aria-label="Закрыть переписку">

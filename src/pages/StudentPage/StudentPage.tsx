@@ -159,7 +159,7 @@ function StudentPage({ user, items, accounts }: Props) {
                         .join(' · ')}
                     </span>
                   </div>
-                  {answer ? <StatusBadge status={answer.status} /> : <span className={styles.notSent}>Не отправлено</span>}
+                  {answer ? <StatusBadge answer={answer} /> : <span className={styles.notSent}>Не отправлено</span>}
                 </li>
               )
             })}

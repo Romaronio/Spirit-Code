@@ -135,6 +135,24 @@ def clean_numbered_tasks(value, allow_required=True):
     return [tasks[n] for n in sorted(tasks)]
 
 
+INFORMATICS = 'Информатика'
+# Курсы, уроки которых в «Информатику» не попадают
+NOT_INFORMATICS = {'математика', 'русский язык', 'информатика'}
+
+
+def needs_informatics(old_subjects, new_subjects):
+    """Урок создали или добавили в какой-то курс (не Математику и не Русский) — он попадает
+    и в папку «Информатика». Срабатывает только при появлении нового курса: если учитель
+    сам убрал урок из «Информатики», при следующих сохранениях она не возвращается"""
+    def keys(names):
+        return {' '.join(str(s).split()).casefold() for s in names if s and str(s).strip()}
+
+    old, new = keys(old_subjects), keys(new_subjects)
+    if INFORMATICS.casefold() in new:
+        return False
+    return any(s not in NOT_INFORMATICS for s in new - old)
+
+
 def clean_subject_list(value):
     """Список названий предметов без пустых и повторов (без учёта регистра)"""
     if value in (None, ''):
@@ -260,7 +278,11 @@ class AssignmentSerializer(serializers.ModelSerializer):
         subject = attrs.get('subject', getattr(self.instance, 'subject', ''))
         extra = attrs.get('extra_subjects', getattr(self.instance, 'extra_subjects', None) or [])
         if 'extra_subjects' in attrs or 'subject' in attrs:
-            attrs['extra_subjects'] = [s for s in extra if s.casefold() != subject.strip().casefold()]
+            extra = [s for s in extra if s.casefold() != subject.strip().casefold()]
+            old = self.instance.all_subjects if self.instance else []
+            if needs_informatics(old, [subject, *extra]):
+                extra.append(INFORMATICS)
+            attrs['extra_subjects'] = extra
         return attrs
 
     def to_representation(self, instance):

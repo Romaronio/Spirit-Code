@@ -328,7 +328,8 @@ class AssignmentViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         self._check_files(request)
         assignment = serializer.save()
-        Subject.ensure(assignment.subject)  # новый предмет появляется в списках выбора
+        for name in assignment.all_subjects:  # новый предмет появляется в списках выбора
+            Subject.ensure(name)
 
         self._save_homework(request, assignment)
         self._save_lesson_files(request, assignment)
@@ -453,10 +454,14 @@ class AssignmentViewSet(viewsets.ModelViewSet):
         else:
             answers.pop(task, None)
         sh.task_answers = answers
-        # Ответ изменился — учителю нужно проверить его заново
-        sh.status = 'pending'
-        sh.checked_at = None
-        sh.save(update_fields=['task_answers', 'status', 'checked_at'])
+        if task == 'classwork' or task.startswith('cw-'):
+            # Классную работу можно не решать, учитель её не проверяет — отметка урока остаётся
+            sh.save(update_fields=['task_answers'])
+        else:
+            # Ответ к ДЗ изменился — учителю нужно проверить его заново
+            sh.status = 'pending'
+            sh.checked_at = None
+            sh.save(update_fields=['task_answers', 'status', 'checked_at'])
 
         StudentHomeworkFile.objects.filter(id__in=delete_ids).delete()
         for f in files:

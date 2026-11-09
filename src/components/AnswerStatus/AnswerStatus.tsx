@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import styles from './AnswerStatus.module.css'
-import type { ReviewStatus } from '../../types'
+import type { ReviewStatus, StudentHomework } from '../../types'
+import { isClassworkOnly } from '../../utils/studentStats'
 
 const LABELS: Record<ReviewStatus, string> = {
   pending: '⏳ На проверке',
@@ -8,7 +9,12 @@ const LABELS: Record<ReviewStatus, string> = {
   rejected: '✗ Не сдано',
 }
 
-export function StatusBadge({ status = 'pending' }: { status?: ReviewStatus }) {
+// Без отметки учителя ответ только с классной работой — не «На проверке»: её можно не решать
+export function StatusBadge({ answer }: { answer: StudentHomework }) {
+  const status = answer.status ?? 'pending'
+  if (status === 'pending' && isClassworkOnly(answer)) {
+    return <span className={`${styles.badge} ${styles.classwork}`}>Классная работа</span>
+  }
   return <span className={`${styles.badge} ${styles[status]}`}>{LABELS[status]}</span>
 }
 

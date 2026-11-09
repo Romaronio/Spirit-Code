@@ -40,7 +40,7 @@ function AssignmentCard({ assignment, user, onDelete }: Props) {
           <span className={styles.subject} title={assignment.subject}>{assignment.subject}</span>
           {!isTeacher &&
             (myAnswer ? (
-              <StatusBadge status={myAnswer.status} />
+              <StatusBadge answer={myAnswer} />
             ) : (
               <span className={styles.notSent}>Не отправлено</span>
             ))}

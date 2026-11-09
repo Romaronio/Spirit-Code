@@ -14,6 +14,11 @@
   color: var(--amber);
 }
 
+.classwork {
+  background: var(--surface-2);
+  color: var(--muted);
+}
+
 .accepted {
   border-color: var(--accent);
   background: var(--accent-soft);

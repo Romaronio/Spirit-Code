@@ -4,6 +4,7 @@ import styles from './AnswersPanel.module.css'
 import type { Account, Assignment, ReviewStatus, StudentHomework } from '../../types'
 import { ReviewButtons, StatusBadge } from '../AnswerStatus/AnswerStatus'
 import { lessonForSubjects } from '../../utils/subjects'
+import { awaitsReview } from '../../utils/studentStats'
 
 interface Props {
   items: Assignment[]
@@ -54,7 +55,7 @@ function AnswersPanel({ items, accounts, onReview, activeAnswerId, onOpenChat, r
   const answers = selected ? answersByStudent.get(selected.id!) ?? [] : []
   const answeredIds = new Set(answers.map((a) => a.assignment.id))
   const acceptedCount = answers.filter((a) => a.answer.status === 'accepted').length
-  const pendingCount = answers.filter((a) => (a.answer.status ?? 'pending') === 'pending').length
+  const pendingCount = answers.filter((a) => awaitsReview(a.answer)).length
   const notSubmitted = selected
     ? items.filter((a) => lessonForSubjects(selected.subjects, a) && !answeredIds.has(a.id))
     : []
@@ -115,7 +116,7 @@ function AnswersPanel({ items, accounts, onReview, activeAnswerId, onOpenChat, r
                         </div>
                         <div className={styles.meta}>
                           <span className={styles.subject}>{assignment.subject}</span>
-                          <StatusBadge status={answer.status} />
+                          <StatusBadge answer={answer} />
                         </div>
 
                         {answer.description ? (

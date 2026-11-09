@@ -26,6 +26,23 @@ export function taskAnswerCount(answer?: StudentHomework) {
   return keys.size
 }
 
+// Ключи классной работы: 'cw-5' — номер, 'classwork' — задания без номера
+const isClassworkKey = (key: string) => key === 'classwork' || key.startsWith('cw-')
+
+// В ответе только классная работа: ни ДЗ, ни описания, ни общих файлов к уроку.
+// Классную работу можно не решать, поэтому учителю такой ответ проверять не нужно
+export function isClassworkOnly(answer: StudentHomework) {
+  if (answer.description?.trim()) return false
+  const answers = answer.task_answers ?? {}
+  if (Object.keys(answers).some((k) => answers[k]?.trim() && !isClassworkKey(k))) return false
+  return !(answer.files ?? []).some((f) => !f.task_key || !isClassworkKey(f.task_key))
+}
+
+// Ответ ждёт проверки учителя: отметки ещё нет и в нём есть что-то кроме классной работы
+export function awaitsReview(answer: StudentHomework) {
+  return (answer.status ?? 'pending') === 'pending' && !isClassworkOnly(answer)
+}
+
 // Статистика ученика по урокам — считается из уже загруженных уроков (учитель видит все ответы)
 export function studentStats(student: Account, items: Assignment[]): StudentStats {
   const lessons = items
@@ -50,7 +67,7 @@ export function studentStats(student: Account, items: Assignment[]): StudentStat
       continue
     }
     const status = answer.status ?? 'pending'
-    stats[status]++
+    if (status !== 'pending' || awaitsReview(answer)) stats[status]++
     stats.taskAnswers += taskAnswerCount(answer)
     if (answer.submitted_at) dates.push(answer.submitted_at)
     for (const c of answer.comments ?? []) if (c.author === student.id) dates.push(c.created_at)

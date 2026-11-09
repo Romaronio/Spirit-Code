@@ -13,6 +13,7 @@ import ChatWindow from '../../components/ChatWindow/ChatWindow'
 import StudentsList from '../../components/StudentsList/StudentsList'
 import { promptInstall, useCanInstall } from '../../utils/install'
 import { lessonForSubjects, normalize } from '../../utils/subjects'
+import { awaitsReview } from '../../utils/studentStats'
 
 interface Props {
   user: User | null;
@@ -111,7 +112,7 @@ function HomePage({
     visibleItems.filter((item) => !item.student_homeworks?.[0]).length + rejectedCount
   const pendingReviewCount = items
     .flatMap((item) => item.student_homeworks ?? [])
-    .filter((answer) => (answer.status ?? 'pending') === 'pending').length
+    .filter(awaitsReview).length
 
   // Предметы для учеников и созвонов — список с сервера (можно удалять в форме урока)
   const subjectList = subjects.map((s) => s.name)

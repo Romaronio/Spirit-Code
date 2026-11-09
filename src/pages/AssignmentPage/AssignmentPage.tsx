@@ -4,6 +4,7 @@ import styles from './AssignmentPage.module.css'
 import panel from '../../components/AnswersPanel/AnswersPanel.module.css'
 import * as api from '../../services/api'
 import { lessonForSubjects, normalize } from '../../utils/subjects'
+import { awaitsReview } from '../../utils/studentStats'
 import type { Account, Assignment, AssignmentChanges, CommentActions, NumberedTask, ReviewStatus, StudentHomework, User } from '../../types'
 import { ReviewButtons, StatusBadge } from '../../components/AnswerStatus/AnswerStatus'
 import CommentThread from '../../components/CommentThread/CommentThread'
@@ -715,7 +716,7 @@ function AssignmentDetails({ assignment, user, studentId, students, onUpdate, on
               <h2>Отправить ответ</h2>
               {myAnswer && (
                 <p className={styles.reviewStatus}>
-                  Статус: <StatusBadge status={myAnswer.status} />
+                  Статус: <StatusBadge answer={myAnswer} />
                   {myAnswer.status === 'rejected' && ' — исправьте ответ и отправьте снова'}
                 </p>
               )}
@@ -1043,7 +1044,7 @@ function LessonAnswers({ assignment, students, answerOrder, correctAnswer, curre
   const sh = selected ? answerOf(selected.id) : undefined
 
   const acceptedCount = answers.filter((a) => a.status === 'accepted').length
-  const pendingCount = answers.filter((a) => (a.status ?? 'pending') === 'pending').length
+  const pendingCount = answers.filter(awaitsReview).length
 
   return (
     <section className={`${panel.panel} ${styles.lessonAnswers}`}>
@@ -1060,7 +1061,7 @@ function LessonAnswers({ assignment, students, answerOrder, correctAnswer, curre
           <div className={panel.students}>
             {list.map((s) => {
               const a = answerOf(s.id)
-              const mark = !a ? '—' : a.status === 'accepted' ? '✓' : a.status === 'rejected' ? '✗' : '•'
+              const mark = !a ? '—' : a.status === 'accepted' ? '✓' : a.status === 'rejected' ? '✗' : awaitsReview(a) ? '•' : '○'
               return (
                 <button
                   key={s.id}
@@ -1092,7 +1093,7 @@ function LessonAnswers({ assignment, students, answerOrder, correctAnswer, curre
               </div>
               <div className={panel.meta}>
                 <span className={panel.subject}>{assignment.subject}</span>
-                <StatusBadge status={sh.status} />
+                <StatusBadge answer={sh} />
               </div>
 
               {sh.description ? (
