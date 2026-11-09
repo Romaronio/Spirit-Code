@@ -98,8 +98,10 @@ MAX_TASK_ANSWER_LENGTH = 500
 
 
 def clean_numbered_tasks(value):
-    """Список {number, latex, answer}: номера от 1 до 999 без повторов, по возрастанию.
-    Ответ необязателен — пустой не сохраняем"""
+    """Список {number, latex, answer, short_only}: номера от 1 до 999 без повторов, по возрастанию.
+    Ответ необязателен — пустой не сохраняем. short_only — ученик присылает только краткий ответ
+    (без программы и файлов); detailed_required — без программы или файла к номеру ученик
+    не отправит ДЗ. Флаги хранятся, только если включены, и вместе не бывают"""
     if value in (None, ''):
         return []
     if not isinstance(value, list) or len(value) > 50:
@@ -122,6 +124,10 @@ def clean_numbered_tasks(value):
         tasks[number] = {'number': number, 'latex': latex}
         if answer.strip():
             tasks[number]['answer'] = answer.strip()
+        if item.get('short_only') is True:
+            tasks[number]['short_only'] = True
+        elif item.get('detailed_required') is True:
+            tasks[number]['detailed_required'] = True
     if sum(len(t['latex']) for t in tasks.values()) > MAX_TOTAL_LATEX_LENGTH:
         raise serializers.ValidationError(f'Все задания вместе длиннее {MAX_TOTAL_LATEX_LENGTH} знаков')
     return [tasks[n] for n in sorted(tasks)]

@@ -1,4 +1,5 @@
 import json
+import re
 import secrets
 
 from django.conf import settings
@@ -50,7 +51,7 @@ def _parse_json(raw):
     return raw
 
 
-MAX_TASK_ANSWER_TEXT = 5000
+MAX_TASK_ANSWER_TEXT = 20000  # ответ и программа к заданию
 
 
 def _task_keys(assignment):
@@ -64,6 +65,34 @@ def _task_keys(assignment):
         if (homework.tasks_latex or '').strip():
             keys.add('homework')
     return keys
+
+
+def _has_detailed_answer(sh, key):
+    """Развёрнутый ответ к заданию: программа (блок ``` в ответе) или файл к этому заданию"""
+    text = ((sh.task_answers or {}).get(key) or '').replace('\r\n', '\n') if sh else ''
+    match = re.match(r'^[\s\S]*?\n?```\n([\s\S]*)\n```$', text)
+    if match and match.group(1).strip():
+        return True
+    return bool(sh) and sh.files.filter(task_key=key).exists()
+
+
+def _missing_detailed_answers(assignment, sh):
+    """Номера с обязательным развёрнутым ответом, к которым ученик его не прикрепил.
+    Номер без текста и файлов ученик не видит — его не требуем"""
+    missing = []
+    groups = [('cw', 'класс', assignment.numbered_tasks, assignment.files)]
+    homework = getattr(assignment, 'homework', None)
+    if homework is not None:
+        groups.append(('hw', 'дз', homework.numbered_tasks, homework.files))
+    for prefix, label, tasks, files in groups:
+        for t in tasks or []:
+            if not t.get('detailed_required'):
+                continue
+            number = t['number']
+            shown = (t.get('latex') or '').strip() or files.filter(task_number=number).exists()
+            if shown and not _has_detailed_answer(sh, f'{prefix}-{number}'):
+                missing.append(f'{number} ({label})')
+    return missing
 
 
 def _is_empty_answer(sh):
@@ -335,6 +364,15 @@ class AssignmentViewSet(viewsets.ModelViewSet):
         description = request.data.get('description', '')
         files = request.FILES.getlist('files')
 
+        # Учитель отметил номера, где развёрнутый ответ обязателен, — без него ДЗ не отправить
+        existing = StudentHomework.objects.filter(assignment=assignment, student=request.user).first()
+        missing = _missing_detailed_answers(assignment, existing)
+        if missing:
+            raise ValidationError({'detail': [
+                'У вас не прикреплён развёрнутый ответ к номеру: ' + ', '.join(missing)
+                + '. Вставьте программу или прикрепите файл в окне номера.'
+            ]})
+
         # Файлы, которые ученик убрал из ответа. Фильтр по ученику и заданию
         # не даёт удалить чужие файлы.
         raw_ids = _parse_json(request.data.get('delete_file_ids'))
@@ -382,7 +420,8 @@ class AssignmentViewSet(viewsets.ModelViewSet):
         task = str(request.data.get('task', ''))
         if task not in _task_keys(assignment):
             raise ValidationError({'task': ['Такого задания нет в уроке']})
-        text = str(request.data.get('text', '')).strip()
+        # Браузер отправляет переводы строк формы как \r\n — храним обычные \n
+        text = str(request.data.get('text', '')).replace('\r\n', '\n').strip()
         if len(text) > MAX_TASK_ANSWER_TEXT:
             raise ValidationError({'text': [f'Ответ длиннее {MAX_TASK_ANSWER_TEXT} знаков']})
         files = request.FILES.getlist('files')
@@ -814,7 +853,8 @@ class CallViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retriev
         task = str(request.data.get('task', ''))
         if task not in _task_keys(assignment):
             raise ValidationError({'task': ['Такого задания нет в уроке']})
-        text = str(request.data.get('text', '')).strip()
+        # Браузер отправляет переводы строк формы как \r\n — храним обычные \n
+        text = str(request.data.get('text', '')).replace('\r\n', '\n').strip()
         if len(text) > MAX_TASK_ANSWER_TEXT:
             raise ValidationError({'text': [f'Ответ длиннее {MAX_TASK_ANSWER_TEXT} знаков']})
         files = request.FILES.getlist('files')

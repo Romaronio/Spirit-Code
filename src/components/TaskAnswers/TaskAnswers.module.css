@@ -133,3 +133,75 @@
     opacity: 0.45;
   }
 }
+
+/* Поля «Ответ» и «Программа» у ученика */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fieldLabel {
+  color: var(--text-2);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.input {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 16px;
+  font-family: inherit;
+}
+
+.codeInput,
+.code {
+  font-family: ui-monospace, 'Cascadia Code', Consolas, 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.45;
+  tab-size: 4;
+}
+
+.codeInput {
+  min-height: 140px;
+  resize: vertical;
+  white-space: pre;
+  overflow-x: auto;
+}
+
+/* Ответ и программа ученика у учителя */
+.answerLabel {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.codeView {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 6px 0;
+}
+
+.code {
+  max-height: 420px;
+  margin: 0;
+  padding: 10px 12px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  white-space: pre;
+}
+
+/* «Развёрнутый ответ обязателен» */
+.required {
+  padding: 8px 12px;
+  border-left: 3px solid var(--amber);
+  border-radius: 6px;
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: 14px;
+}

@@ -30,7 +30,7 @@ function NumberedTasksEditor({ value, onChange, files, pendingNames, taskFiles, 
   function openNew() {
     const number = suggestNumber(value)
     if (!value.some((t) => t.number === number)) {
-      onChange(sortTasks([...value, { number, latex: '' }]))
+      onChange(sortTasks([...value, newTask(number)]))
     }
     setOpenNumber(number)
   }
@@ -117,7 +117,7 @@ function NumberedTasksWindow({
       onSelect(number)
       return
     }
-    onChange(sortTasks([...value, { number, latex: '' }]))
+    onChange(sortTasks([...value, newTask(number)]))
     onSelect(number)
     setNewNumber('')
     setError('')
@@ -152,6 +152,21 @@ function NumberedTasksWindow({
 
   function handleAnswer(number: number, answer: string) {
     const next = latestValue.current.map((t) => (t.number === number ? { ...t, answer } : t))
+    latestValue.current = next
+    onChange(next)
+  }
+
+  // Что присылает ученик: только краткий ответ, развёрнутый по желанию или обязательный развёрнутый
+  function handleAnswerKind(number: number, kind: AnswerKind) {
+    const next = latestValue.current.map((t) => {
+      if (t.number !== number) return t
+      const rest = { ...t }
+      delete rest.short_only
+      delete rest.detailed_required
+      if (kind === 'short') return { ...rest, short_only: true }
+      if (kind === 'required') return { ...rest, detailed_required: true }
+      return rest
+    })
     latestValue.current = next
     onChange(next)
   }
@@ -229,6 +244,20 @@ function NumberedTasksWindow({
                     onChange={(e) => handleAnswer(task.number, e.target.value)}
                   />
                 </label>
+                <fieldset className={styles.answerKind}>
+                  <legend>Что присылает ученик</legend>
+                  {ANSWER_KINDS.map(({ kind, label }) => (
+                    <label key={kind}>
+                      <input
+                        type="radio"
+                        name={`answer-kind-${task.number}`}
+                        checked={answerKind(task) === kind}
+                        onChange={() => handleAnswerKind(task.number, kind)}
+                      />
+                      {label}
+                    </label>
+                  ))}
+                </fieldset>
                 {taskFiles && onTaskFilesChange && (
                   <TaskFilesSection
                     number={task.number}
@@ -246,6 +275,23 @@ function NumberedTasksWindow({
       </div>
     </div>
   )
+}
+
+type AnswerKind = 'detailed' | 'required' | 'short'
+
+const ANSWER_KINDS: { kind: AnswerKind; label: string }[] = [
+  { kind: 'detailed', label: 'Развёрнутый ответ по желанию: ответ, программа и файлы' },
+  { kind: 'required', label: 'Развёрнутый ответ обязателен — без программы или файла ДЗ не отправить' },
+  { kind: 'short', label: 'Только краткий ответ (число или слово)' },
+]
+
+function answerKind(task: NumberedTask): AnswerKind {
+  return task.short_only ? 'short' : task.detailed_required ? 'required' : 'detailed'
+}
+
+// Новый номер по умолчанию требует развёрнутый ответ; учитель может переключить в окне номера
+function newTask(number: number): NumberedTask {
+  return { number, latex: '', detailed_required: true }
 }
 
 function sortTasks(tasks: NumberedTask[]): NumberedTask[] {
@@ -266,6 +312,8 @@ function describe(task: NumberedTask, fileCount: number): string {
   }
   if (fileCount) parts.push(`файлов: ${fileCount}`)
   if (task.answer?.trim()) parts.push('есть ответ')
+  if (task.short_only) parts.push('только краткий ответ')
+  else if (task.detailed_required) parts.push('развёрнутый обязателен')
   if (!task.latex.trim() && !fileCount) parts.push('ученик не увидит')
   return parts.join(', ')
 }

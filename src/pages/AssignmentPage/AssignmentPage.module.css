@@ -208,41 +208,6 @@
   font-weight: 600;
 }
 
-.studentHomeworks {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding-left: 0;
-  list-style: none;
-}
-
-.studentHomeworkCard {
-  padding: 12px;
-  background: var(--surface-2);
-  border-radius: 8px;
-}
-
-.studentHomeworkHeader {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 6px;
-}
-
-.studentName {
-  font-weight: 600;
-}
-
-.submittedAt {
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.studentHomeworkDescription {
-  white-space: pre-wrap;
-  line-height: 1.5;
-  margin: 6px 0;
-}
 .reviewStatus {
   display: flex;
   flex-wrap: wrap;
@@ -410,4 +375,49 @@
   font-size: 0.85em;
   font-weight: normal;
   color: var(--faint);
+}
+
+/* Ответы учеников в уроке — панель как на главной, но на всю ширину колонки */
+.lessonAnswers {
+  max-width: none;
+  margin-top: 0;
+}
+
+/* Не прикреплён обязательный развёрнутый ответ — ДЗ не отправить */
+.missingDetailed {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--danger);
+  border-radius: 8px;
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.missingDetailed p {
+  margin: 0;
+}
+
+.missingLink {
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.missingHint {
+  color: var(--text-2);
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.openTasksMissing {
+  display: block;
+  color: var(--danger);
+  font-size: 12px;
+  font-weight: 600;
 }

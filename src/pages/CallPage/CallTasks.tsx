@@ -467,6 +467,8 @@ function CallTasks({ call, isTeacher, open, onOpen, onClose, onCallChange }: Pro
                 key={`${lesson.id}-${current.key}`}
                 answer={myAnswer}
                 taskKey={current.key}
+                shortOnly={current.shortOnly}
+                detailedRequired={current.detailedRequired}
                 onSave={handleSaveAnswer}
                 onDraft={handleDraft}
               />

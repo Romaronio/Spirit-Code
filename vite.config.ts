@@ -4,6 +4,8 @@ import { defineConfig } from 'vite'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  // Фоновый поток Python (src/utils/pythonWorker.ts) — модуль: он загружает Pyodide через import()
+  worker: { format: 'es' },
   server: {
     proxy: {
       "/api": "http://localhost:8000",

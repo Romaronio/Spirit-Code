@@ -11,6 +11,8 @@ export interface LessonTask {
   source: string // LaTeX
   number?: number // номер задания — им подписаны плашки
   answer?: string // верный ответ, приходит только учителю
+  shortOnly?: boolean // только краткий ответ — без программы и файлов
+  detailedRequired?: boolean // развёрнутый ответ обязателен
   files: DocFile[] // картинки для документа
   attachments: DocFile[] // файлы для выполнения этого номера
 }
@@ -34,6 +36,8 @@ export function lessonTasks(assignment: Assignment): LessonTask[] {
         source: t.latex,
         number: t.number,
         answer: t.answer,
+        shortOnly: t.short_only,
+        detailedRequired: t.detailed_required,
         files,
         attachments: files.filter((f) => f.task_number === t.number),
       })
@@ -65,4 +69,30 @@ export function answerKeyTitle(key: string): string {
 // Есть ли у ученика ответ к заданию: текст или файлы
 export function hasTaskAnswer(sh: StudentHomework | undefined, key: string) {
   return Boolean(sh?.task_answers?.[key]?.trim() || sh?.files?.some((f) => f.task_key === key))
+}
+
+// Ответ к заданию хранится одной строкой: короткий ответ, а программа — блоком ``` в конце.
+// Старые ответы без блока — просто текст ответа
+const CODE_BLOCK_RE = /^([\s\S]*?)\n?```\n([\s\S]*)\n```$/
+
+export interface TaskAnswerParts {
+  answer: string
+  code: string
+}
+
+export function splitTaskAnswer(text: string | undefined): TaskAnswerParts {
+  // При отправке через FormData браузер меняет переводы строк на \r\n — приводим обратно
+  const value = (text ?? '').replace(/\r\n?/g, '\n')
+  const m = CODE_BLOCK_RE.exec(value)
+  return m ? { answer: m[1], code: m[2] } : { answer: value, code: '' }
+}
+
+export function joinTaskAnswer({ answer, code }: TaskAnswerParts): string {
+  const a = answer.trim()
+  return code.trim() ? `${a}${a ? '\n' : ''}\`\`\`\n${code.replace(/\s+$/, '')}\n\`\`\`` : a
+}
+
+// Развёрнутый ответ к заданию: программа или файл к этому заданию
+export function hasDetailedAnswer(sh: StudentHomework | undefined, key: string) {
+  return Boolean(splitTaskAnswer(sh?.task_answers?.[key]).code.trim() || sh?.files?.some((f) => f.task_key === key))
 }

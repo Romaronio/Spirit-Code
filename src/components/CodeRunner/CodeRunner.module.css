@@ -1,0 +1,114 @@
+.runner {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.run,
+.stop,
+.stdinToggle {
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.run {
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.run:hover:not(:disabled) {
+  border-color: var(--accent-hover);
+  background: var(--accent-hover);
+}
+
+.run:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.stop {
+  border: 1px solid var(--danger);
+  background: var(--surface);
+  color: var(--danger);
+}
+
+.stdinToggle {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text-2);
+}
+
+.stdinToggle:hover {
+  border-color: var(--accent);
+}
+
+.status {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.stdin,
+.output {
+  font-family: ui-monospace, 'Cascadia Code', Consolas, 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.stdin {
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  resize: vertical;
+}
+
+/* Вывод программы — как консоль */
+.output {
+  max-height: 320px;
+  margin: 0;
+  padding: 10px 12px;
+  overflow: auto;
+  border-radius: 8px;
+  background: #1e1f24;
+  color: #e6e6e6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.error {
+  color: #ff8a80;
+}
+
+.muted {
+  color: #9a9aa2;
+}
+
+/* Рисунок черепахи */
+.turtle {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.canvas {
+  display: block;
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}

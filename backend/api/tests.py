@@ -893,6 +893,48 @@ class TasksLatexTests(AuthTestCase):
         bad = [{'number': 5, 'answer': 'x' * 501}]
         self.assertEqual(self.patch({'numbered_tasks': json.dumps(bad)}).status_code, 400)
 
+    def test_detailed_required_task(self):
+        """Без программы или файла к обязательному номеру ученик не отправит ДЗ"""
+        self.login_as(self.teacher)
+        tasks = [{'number': 1, 'latex': 'x', 'detailed_required': True},
+                 {'number': 2, 'latex': '', 'detailed_required': True},  # пустой номер ученик не видит
+                 {'number': 3, 'latex': 'z', 'short_only': True, 'detailed_required': True}]
+        response = self.patch({'numbered_tasks': json.dumps(tasks)})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['numbered_tasks'][0], {'number': 1, 'latex': 'x', 'detailed_required': True})
+        self.assertEqual(response.data['numbered_tasks'][2], {'number': 3, 'latex': 'z', 'short_only': True})
+
+        self.login_as(self.anna)
+        submit = f'/api/assignments/{self.bio.id}/submit/'
+        task = f'/api/assignments/{self.bio.id}/submit-task/'
+        response = self.client.post(submit, {'description': 'готово'})
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('1 (класс)', str(response.data))
+        self.assertNotIn('2 (класс)', str(response.data))
+
+        # Только краткий ответ — не развёрнутый
+        self.client.post(task, {'task': 'cw-1', 'text': '42'})
+        self.assertEqual(self.client.post(submit, {'description': 'готово'}).status_code, 400)
+
+        # Программа (переводы строк как у браузера) — можно отправлять
+        self.client.post(task, {'task': 'cw-1', 'text': '42\r\n```\r\nprint(42)\r\n```'})
+        self.assertIn(self.client.post(submit, {'description': 'готово'}).status_code, (200, 201))
+
+    def test_short_only_task(self):
+        """Учитель отмечает номер «только краткий ответ» — ученик тоже видит отметку"""
+        self.login_as(self.teacher)
+        tasks = [{'number': 1, 'latex': 'x', 'short_only': True}, {'number': 2, 'latex': 'y', 'short_only': False},
+                 {'number': 3, 'latex': 'z', 'short_only': 'yes'}]
+        response = self.patch({'numbered_tasks': json.dumps(tasks)})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['numbered_tasks'], [
+            {'number': 1, 'latex': 'x', 'short_only': True}, {'number': 2, 'latex': 'y'}, {'number': 3, 'latex': 'z'},
+        ])
+
+        self.login_as(self.anna)
+        data = self.client.get(f'/api/assignments/{self.bio.id}/').data
+        self.assertEqual(data['numbered_tasks'][0], {'number': 1, 'latex': 'x', 'short_only': True})
+
 
 class TaskFilesTests(AuthTestCase):
     def setUp(self):

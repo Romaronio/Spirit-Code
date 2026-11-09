@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import styles from './AssignmentPage.module.css'
+import panel from '../../components/AnswersPanel/AnswersPanel.module.css'
 import * as api from '../../services/api'
 import { lessonForSubjects, normalize } from '../../utils/subjects'
-import type { Account, Assignment, AssignmentChanges, CommentActions, NumberedTask, ReviewStatus, User } from '../../types'
+import type { Account, Assignment, AssignmentChanges, CommentActions, NumberedTask, ReviewStatus, StudentHomework, User } from '../../types'
 import { ReviewButtons, StatusBadge } from '../../components/AnswerStatus/AnswerStatus'
 import CommentThread from '../../components/CommentThread/CommentThread'
 import { TaskAnswerContent, TaskAnswerForm, TaskAnswersList } from '../../components/TaskAnswers/TaskAnswers'
-import { answerKeyTitle, hasTaskAnswer } from '../../utils/lessonTasks'
+import { answerKeyTitle, hasDetailedAnswer, hasTaskAnswer } from '../../utils/lessonTasks'
 import { FiguresContext } from '../../components/LatexDocument/FiguresContext'
 import { ACCEPT, EMPTY_TASK_FILES, pickFiles, taskFileChanges, type FileEntry, type TaskFilesDraft } from '../../utils/uploads'
 import { taskNumberTitle } from '../../utils/taskNumbers'
@@ -75,6 +76,7 @@ function AssignmentPage({ user, items, accounts, onUpdate, onSubmitStudentHomewo
         assignment={assignment}
         user={user}
         studentId={account?.id}
+        students={accounts.filter((a) => a.role === 'student' && lessonForSubjects(a.subjects, assignment))}
         onUpdate={onUpdate}
         onSubmitStudentHomework={onSubmitStudentHomework}
         onReview={onReview}
@@ -88,13 +90,14 @@ interface DetailsProps {
   assignment: Assignment
   user: User
   studentId?: number
+  students: Account[] // ученики, которым виден урок
   onUpdate: (id: Assignment['id'], changes: AssignmentChanges) => Promise<void>
   onSubmitStudentHomework?: (assignmentId: number) => Promise<void> | void
   onReview?: (assignmentId: number, answerId: number, status: ReviewStatus) => Promise<void>
   commentActions?: CommentActions
 }
 
-function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStudentHomework, onReview, commentActions }: DetailsProps) {
+function AssignmentDetails({ assignment, user, studentId, students, onUpdate, onSubmitStudentHomework, onReview, commentActions }: DetailsProps) {
   const canEdit = user.role === 'teacher'
 
   const [isEditing, setIsEditing] = useState(false)
@@ -183,10 +186,34 @@ function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStud
     await onSubmitStudentHomework?.(assignment.id)
   }
 
+  // Номер по ключу задания (у заданий без номера — undefined)
+  const numberedOf = (key: TasksKey) =>
+    typeof key === 'number'
+      ? assignment.numbered_tasks?.find((t) => t.number === key)
+      : key.startsWith('hw-')
+        ? assignment.homework?.numbered_tasks?.find((t) => `hw-${t.number}` === key)
+        : undefined
+  // Только краткий ответ (без программы и файлов) или обязательный развёрнутый — так решил учитель
+  const isShortOnly = (key: TasksKey) => Boolean(numberedOf(key)?.short_only)
+  const isDetailedRequired = (key: TasksKey) => Boolean(numberedOf(key)?.detailed_required && !numberedOf(key)?.short_only)
+  // Номера, к которым ученик ещё не прикрепил обязательный развёрнутый ответ, — без них ДЗ не отправить
+  const missingDetailed = [
+    ...shownNumbered.map((t) => ({ key: t.number as TasksKey, title: `${taskNumberTitle(t.number)} (класс)` })),
+    ...shownHomeworkNumbered.map((t) => ({ key: `hw-${t.number}` as TasksKey, title: `${taskNumberTitle(t.number)} (дз)` })),
+  ].filter(({ key }) => isDetailedRequired(key) && !hasDetailedAnswer(myAnswer, answerKey(key)))
+  const needsDetailed = (key: TasksKey) => user.role === 'student' && missingDetailed.some((m) => m.key === key)
+
   // Под открытым заданием: ученику — форма ответа, учителю — ответы учеников к этому заданию
   const answerBlock = (key: TasksKey) =>
     user.role === 'student' ? (
-      <TaskAnswerForm key={answerKey(key)} answer={myAnswer} taskKey={answerKey(key)} onSave={handleSaveTaskAnswer} />
+      <TaskAnswerForm
+        key={answerKey(key)}
+        answer={myAnswer}
+        taskKey={answerKey(key)}
+        shortOnly={isShortOnly(key)}
+        detailedRequired={isDetailedRequired(key)}
+        onSave={handleSaveTaskAnswer}
+      />
     ) : canEdit ? (
       <TaskAnswersList answers={assignment.student_homeworks ?? []} taskKey={answerKey(key)} />
     ) : null
@@ -215,7 +242,7 @@ function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStud
   }
 
   async function handleSubmitAnswer() {
-    if (!assignment.id) return
+    if (!assignment.id || missingDetailed.length > 0) return
     if (!studentId) {
       setSubmitError('Аккаунт ученика не найден')
       return
@@ -483,6 +510,7 @@ function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStud
                         title={taskNumberTitle(t.number)}
                         isOpen={openTasks === t.number}
                         answered={hasTaskAnswer(myAnswer, answerKey(t.number))}
+                        needsDetailed={needsDetailed(t.number)}
                         onOpen={() => setOpenTasks(t.number)}
                       />
                     ))}
@@ -622,6 +650,7 @@ function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStud
                             title={taskNumberTitle(t.number)}
                             isOpen={openTasks === `hw-${t.number}`}
                             answered={hasTaskAnswer(myAnswer, `hw-${t.number}`)}
+                            needsDetailed={needsDetailed(`hw-${t.number}`)}
                             onOpen={() => setOpenTasks(`hw-${t.number}`)}
                           />
                         ))}
@@ -663,75 +692,17 @@ function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStud
             )}
           </section>
 
-          {/* Секция "Ответы учеников" — только для учителей */}
+          {/* Секция "Ответы учеников" — только для учителей, в том же виде, что панель на главной */}
           {user.role === 'teacher' && (
-            <section className={styles.section}>
-              <h2>Ответы учеников</h2>
-              {assignment.student_homeworks && assignment.student_homeworks.length > 0 ? (
-                <ul className={styles.studentHomeworks}>
-                  {assignment.student_homeworks.map((sh) => (
-                    <li key={sh.id} className={styles.studentHomeworkCard}>
-                      <div className={styles.studentHomeworkHeader}>
-                        <span className={styles.studentName}>
-                          {sh.student_name} <StatusBadge status={sh.status} />
-                        </span>
-                        <span className={styles.submittedAt}>
-                          {sh.submitted_at ? new Date(sh.submitted_at).toLocaleString('ru-RU') : ''}
-                        </span>
-                      </div>
-                      {sh.description && (
-                        <p className={styles.studentHomeworkDescription}>{sh.description}</p>
-                      )}
-                      {answerOrder.some((key) => hasTaskAnswer(sh, key)) && (
-                        <ul className={styles.taskAnswers}>
-                          {answerOrder
-                            .filter((key) => hasTaskAnswer(sh, key))
-                            .map((key) => (
-                              <li key={key}>
-                                <span className={styles.taskAnswerTitle}>{answerKeyTitle(key)}</span>
-                                {correctAnswer(key) && (
-                                  <span className={styles.taskAnswerCorrect}> · верный ответ: {correctAnswer(key)}</span>
-                                )}
-                                <TaskAnswerContent answer={sh} taskKey={key} />
-                              </li>
-                            ))}
-                        </ul>
-                      )}
-                      {sh.files?.some((f) => !f.task_key) && (
-                        <ul className={styles.files}>
-                          {sh.files.filter((f) => !f.task_key).map((f) => (
-                            <li key={f.id}>
-                              <a className={styles.link} href={f.url} download={f.name}>
-                                📎 {f.name}
-                              </a>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                      {onReview && (
-                        <ReviewButtons
-                          status={sh.status}
-                          onChange={(value) => onReview(assignment.id!, sh.id!, value)}
-                        />
-                      )}
-                      {commentActions && (
-                        <CommentThread
-                          comments={sh.comments}
-                          currentUserId={user.id}
-                          canDeleteAll
-                          placeholder="Ответить ученику..."
-                          onSend={(text) => commentActions.add(assignment.id!, sh.id!, text)}
-                          onEdit={(id, text) => commentActions.edit(assignment.id!, sh.id!, id, text)}
-                          onDelete={(id) => commentActions.remove(assignment.id!, sh.id!, id)}
-                        />
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className={styles.empty}>Пока никто не отправил ответ</p>
-              )}
-            </section>
+            <LessonAnswers
+              assignment={assignment}
+              students={students}
+              answerOrder={answerOrder}
+              correctAnswer={correctAnswer}
+              currentUserId={user.id}
+              onReview={onReview}
+              commentActions={commentActions}
+            />
           )}
 
           {/* Секция "Отправить ответ" — только для учеников */}
@@ -809,12 +780,31 @@ function AssignmentDetails({ assignment, user, studentId, onUpdate, onSubmitStud
                   ))}
                 </ul>
               )}
+              {missingDetailed.length > 0 && (
+                <div className={styles.missingDetailed} role="alert">
+                  <p>
+                    У вас не прикреплён развёрнутый ответ к{' '}
+                    {missingDetailed.length === 1 ? 'номеру' : 'номерам'}:{' '}
+                    {missingDetailed.map((m, i) => (
+                      <span key={String(m.key)}>
+                        {i > 0 && ', '}
+                        <button type="button" className={styles.missingLink} onClick={() => setOpenTasks(m.key)}>
+                          {m.title}
+                        </button>
+                      </span>
+                    ))}
+                  </p>
+                  <p className={styles.missingHint}>
+                    Откройте номер, вставьте программу или прикрепите файл — после этого ДЗ можно отправить.
+                  </p>
+                </div>
+              )}
               <div className={styles.actions}>
                 <button
                   type="button"
                   className={styles.primary}
                   onClick={handleSubmitAnswer}
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || missingDetailed.length > 0}
                 >
                   {isSubmitting ? 'Отправка...' : 'Отправить ответ'}
                 </button>
@@ -942,7 +932,13 @@ function FieldEditor({ label, initialValue, type = 'text', placeholder, hint, ma
 }
 
 // Кнопка задания: «N задание» или «Другие задания»
-function OpenTasksButton({ title, isOpen, answered, onOpen }: { title: string; isOpen: boolean; answered?: boolean; onOpen: () => void }) {
+function OpenTasksButton({ title, isOpen, answered, needsDetailed, onOpen }: {
+  title: string
+  isOpen: boolean
+  answered?: boolean
+  needsDetailed?: boolean // развёрнутый ответ обязателен, а его ещё нет
+  onOpen: () => void
+}) {
   return (
     <button
       type="button"
@@ -953,7 +949,11 @@ function OpenTasksButton({ title, isOpen, answered, onOpen }: { title: string; i
       <span className={styles.openTasksIcon}>📄</span>
       <span>
         <span className={styles.openTasksTitle}>{title}</span>
-        {answered && <span className={styles.openTasksAnswered}>✓ ответ прикреплён</span>}
+        {needsDetailed ? (
+          <span className={styles.openTasksMissing}>нужен развёрнутый ответ</span>
+        ) : (
+          answered && <span className={styles.openTasksAnswered}>✓ ответ прикреплён</span>
+        )}
       </span>
     </button>
   )
@@ -998,3 +998,160 @@ function TasksIcon() {
 
 
 export default AssignmentPage
+interface LessonAnswersProps {
+  assignment: Assignment
+  students: Account[]
+  answerOrder: string[]
+  correctAnswer: (key: string) => string | undefined
+  currentUserId?: number
+  onReview?: (assignmentId: number, answerId: number, status: ReviewStatus) => Promise<void>
+  commentActions?: CommentActions
+}
+
+function formatAnswerDate(value?: string) {
+  return value ? new Date(value).toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'short' }) : ''
+}
+
+// Ответы учеников к уроку — как панель «Ответы учеников» на главной:
+// сверху ученики с отметками, ниже карточка ответа выбранного ученика
+function LessonAnswers({ assignment, students, answerOrder, correctAnswer, currentUserId, onReview, commentActions }: LessonAnswersProps) {
+  const [selectedId, setSelectedId] = useState<number | null>(null)
+  const [isChatOpen, setIsChatOpen] = useState(false)
+
+  const answers = assignment.student_homeworks ?? []
+  const answerOf = (id: number): StudentHomework | undefined => answers.find((a) => a.student === id)
+
+  // Ученики урока, плюс приславшие ответ, если предмет у них с тех пор сменился
+  const list = students.map((s) => ({ id: s.id!, name: s.name }))
+  for (const a of answers) {
+    if (a.student !== undefined && !list.some((s) => s.id === a.student)) {
+      list.push({ id: a.student, name: a.student_name ?? 'Ученик' })
+    }
+  }
+
+  // Пока никого не выбрали — первый ученик, приславший ответ
+  const selected = list.find((s) => s.id === selectedId) ?? list.find((s) => answerOf(s.id)) ?? list[0]
+  const sh = selected ? answerOf(selected.id) : undefined
+
+  const acceptedCount = answers.filter((a) => a.status === 'accepted').length
+  const pendingCount = answers.filter((a) => (a.status ?? 'pending') === 'pending').length
+
+  return (
+    <section className={`${panel.panel} ${styles.lessonAnswers}`}>
+      <div className={panel.header}>
+        <h2>
+          Ответы учеников <span className={panel.count}>({answers.length})</span>
+        </h2>
+      </div>
+
+      {list.length === 0 ? (
+        <p className={panel.empty}>Учеников пока нет</p>
+      ) : (
+        <>
+          <div className={panel.students}>
+            {list.map((s) => {
+              const a = answerOf(s.id)
+              const mark = !a ? '—' : a.status === 'accepted' ? '✓' : a.status === 'rejected' ? '✗' : '•'
+              return (
+                <button
+                  key={s.id}
+                  type="button"
+                  className={`${panel.student} ${s.id === selected?.id ? panel.active : ''}`}
+                  onClick={() => {
+                    setSelectedId(s.id)
+                    setIsChatOpen(false)
+                  }}
+                >
+                  {s.name}
+                  <span className={panel.badge}>{mark}</span>
+                </button>
+              )
+            })}
+          </div>
+
+          <p className={panel.summary}>
+            Прислали {answers.length} из {list.length} · сдано {acceptedCount} · ждут проверки {pendingCount}
+          </p>
+
+          {selected && !sh && <p className={panel.empty}>{selected.name} пока ничего не прислал(а)</p>}
+
+          {sh && (
+            <div className={panel.card}>
+              <div className={panel.cardHeader}>
+                <span className={panel.title}>{sh.student_name ?? selected?.name}</span>
+                <span className={panel.date}>{formatAnswerDate(sh.submitted_at)}</span>
+              </div>
+              <div className={panel.meta}>
+                <span className={panel.subject}>{assignment.subject}</span>
+                <StatusBadge status={sh.status} />
+              </div>
+
+              {sh.description ? (
+                <p className={panel.description}>{sh.description}</p>
+              ) : (
+                <p className={panel.empty}>Без описания</p>
+              )}
+
+              {answerOrder.some((key) => hasTaskAnswer(sh, key)) && (
+                <ul className={styles.taskAnswers}>
+                  {answerOrder
+                    .filter((key) => hasTaskAnswer(sh, key))
+                    .map((key) => (
+                      <li key={key}>
+                        <span className={styles.taskAnswerTitle}>{answerKeyTitle(key)}</span>
+                        {correctAnswer(key) && (
+                          <span className={styles.taskAnswerCorrect}> · верный ответ: {correctAnswer(key)}</span>
+                        )}
+                        <TaskAnswerContent answer={sh} taskKey={key} />
+                      </li>
+                    ))}
+                </ul>
+              )}
+
+              {sh.files?.some((f) => !f.task_key) && (
+                <ul className={panel.files}>
+                  {sh.files.filter((f) => !f.task_key).map((f) => (
+                    <li key={f.id}>
+                      <a className={panel.link} href={f.url} download={f.name}>
+                        📎 {f.name}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              {onReview && (
+                <ReviewButtons status={sh.status} onChange={(value) => onReview(assignment.id!, sh.id!, value)} />
+              )}
+
+              {commentActions && (
+                <>
+                  <button
+                    type="button"
+                    className={`${panel.threadToggle} ${isChatOpen ? panel.threadActive : ''}`}
+                    onClick={() => setIsChatOpen((open) => !open)}
+                    aria-expanded={isChatOpen}
+                  >
+                    💬 Переписка ({sh.comments?.length ?? 0})
+                    <span className={panel.chevron}>{isChatOpen ? '▲' : '▼'}</span>
+                  </button>
+                  {isChatOpen && (
+                    <CommentThread
+                      comments={sh.comments}
+                      currentUserId={currentUserId}
+                      canDeleteAll
+                      placeholder="Ответить ученику..."
+                      onSend={(text) => commentActions.add(assignment.id!, sh.id!, text)}
+                      onEdit={(id, text) => commentActions.edit(assignment.id!, sh.id!, id, text)}
+                      onDelete={(id) => commentActions.remove(assignment.id!, sh.id!, id)}
+                    />
+                  )}
+                </>
+              )}
+            </div>
+          )}
+        </>
+      )}
+    </section>
+  )
+}

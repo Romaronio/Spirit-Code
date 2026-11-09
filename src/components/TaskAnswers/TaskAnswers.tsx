@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import styles from './TaskAnswers.module.css'
 import { StatusBadge } from '../AnswerStatus/AnswerStatus'
+import CodeRunner from '../CodeRunner/CodeRunner'
 import { ACCEPT, pickFiles, type FileEntry } from '../../utils/uploads'
-import { hasTaskAnswer } from '../../utils/lessonTasks'
+import { hasTaskAnswer, joinTaskAnswer, splitTaskAnswer } from '../../utils/lessonTasks'
 import type { StudentHomework } from '../../types'
 
 // Ответы учеников к отдельным заданиям урока — на странице урока и в созвоне.
@@ -11,11 +12,22 @@ import type { StudentHomework } from '../../types'
 // Ответ ученика к одному заданию: текст и файлы
 // liveText — то, что ученик печатает прямо сейчас (в созвоне), вместо сохранённого текста
 export function TaskAnswerContent({ answer, taskKey, liveText }: { answer: StudentHomework; taskKey: string; liveText?: string }) {
-  const text = liveText ?? answer.task_answers?.[taskKey]
+  const { answer: text, code } = splitTaskAnswer(liveText ?? answer.task_answers?.[taskKey])
   const files = (answer.files ?? []).filter((f) => f.task_key === taskKey)
   return (
     <>
-      {text && <p className={styles.answerText}>{text}</p>}
+      {text.trim() && (
+        <p className={styles.answerText}>
+          <span className={styles.answerLabel}>Ответ:</span> <strong>{text}</strong>
+        </p>
+      )}
+      {code.trim() && (
+        <div className={styles.codeView}>
+          <span className={styles.answerLabel}>Программа</span>
+          <pre className={styles.code}>{code}</pre>
+          {liveText === undefined && <CodeRunner code={code} />}
+        </div>
+      )}
       {files.length > 0 && (
         <ul className={styles.files}>
           {files.map((f) => (
@@ -79,7 +91,9 @@ export function TaskAnswersList({
               <span className={styles.studentName}>
                 {l.name} <Typing />
               </span>
-              {l.text && <p className={styles.answerText}>{l.text}</p>}
+              {l.text && (
+                <TaskAnswerContent answer={{ student: l.student, description: '', files: [] }} taskKey={taskKey} liveText={l.text} />
+              )}
             </li>
           ))}
         </ul>
@@ -93,6 +107,8 @@ export function TaskAnswersList({
 interface TaskAnswerFormProps {
   answer?: StudentHomework
   taskKey: string
+  shortOnly?: boolean // учитель просит только краткий ответ — без программы и файлов
+  detailedRequired?: boolean // без программы или файла ДЗ не отправить
   onSave: (task: string, text: string, files: File[], deleteFileIds: Array<number | string>) => Promise<void>
   // Текст по мере набора, ещё до сохранения (в созвоне — учителю вживую)
   onDraft?: (task: string, text: string) => void
@@ -105,16 +121,18 @@ type SaveState = 'idle' | 'saving' | 'saved' | 'error'
 
 // Ученику под заданием — ответ к этому заданию: текст и файлы.
 // Кнопки «Сохранить» нет: текст сохраняется после паузы в вводе, файлы — сразу
-export function TaskAnswerForm({ answer, taskKey, onSave, onDraft }: TaskAnswerFormProps) {
-  const [text, setText] = useState(answer?.task_answers?.[taskKey] ?? '')
+export function TaskAnswerForm({ answer, taskKey, shortOnly, detailedRequired, onSave, onDraft }: TaskAnswerFormProps) {
+  const [parts, setParts] = useState(() => splitTaskAnswer(answer?.task_answers?.[taskKey]))
+  const text = joinTaskAnswer(parts)
   const [uploading, setUploading] = useState<FileEntry[]>([])
   const [deletedIds, setDeletedIds] = useState<Array<number | string>>([])
   const [saveState, setSaveState] = useState<SaveState>('idle')
   const [error, setError] = useState('')
 
   // Текст, который уже в БД, и текущий — для сохранения при закрытии задания
-  const savedTextRef = useRef(text)
-  const textRef = useRef(text)
+  const [initialText] = useState(answer?.task_answers?.[taskKey] ?? '')
+  const savedTextRef = useRef(initialText)
+  const textRef = useRef(initialText)
   const onSaveRef = useRef(onSave)
   // Сохранения идут строго по очереди, чтобы старый текст не перезаписал новый
   const queueRef = useRef<Promise<void>>(Promise.resolve())
@@ -161,10 +179,23 @@ export function TaskAnswerForm({ answer, taskKey, onSave, onDraft }: TaskAnswerF
     (f) => f.task_key === taskKey && (f.id === undefined || !deletedIds.includes(f.id))
   )
 
-  function handleTextChange(value: string) {
+  function handleChange(changes: Partial<typeof parts>) {
+    const next = { ...parts, ...changes }
+    const value = joinTaskAnswer(next)
     textRef.current = value
-    setText(value)
+    setParts(next)
     onDraft?.(taskKey, value)
+  }
+
+  // Tab в поле программы — отступ, а не переход к следующему полю
+  function handleCodeKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key !== 'Tab' || e.shiftKey || e.ctrlKey || e.altKey || e.metaKey) return
+    e.preventDefault()
+    const el = e.currentTarget
+    const { selectionStart: start, selectionEnd: end } = el
+    const code = parts.code.slice(0, start) + '    ' + parts.code.slice(end)
+    handleChange({ code })
+    requestAnimationFrame(() => el.setSelectionRange(start + 4, start + 4))
   }
 
   async function handleFilesChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -195,18 +226,47 @@ export function TaskAnswerForm({ answer, taskKey, onSave, onDraft }: TaskAnswerF
   return (
     <section className={`${styles.answerForm} ${styles.taskAnswerBox}`}>
       <h3>Ваш ответ к заданию</h3>
-      <textarea
-        className={styles.textarea}
-        rows={3}
-        placeholder="Ответ, решение или комментарий..."
-        value={text}
-        onChange={(e) => handleTextChange(e.target.value)}
-        onBlur={() => save().catch(() => {})}
-      />
-      <label className={styles.fileButton}>
-        📎 Прикрепить файлы
-        <input type="file" multiple accept={ACCEPT} className={styles.hiddenInput} onChange={handleFilesChange} />
+      {detailedRequired && !shortOnly && (
+        <p className={styles.required}>
+          Развёрнутый ответ обязателен: вставьте программу или прикрепите файл — без этого домашнее задание не отправить
+        </p>
+      )}
+      <label className={styles.field}>
+        <span className={styles.fieldLabel}>Ответ</span>
+        <input
+          type="text"
+          className={styles.input}
+          placeholder={shortOnly ? 'Только краткий ответ, например: 42' : 'Например: 42'}
+          value={parts.answer}
+          onChange={(e) => handleChange({ answer: e.target.value })}
+          onBlur={() => save().catch(() => {})}
+        />
       </label>
+      {/* Только краткий ответ — без программы и файлов (так решил учитель) */}
+      {!shortOnly && (
+        <>
+          <label className={styles.field}>
+            <span className={styles.fieldLabel}>Программа</span>
+            <textarea
+              className={`${styles.textarea} ${styles.codeInput}`}
+              rows={8}
+              placeholder="Вставьте сюда код решения"
+              spellCheck={false}
+              autoCapitalize="off"
+              autoCorrect="off"
+              value={parts.code}
+              onChange={(e) => handleChange({ code: e.target.value })}
+              onKeyDown={handleCodeKeyDown}
+              onBlur={() => save().catch(() => {})}
+            />
+          </label>
+          <CodeRunner code={parts.code} />
+          <label className={styles.fileButton}>
+            📎 Прикрепить файлы
+            <input type="file" multiple accept={ACCEPT} className={styles.hiddenInput} onChange={handleFilesChange} />
+          </label>
+        </>
+      )}
       {(savedFiles.length > 0 || uploading.length > 0) && (
         <ul className={styles.files}>
           {savedFiles.map((f) => (
