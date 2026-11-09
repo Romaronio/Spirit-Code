@@ -142,7 +142,6 @@ function App() {
       const updated = await api.updateAssignment(id, {
         ...assignmentChanges,
         homework: homework && {
-          description: homework.description,
           numbered_tasks: homework.numbered_tasks,
           tasks_latex: homework.tasks_latex,
           task_files: homework.task_files,

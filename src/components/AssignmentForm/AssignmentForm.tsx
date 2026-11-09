@@ -25,7 +25,6 @@ function AssignmentForm({ onAdd, subjects, onDeleteSubject }: AssignmentFormProp
   const [numberedTasks, setNumberedTasks] = useState<NumberedTask[]>([])
   const [error, setError] = useState('')
 
-  const [homeworkDescription, setHomeworkDescription] = useState('')
   const [homeworkTasks, setHomeworkTasks] = useState<NumberedTask[]>([])
   // Файлы к номерам классной работы и ДЗ
   const [taskFiles, setTaskFiles] = useState<TaskFilesDraft>(EMPTY_TASK_FILES)
@@ -52,9 +51,8 @@ function AssignmentForm({ onAdd, subjects, onDeleteSubject }: AssignmentFormProp
         recording_url: recordingUrl.trim() || undefined,
         numbered_tasks: numberedTasks,
         homework:
-          homeworkDescription.trim() || homeworkTasks.length
+          homeworkTasks.length
             ? {
-                description: homeworkDescription.trim(),
                 numbered_tasks: homeworkTasks,
                 ...taskFileChanges(homeworkTaskFiles, homeworkTasks.map((t) => t.number)),
               }
@@ -68,7 +66,6 @@ function AssignmentForm({ onAdd, subjects, onDeleteSubject }: AssignmentFormProp
       setDeadline('')
       setRecordingUrl('')
       setNumberedTasks([])
-      setHomeworkDescription('')
       setHomeworkTasks([])
       setTaskFiles(EMPTY_TASK_FILES)
       setHomeworkTaskFiles(EMPTY_TASK_FILES)
@@ -193,16 +190,6 @@ function AssignmentForm({ onAdd, subjects, onDeleteSubject }: AssignmentFormProp
           <div className={styles.divider} />
 
           <h3>Домашнее задание</h3>
-          <label className={styles.label}>
-            Описание ДЗ
-            <textarea
-              rows={4}
-              placeholder="Опишите, что нужно сделать..."
-              value={homeworkDescription}
-              onChange={(e) => setHomeworkDescription(e.target.value)}
-            />
-          </label>
-
           <NumberedTasksEditor
             value={homeworkTasks}
             onChange={setHomeworkTasks}

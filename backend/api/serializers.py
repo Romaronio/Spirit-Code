@@ -181,14 +181,15 @@ class HomeworkSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Homework
-        fields = ['id', 'assignment', 'description', 'numbered_tasks', 'tasks_latex', 'files', 'created_at', 'updated_at']
+        # Описание ДЗ больше не показывается и не принимается — старые тексты лежат в базе
+        fields = ['id', 'assignment', 'numbered_tasks', 'tasks_latex', 'files', 'created_at', 'updated_at']
 
 
 class HomeworkCreateSerializer(serializers.ModelSerializer):
     """Сериализатор для создания/обновления Homework (без вложенных файлов)"""
     class Meta:
         model = Homework
-        fields = ['id', 'assignment', 'description', 'numbered_tasks', 'tasks_latex', 'created_at', 'updated_at']
+        fields = ['id', 'assignment', 'numbered_tasks', 'tasks_latex', 'created_at', 'updated_at']
 
 
 class StudentHomeworkFileSerializer(serializers.ModelSerializer):

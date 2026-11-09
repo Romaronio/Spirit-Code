@@ -109,7 +109,6 @@ function AssignmentDetails({ assignment, user, studentId, students, onUpdate, on
   const [taskFiles, setTaskFiles] = useState<TaskFilesDraft>(EMPTY_TASK_FILES)
 
   const [isEditingHomework, setIsEditingHomework] = useState(false)
-  const [homeworkDescription, setHomeworkDescription] = useState(assignment.homework?.description ?? '')
   const [homeworkTasks, setHomeworkTasks] = useState<NumberedTask[]>(assignment.homework?.numbered_tasks ?? [])
   const [homeworkLatex, setHomeworkLatex] = useState(assignment.homework?.tasks_latex ?? '')
   const [homeworkFiles, setHomeworkFiles] = useState<FileEntry[]>([])
@@ -142,6 +141,8 @@ function AssignmentDetails({ assignment, user, studentId, students, onUpdate, on
   // Учитель открыл ответ ученика — он показывается в панели справа вместо задания
   const [openAnswerOf, setOpenAnswerOf] = useState<number | null>(null)
   const closeAnswer = useCallback(() => setOpenAnswerOf(null), [])
+  // Каких учеников показывать в «Ответах учеников» — по нему же идёт «Следующий ученик»
+  const [answerFilter, setAnswerFilter] = useState<AnswerFilter>('all')
   function openTask(key: TasksKey) {
     setOpenAnswerOf(null)
     setOpenTasks(key)
@@ -331,7 +332,6 @@ function AssignmentDetails({ assignment, user, studentId, students, onUpdate, on
     try {
       await onUpdate(assignment.id!, {
         homework: {
-          description: homeworkDescription,
           numbered_tasks: homeworkTasks,
           tasks_latex: homeworkLatex,
           files: homeworkFiles.map((f) => f.file),
@@ -349,7 +349,6 @@ function AssignmentDetails({ assignment, user, studentId, students, onUpdate, on
   }
 
   function handleCancelHomework() {
-    setHomeworkDescription(assignment.homework?.description ?? '')
     setHomeworkTasks(assignment.homework?.numbered_tasks ?? [])
     setHomeworkLatex(assignment.homework?.tasks_latex ?? '')
     setHomeworkFiles([])
@@ -385,6 +384,18 @@ function AssignmentDetails({ assignment, user, studentId, students, onUpdate, on
             </div>
           )}
           {assignment.deadline && <p className={styles.deadline}>Сдать до: {assignment.deadline}</p>}
+
+          {/* «Ответы учеников» — у учителя сразу под названием урока; ответ открывается справа */}
+          {user.role === 'teacher' && (
+            <LessonAnswers
+              assignment={assignment}
+              students={students}
+              openId={openAnswerOf}
+              onOpen={openAnswer}
+              filter={answerFilter}
+              onFilterChange={setAnswerFilter}
+            />
+          )}
 
           {isEditing ? (
             <div className={styles.editor}>
@@ -573,17 +584,6 @@ function AssignmentDetails({ assignment, user, studentId, students, onUpdate, on
             <h2>Домашнее задание</h2>
             {isEditingHomework ? (
               <div className={styles.editor}>
-                <label className={styles.label}>
-                  Описание задания
-                  <textarea
-                    className={styles.textarea}
-                    rows={5}
-                    placeholder="Опишите, что нужно сделать..."
-                    value={homeworkDescription}
-                    onChange={(e) => setHomeworkDescription(e.target.value)}
-                  />
-                </label>
-
                 <NumberedTasksEditor
                   value={homeworkTasks}
                   onChange={setHomeworkTasks}
@@ -650,13 +650,8 @@ function AssignmentDetails({ assignment, user, studentId, students, onUpdate, on
               </div>
             ) : (
               <>
-                {assignment.homework ? (
+                {assignment.homework && (shownHomeworkNumbered.length > 0 || assignment.homework.tasks_latex?.trim() || commonHomeworkFiles.length > 0) ? (
                   <>
-                    {assignment.homework.description && (
-                      <p className={styles.homeworkDescription}>
-                        {assignment.homework.description}
-                      </p>
-                    )}
                     {(shownHomeworkNumbered.length > 0 || assignment.homework.tasks_latex?.trim()) && (
                       <TasksMenu title="Задания дз" collapsible={!canEdit}>
                         {shownHomeworkNumbered.map((t) => (
@@ -707,16 +702,6 @@ function AssignmentDetails({ assignment, user, studentId, students, onUpdate, on
               </>
             )}
           </section>
-
-          {/* Секция "Ответы учеников" — только для учителей, в том же виде, что панель на главной */}
-          {user.role === 'teacher' && (
-            <LessonAnswers
-              assignment={assignment}
-              students={students}
-              openId={openAnswerOf}
-              onOpen={openAnswer}
-            />
-          )}
 
           {/* Секция "Отправить ответ" — только для учеников */}
           {user.role === 'student' && (
@@ -838,6 +823,7 @@ function AssignmentDetails({ assignment, user, studentId, students, onUpdate, on
             commentActions={commentActions}
             onOpen={openAnswer}
             onClose={closeAnswer}
+            filter={answerFilter}
           />
         )}
         {openNumbered && (
@@ -1050,6 +1036,22 @@ function lessonStudents(assignment: Assignment, students: Account[]): LessonStud
 const answerOfStudent = (assignment: Assignment, id: number): StudentHomework | undefined =>
   assignment.student_homeworks?.find((a) => a.student === id)
 
+type AnswerFilter = 'all' | 'review' | 'missing'
+
+const ANSWER_FILTERS: { value: AnswerFilter; label: string }[] = [
+  { value: 'all', label: 'Все' },
+  { value: 'review', label: 'Ждут проверки' },
+  { value: 'missing', label: 'Не прислали' },
+]
+
+// Подходит ли ученик под фильтр: «ждут проверки» — есть ответ без отметки учителя
+// (кроме ответа только с классной работой), «не прислали» — ответа нет
+function matchesFilter(filter: AnswerFilter, answer: StudentHomework | undefined) {
+  if (filter === 'review') return answer !== undefined && awaitsReview(answer)
+  if (filter === 'missing') return answer === undefined
+  return true
+}
+
 function formatAnswerDate(value?: string) {
   return value ? new Date(value).toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'short' }) : ''
 }
@@ -1059,13 +1061,17 @@ interface LessonAnswersProps {
   students: Account[]
   openId: number | null // чей ответ открыт в панели справа
   onOpen: (studentId: number) => void
+  filter: AnswerFilter
+  onFilterChange: (filter: AnswerFilter) => void
 }
 
 // «Ответы учеников» в уроке: ученики с отметками и сводка. Ответ ученика открывается
 // по нажатию в панели справа — там же, где задания
-function LessonAnswers({ assignment, students, openId, onOpen }: LessonAnswersProps) {
+function LessonAnswers({ assignment, students, openId, onOpen, filter, onFilterChange }: LessonAnswersProps) {
   const answers = assignment.student_homeworks ?? []
-  const list = lessonStudents(assignment, students)
+  const all = lessonStudents(assignment, students)
+  const list = all.filter((s) => matchesFilter(filter, answerOfStudent(assignment, s.id)))
+  const countOf = (value: AnswerFilter) => all.filter((s) => matchesFilter(value, answerOfStudent(assignment, s.id))).length
   const acceptedCount = answers.filter((a) => a.status === 'accepted').length
   const pendingCount = answers.filter(awaitsReview).length
 
@@ -1077,8 +1083,22 @@ function LessonAnswers({ assignment, students, openId, onOpen }: LessonAnswersPr
         </h2>
       </div>
 
-      {list.length === 0 ? (
+      {all.length > 0 && (
+        <div className={styles.answerFilter} role="group" aria-label="Каких учеников показать">
+          {ANSWER_FILTERS.map((f) => (
+            <button key={f.value} type="button" aria-pressed={filter === f.value} onClick={() => onFilterChange(f.value)}>
+              {f.label} ({countOf(f.value)})
+            </button>
+          ))}
+        </div>
+      )}
+
+      {all.length === 0 ? (
         <p className={panel.empty}>Учеников пока нет</p>
+      ) : list.length === 0 ? (
+        <p className={panel.empty}>
+          {filter === 'review' ? 'Все ответы проверены' : 'Ответ прислали все ученики'}
+        </p>
       ) : (
         <>
           <div className={panel.students}>
@@ -1100,11 +1120,14 @@ function LessonAnswers({ assignment, students, openId, onOpen }: LessonAnswersPr
             })}
           </div>
 
-          <p className={panel.summary}>
-            Прислали {answers.length} из {list.length} · сдано {acceptedCount} · ждут проверки {pendingCount}
-          </p>
           {openId === null && <p className={panel.empty}>Нажмите на ученика — его ответ откроется справа</p>}
         </>
+      )}
+
+      {all.length > 0 && (
+        <p className={panel.summary}>
+          Прислали {answers.length} из {all.length} · сдано {acceptedCount} · ждут проверки {pendingCount}
+        </p>
       )}
     </section>
   )
@@ -1121,12 +1144,14 @@ interface StudentAnswerPanelProps {
   commentActions?: CommentActions
   onOpen: (studentId: number) => void
   onClose: () => void
+  filter: AnswerFilter
 }
 
 // Ответ одного ученика в панели справа: ответы по заданиям, файлы, проверка, переписка.
-// «Следующий ученик» открывает ответ следующего приславшего
+// «Следующий ученик» открывает ответ следующего приславшего, а в фильтре «Ждут проверки» —
+// следующего непроверенного: отметили ответ — ученик уходит из списка, кнопка ведёт к первому оставшемуся
 function StudentAnswerPanel({
-  assignment, students, studentId, answerOrder, correctAnswer, currentUserId, onReview, commentActions, onOpen, onClose,
+  assignment, students, studentId, answerOrder, correctAnswer, currentUserId, onReview, commentActions, onOpen, onClose, filter,
 }: StudentAnswerPanelProps) {
   const [chatOf, setChatOf] = useState<number | null>(null) // у какого ученика раскрыта переписка
   const isChatOpen = chatOf === studentId
@@ -1135,9 +1160,13 @@ function StudentAnswerPanel({
   const sh = answerOfStudent(assignment, studentId)
   const name = sh?.student_name ?? student?.name ?? 'Ученик'
 
-  const sent = list.filter((s) => answerOfStudent(assignment, s.id))
-  const i = sent.findIndex((s) => s.id === studentId)
-  const next = i === -1 ? sent[0] : sent[i + 1]
+  // Листаем только тех, у кого есть ответ: «не прислали» смотреть нечего
+  const queue = filter === 'missing' ? [] : list.filter((s) => {
+    const answer = answerOfStudent(assignment, s.id)
+    return answer !== undefined && matchesFilter(filter, answer)
+  })
+  const i = queue.findIndex((s) => s.id === studentId)
+  const next = i === -1 ? queue.find((s) => s.id !== studentId) : queue[i + 1]
 
   return (
     <TasksViewer

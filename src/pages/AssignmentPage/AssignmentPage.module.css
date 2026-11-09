@@ -194,11 +194,6 @@
   background: var(--line);
 }
 
-.homeworkDescription {
-  white-space: pre-wrap;
-  line-height: 1.6;
-}
-
 .success {
   color: var(--success);
   font-weight: 600;
@@ -387,6 +382,30 @@
 .lessonAnswers {
   max-width: none;
   margin-top: 0;
+}
+
+/* Фильтр учеников в «Ответах учеников»: все / ждут проверки / не прислали */
+.answerFilter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.answerFilter button {
+  padding: 4px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.answerFilter button[aria-pressed='true'] {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
 }
 
 /* Ответ ученика в панели справа вместо задания */

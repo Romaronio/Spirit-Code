@@ -187,6 +187,7 @@ class Homework(models.Model):
         related_name='homework',
         on_delete=models.CASCADE
     )
+    # Описание ДЗ больше нигде не показывается и не приходит в API; старые тексты лежат здесь
     description = models.TextField()
     # Задания ДЗ по номерам — как у классной работы: [{"number": 5, "latex": "..."}]
     numbered_tasks = models.JSONField(blank=True, default=list)

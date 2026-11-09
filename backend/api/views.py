@@ -269,7 +269,7 @@ class AssignmentViewSet(viewsets.ModelViewSet):
         # Поля, которых нет в запросе, не трогаем: None — «не прислали», '' — «очистить»
         fields = {
             key: homework_data.get(key)
-            for key in ('description', 'tasks_latex')
+            for key in ('tasks_latex',)  # описание ДЗ больше не принимается
             if homework_data and isinstance(homework_data.get(key), str)
         }
         if len(fields.get('tasks_latex', '')) > MAX_LATEX_LENGTH:

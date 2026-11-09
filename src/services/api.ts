@@ -139,9 +139,9 @@ function appendTaskFiles(formData: FormData, prefix: string, deleteField: string
 }
 
 // Поля ДЗ без файлов — файлы уходят отдельными полями формы
-function homeworkJson(homework: { description: string; numbered_tasks?: NumberedTask[]; tasks_latex?: string }) {
-  const { description, numbered_tasks, tasks_latex } = homework;
-  return JSON.stringify({ description, numbered_tasks, tasks_latex });
+function homeworkJson(homework: { numbered_tasks?: NumberedTask[]; tasks_latex?: string }) {
+  const { numbered_tasks, tasks_latex } = homework;
+  return JSON.stringify({ numbered_tasks, tasks_latex });
 }
 
 export async function getAllAssignments(subject?: string): Promise<Assignment[]> {
@@ -170,7 +170,7 @@ export async function createAssignment(data: NewAssignment): Promise<Assignment>
   if (data.tasks_latex) {
     formData.append('tasks_latex', data.tasks_latex);
   }
-  if (data.homework && (data.homework.description || data.homework.tasks_latex || data.homework.numbered_tasks?.length)) {
+  if (data.homework && (data.homework.tasks_latex || data.homework.numbered_tasks?.length)) {
     formData.append('homework', homeworkJson(data.homework));
   }
   appendTaskFiles(formData, 'task_files', 'delete_file_ids', data);
@@ -195,7 +195,7 @@ export async function updateAssignment(
     recording_url?: string
     numbered_tasks?: NumberedTask[]
     tasks_latex?: string
-    homework?: { description: string; numbered_tasks?: NumberedTask[]; tasks_latex?: string } & TaskFileChanges
+    homework?: { numbered_tasks?: NumberedTask[]; tasks_latex?: string } & TaskFileChanges
     files?: File[]
     homework_files?: File[]
   } & TaskFileChanges

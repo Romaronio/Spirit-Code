@@ -826,7 +826,7 @@ class TasksLatexTests(AuthTestCase):
         self.login_as(self.teacher)
         response = self.patch({
             'tasks_latex': self.LATEX,
-            'homework': json.dumps({'description': 'Решить', 'tasks_latex': r'\zadacha{1} ДЗ'}),
+            'homework': json.dumps({'tasks_latex': r'\zadacha{1} ДЗ'}),
         })
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['tasks_latex'], self.LATEX)
@@ -841,13 +841,12 @@ class TasksLatexTests(AuthTestCase):
         self.login_as(self.teacher)
         response = self.patch({'homework': json.dumps({'tasks_latex': self.LATEX})})
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data['homework']['description'], '')
         self.assertEqual(response.data['homework']['tasks_latex'], self.LATEX)
 
     def test_homework_numbered_tasks(self):
         self.login_as(self.teacher)
         tasks = [{'number': 7, 'latex': 'семь'}, {'number': 3, 'latex': ''}]
-        response = self.patch({'homework': json.dumps({'description': '', 'numbered_tasks': tasks})})
+        response = self.patch({'homework': json.dumps({'numbered_tasks': tasks})})
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['homework']['numbered_tasks'], [
             {'number': 3, 'latex': ''}, {'number': 7, 'latex': 'семь'},
@@ -857,12 +856,15 @@ class TasksLatexTests(AuthTestCase):
         response = self.patch({'homework': json.dumps({'numbered_tasks': bad})})
         self.assertEqual(response.status_code, 400)
 
-    def test_description_update_keeps_latex(self):
+    def test_homework_description_not_in_api(self):
         self.login_as(self.teacher)
-        self.patch({'homework': json.dumps({'description': 'a', 'tasks_latex': self.LATEX})})
-        response = self.patch({'homework': json.dumps({'description': 'b'})})
-        self.assertEqual(response.data['homework']['description'], 'b')
+        self.patch({'homework': json.dumps({'tasks_latex': self.LATEX})})
+        Homework.objects.filter(assignment=self.bio).update(description='старое описание')
+        # Описание не приходит и не меняется, остальное ДЗ не трогается
+        response = self.patch({'homework': json.dumps({'description': 'новое'})})
+        self.assertNotIn('description', response.data['homework'])
         self.assertEqual(response.data['homework']['tasks_latex'], self.LATEX)
+        self.assertEqual(Homework.objects.get(assignment=self.bio).description, 'старое описание')
 
     def test_too_long_latex_rejected(self):
         self.login_as(self.teacher)

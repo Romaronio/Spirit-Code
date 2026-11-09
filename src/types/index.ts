@@ -33,7 +33,6 @@ export interface HomeworkFile {
 export interface Homework {
   id?: number
   assignment?: number
-  description: string
   numbered_tasks?: NumberedTask[] // задания ДЗ по номерам — у каждого своя кнопка
   tasks_latex?: string // задания в LaTeX, открываются прямо на сайте
   files?: HomeworkFile[]
@@ -126,14 +125,14 @@ export type NewAssignment = {
   recording_url?: string
   numbered_tasks?: NumberedTask[]
   tasks_latex?: string
-  homework?: { description: string; numbered_tasks?: NumberedTask[]; tasks_latex?: string } & TaskFileChanges
+  homework?: { numbered_tasks?: NumberedTask[]; tasks_latex?: string } & TaskFileChanges
   files?: File[]
   homework_files?: File[]
 } & TaskFileChanges
 
 export type AssignmentChanges = Omit<Partial<Assignment>, 'files' | 'homework'> & TaskFileChanges & {
   files?: File[]
-  homework?: { description: string; numbered_tasks?: NumberedTask[]; tasks_latex?: string; files?: File[] } & TaskFileChanges
+  homework?: { numbered_tasks?: NumberedTask[]; tasks_latex?: string; files?: File[] } & TaskFileChanges
 }
 
 // Действия с перепиской по ответу (реализованы в App.tsx)
