@@ -162,6 +162,7 @@ function NumberedTasksWindow({
 
   // Что присылает ученик: только краткий ответ, развёрнутый по желанию или обязательный развёрнутый
   function handleAnswerKind(number: number, kind: AnswerKind) {
+    rememberAnswerKind(homework, kind)
     const next = latestValue.current.map((t) => {
       if (t.number !== number) return t
       const rest = { ...t }
@@ -294,10 +295,38 @@ function answerKind(task: NumberedTask, homework: boolean): AnswerKind {
   return task.short_only ? 'short' : task.detailed_required && homework ? 'required' : 'detailed'
 }
 
-// Новый номер ДЗ по умолчанию требует развёрнутый ответ (учитель может переключить в окне номера),
-// номер классной работы — нет: её можно не решать, чтобы отправить урок
+// Новый номер получает тот тип ответа, который учитель выбрал последним (отдельно для ДЗ и класса;
+// запоминается в браузере и действует и в следующих уроках). Пока ничего не выбирали: номер ДЗ
+// требует развёрнутый ответ, номер классной работы — нет: её можно не решать, чтобы отправить урок
+function kindStorageKey(homework: boolean): string {
+  return homework ? 'spirit:lastAnswerKind:hw' : 'spirit:lastAnswerKind:class'
+}
+
+function lastAnswerKind(homework: boolean): AnswerKind {
+  let saved: string | null = null
+  try {
+    saved = localStorage.getItem(kindStorageKey(homework))
+  } catch {
+    // хранилище недоступно — берём умолчание
+  }
+  if (saved === 'short' || saved === 'detailed') return saved
+  if (saved === 'required' && homework) return 'required'
+  return homework ? 'required' : 'detailed'
+}
+
+function rememberAnswerKind(homework: boolean, kind: AnswerKind) {
+  try {
+    localStorage.setItem(kindStorageKey(homework), kind)
+  } catch {
+    // не запомнили — не страшно
+  }
+}
+
 function newTask(number: number, homework: boolean): NumberedTask {
-  return homework ? { number, latex: '', detailed_required: true } : { number, latex: '' }
+  const kind = lastAnswerKind(homework)
+  if (kind === 'short') return { number, latex: '', short_only: true }
+  if (kind === 'required') return { number, latex: '', detailed_required: true }
+  return { number, latex: '' }
 }
 
 function sortTasks(tasks: NumberedTask[]): NumberedTask[] {
