@@ -174,16 +174,8 @@ function AssignmentDetails({ assignment, user, studentId, students, onUpdate, on
   // Форма отправки ответа учеником
   const [isSubmitting, setIsSubmitting] = useState(false)
   const myAnswer = assignment.student_homeworks?.find((sh) => sh.student === studentId)
-  const [studentDescription, setStudentDescription] = useState(myAnswer?.description ?? '')
-  const [deletedSavedFileIds, setDeletedSavedFileIds] = useState<Array<number | string>>([])
-  const [answerFiles, setAnswerFiles] = useState<FileEntry[]>([]) // новые файлы ко всему уроку
   const [submitError, setSubmitError] = useState('')
   const [submitSuccess, setSubmitSuccess] = useState(false)
-
-  // Сохранённые файлы ответа без тех, что ученик пометил на удаление
-  const savedFiles = (myAnswer?.files ?? []).filter(
-    (f) => !f.task_key && (f.id === undefined || !deletedSavedFileIds.includes(f.id))
-  )
 
   // Порядок заданий в ответах учеников у учителя — как у кнопок заданий
   const answerOrder = [...classworkOrder, ...homeworkOrder].map(answerKey)
@@ -245,18 +237,6 @@ function AssignmentDetails({ assignment, user, studentId, students, onUpdate, on
     setHomeworkFiles((prev) => prev.filter((f) => f.id !== id))
   }
 
-  function handleRemoveSavedFile(id: number | string | undefined) {
-    if (id === undefined) return
-    setDeletedSavedFileIds((prev) => [...prev, id])
-  }
-
-  function handleAnswerFilesChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const { entries, error } = pickFiles(e.target.files)
-    setAnswerFiles((prev) => [...prev, ...entries])
-    setSubmitError(error)
-    e.target.value = ''
-  }
-
   async function handleSubmitAnswer() {
     if (!assignment.id || missingDetailed.length > 0) return
     if (!studentId) {
@@ -269,18 +249,12 @@ function AssignmentDetails({ assignment, user, studentId, students, onUpdate, on
     setSubmitSuccess(false)
 
     try {
-      await api.submitStudentHomework({
-        assignmentId: assignment.id,
-        description: studentDescription,
-        files: answerFiles.map((f) => f.file),
-        deleteFileIds: deletedSavedFileIds,
-      })
+      // Ответы и файлы ученик прикрепляет к номерам — здесь только отправка урока на проверку
+      await api.submitStudentHomework({ assignmentId: assignment.id })
       // Перезагружаем задание, чтобы сохранённый ответ подтянулся с сервера
       if (onSubmitStudentHomework) {
         await onSubmitStudentHomework(assignment.id)
       }
-      setDeletedSavedFileIds([])
-      setAnswerFiles([])
       setSubmitSuccess(true)
       setTimeout(() => setSubmitSuccess(false), 3000)
     } catch (err) {
@@ -730,56 +704,6 @@ function AssignmentDetails({ assignment, user, studentId, students, onUpdate, on
               )}
               {submitSuccess && <p className={styles.success}>Ответ сохранён!</p>}
               {submitError && <p className={styles.error}>{submitError}</p>}
-              <label className={styles.label}>
-                Описание проделанной работы
-                <textarea
-                  className={styles.textarea}
-                  rows={5}
-                  placeholder="Опишите, что вы сделали..."
-                  value={studentDescription}
-                  onChange={(e) => setStudentDescription(e.target.value)}
-                />
-              </label>
-              {/* Файлы ко всему уроку; к отдельному заданию они прикрепляются в его окне */}
-              <span className={styles.label}>Файлы ко всему уроку</span>
-              <label className={styles.fileButton}>
-                📎 Прикрепить файлы
-                <input type="file" multiple accept={ACCEPT} className={styles.hiddenInput} onChange={handleAnswerFilesChange} />
-              </label>
-              {answerFiles.length > 0 && (
-                <ul className={styles.files}>
-                  {answerFiles.map((f) => (
-                    <li key={f.id}>
-                      <span>{f.name}</span>
-                      <button
-                        type="button"
-                        className={styles.linkButton}
-                        onClick={() => setAnswerFiles((prev) => prev.filter((x) => x.id !== f.id))}
-                      >
-                        Удалить
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {savedFiles.length > 0 && (
-                <ul className={styles.files}>
-                  {savedFiles.map((f) => (
-                    <li key={f.id}>
-                      <a className={styles.link} href={f.url} download={f.name}>
-                        📎 {f.name}
-                      </a>
-                      <button
-                        type="button"
-                        className={styles.linkButton}
-                        onClick={() => handleRemoveSavedFile(f.id)}
-                      >
-                        Удалить
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
               {missingDetailed.length > 0 && (
                 <div className={styles.missingDetailed} role="alert">
                   <p>

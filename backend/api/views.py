@@ -408,7 +408,6 @@ class AssignmentViewSet(viewsets.ModelViewSet):
     def submit(self, request, pk=None):
         """Отправка ответа учеником по заданию (всегда от имени вошедшего ученика)"""
         assignment = self.get_object()  # чужой предмет → 404
-        description = request.data.get('description', '')
         files = request.FILES.getlist('files')
 
         # Учитель отметил номера, где развёрнутый ответ обязателен, — без него ДЗ не отправить
@@ -435,11 +434,15 @@ class AssignmentViewSet(viewsets.ModelViewSet):
         check_uploads(files)
         check_student_quota(request.user, files, deleted_ids=delete_ids)
 
+        # Ответ изменился — учителю нужно проверить его заново.
+        # Описания работы в форме ученика больше нет: без него старое описание не стираем
+        defaults = {'status': 'pending', 'checked_at': None}
+        if 'description' in request.data:
+            defaults['description'] = request.data.get('description', '')
         sh, created = StudentHomework.objects.update_or_create(
             assignment=assignment,
             student=request.user,
-            # Ответ изменился — учителю нужно проверить его заново
-            defaults={'description': description, 'status': 'pending', 'checked_at': None}
+            defaults=defaults,
         )
         StudentHomeworkFile.objects.filter(id__in=delete_ids).delete()
 

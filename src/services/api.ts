@@ -298,12 +298,14 @@ export async function deleteHomeworkFile(id: number): Promise<void> {
 
 export async function submitStudentHomework(data: {
   assignmentId: number
-  description: string
+  description?: string
   files?: File[]
   deleteFileIds?: Array<number | string>
 }): Promise<StudentHomework> {
   const formData = new FormData();
-  formData.append('description', data.description);
+  if (data.description !== undefined) {
+    formData.append('description', data.description);
+  }
   if (data.deleteFileIds) {
     formData.append('delete_file_ids', JSON.stringify(data.deleteFileIds));
   }
