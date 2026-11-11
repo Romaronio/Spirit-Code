@@ -6,6 +6,7 @@ import * as api from '../../services/api'
 import TypingTrainer from '../../components/TypingTrainer/TypingTrainer'
 import TypingHistory from '../../components/TypingHistory/TypingHistory'
 import TypingResultsPanel from '../../components/TypingResultsPanel/TypingResultsPanel'
+import Celebration from '../../components/Celebration/Celebration'
 import { canReview } from '../../utils/roles'
 
 interface Props {
@@ -21,6 +22,7 @@ function TypingPage({ user }: Props) {
   const isTeacher = canReview(user?.role) // учитель и куратор видят результаты учеников
   const [history, setHistory] = useState<TypingResult[] | null>(null)
   const [saveState, setSaveState] = useState<SaveState | null>(null)
+  const [celebration, setCelebration] = useState(0) // номер праздника по рекорду; 0 — праздника нет
 
   // Ученик видит свои прошлые попытки
   useEffect(() => {
@@ -51,6 +53,8 @@ function TypingPage({ user }: Props) {
         const result = await api.saveTypingResult(stats)
         setHistory((prev) => [result, ...(prev ?? [])])
         setSaveState({ kind: 'saved', result, previousBest })
+        // Новый рекорд в этом режиме — шарики и салют (первая попытка рекордом не считается)
+        if (previousBest !== null && result.wpm > previousBest) setCelebration((n) => n + 1)
       } catch (err) {
         setSaveState({ kind: 'error', message: err instanceof Error ? err.message : 'Не удалось сохранить результат' })
       }
@@ -83,6 +87,7 @@ function TypingPage({ user }: Props) {
 
   return (
     <div className={styles.page}>
+      {celebration > 0 && <Celebration key={celebration} onDone={() => setCelebration(0)} />}
       <Link to="/home" className={styles.back}>
         ← На главную
       </Link>

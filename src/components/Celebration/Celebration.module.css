@@ -1,0 +1,9 @@
+/* Поверх всей страницы, но не мешает кликать и печатать */
+.canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+}
