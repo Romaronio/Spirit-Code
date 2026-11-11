@@ -34,7 +34,7 @@ class Account(models.Model):
     # Создатель платформы: только он добавляет, меняет и удаляет учителей и кураторов
     # (учеников может добавлять любой учитель). Ставится миграцией 0039, через API не меняется
     is_owner = models.BooleanField(default=False)
-    # Учитель, который добавил аккаунт: учитель (кроме создателя платформы) видит только своих учеников
+    # Учитель, который добавил аккаунт (для истории; учеников видят все учителя)
     added_by = models.ForeignKey(
         'self', on_delete=models.SET_NULL, null=True, blank=True, related_name='added_accounts',
     )
@@ -71,16 +71,9 @@ class Account(models.Model):
 
     @property
     def own_lessons_only(self):
-        """Учитель, кроме создателя платформы, видит и меняет только уроки, которые создал сам,
-        и только учеников, которых добавил сам"""
+        """Учитель, кроме создателя платформы, видит и меняет только уроки, которые создал сам
+        (учеников видит всех)"""
         return self.role == 'teacher' and not self.is_owner
-
-    @cached_property
-    def own_student_ids(self):
-        """id своих учеников у такого учителя; None — ограничения нет"""
-        if not self.own_lessons_only:
-            return None
-        return set(Account.objects.filter(role='student', added_by=self).values_list('id', flat=True))
 
     @property
     def can_review(self):

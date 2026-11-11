@@ -192,10 +192,10 @@ class CuratorTests(AuthTestCase):
         self.assertEqual(self.client.patch(url, {'students': [self.teacher.id]}, format='json').status_code, 400)
         response = self.client.patch(f'/api/accounts/{self.anna.id}/', {'students': [self.ivan.id]}, format='json')
         self.assertEqual(response.status_code, 400)
-        # Обычный учитель закреплять не может — кураторами управляет создатель; чужой куратор ему даже не виден
+        # Обычный учитель закреплять не может — кураторами управляет создатель
         petr = self.make_account('petr', 'teacher')
         self.login_as(petr)
-        self.assertEqual(self.client.patch(url, {'students': []}, format='json').status_code, 404)
+        self.assertEqual(self.client.patch(url, {'students': []}, format='json').status_code, 403)
 
     def test_curator_reviews_and_comments(self):
         self.login_as(self.curator)
@@ -260,18 +260,15 @@ class OwnerTests(AuthTestCase):
         self.assertEqual(self.client.delete(f'/api/accounts/{self.petr.id}/').status_code, 204)
 
     def test_other_teacher_manages_only_students(self):
-        # Свои ученики — те, кого учитель добавил сам
-        Account.objects.filter(id__in=[self.anna.id, self.ivan.id]).update(added_by=self.petr)
         self.login_as(self.petr)
         self.assertEqual(self.create('Новый ученик', 'student').status_code, 201)
         self.assertEqual(self.client.post(f'/api/accounts/{self.anna.id}/reset_password/').status_code, 200)
         self.assertEqual(self.client.delete(f'/api/accounts/{self.ivan.id}/').status_code, 204)
         self.assertEqual(self.create('Учитель 2', 'teacher').status_code, 403)
         self.assertEqual(self.create('Куратор 2', 'curator').status_code, 403)
-        # Кураторы и другие учителя такому учителю не видны
-        self.assertEqual(self.client.post(f'/api/accounts/{self.curator.id}/reset_password/').status_code, 404)
-        self.assertEqual(self.client.delete(f'/api/accounts/{self.curator.id}/').status_code, 404)
-        self.assertEqual(self.client.delete(f'/api/accounts/{self.teacher.id}/').status_code, 404)
+        self.assertEqual(self.client.post(f'/api/accounts/{self.curator.id}/reset_password/').status_code, 403)
+        self.assertEqual(self.client.delete(f'/api/accounts/{self.curator.id}/').status_code, 403)
+        self.assertEqual(self.client.delete(f'/api/accounts/{self.teacher.id}/').status_code, 403)
         # Ученика в учителя не превратить
         response = self.client.patch(f'/api/accounts/{self.anna.id}/', {'role': 'teacher'}, format='json')
         self.assertEqual(response.status_code, 403)
@@ -1919,35 +1916,12 @@ class OwnLessonsTests(AuthTestCase):
         self.assertTrue({theirs['id'], self.bio.id} <= ids)
 
 
-class OwnStudentsTests(AuthTestCase):
-    """Учитель (не создатель платформы) видит и меняет только учеников, которых добавил сам"""
-    def setUp(self):
-        super().setUp()
-        self.olga = self.make_account('olga', 'teacher')
-
-    def test_other_teacher_sees_only_own_students(self):
-        self.login_as(self.olga)
-        created = self.client.post(
-            '/api/accounts/', {'name': 'petya', 'password': 'petya-pass-1', 'role': 'student'}, format='json',
-        )
-        self.assertEqual(created.status_code, 201)
+class AllStudentsVisibleTests(AuthTestCase):
+    """Любой учитель видит всех учеников (ограничение «только свои» — только у уроков)"""
+    def test_other_teacher_sees_all_students(self):
+        olga = self.make_account('olga', 'teacher')
+        self.login_as(olga)
         data = self.client.get('/api/accounts/').data
         names = {a['name'] for a in (data['results'] if isinstance(data, dict) else data)}
-        self.assertEqual(names, {'olga', 'petya'})
-        # Чужой ученик — как будто его нет
-        self.assertEqual(self.client.get(f'/api/accounts/{self.anna.id}/').status_code, 404)
-        self.assertEqual(self.client.delete(f'/api/accounts/{self.anna.id}/').status_code, 404)
-        self.assertEqual(self.client.get(f'/api/accounts/{self.anna.id}/parent-link/').status_code, 404)
-        self.assertEqual(self.client.get(f'/api/typing-results/by-mode/?student={self.anna.id}').status_code, 404)
-        paid = self.client.post('/api/payments/set/', {'student': self.anna.id, 'year': 2026, 'month': 9, 'paid': True}, format='json')
-        self.assertEqual(paid.status_code, 404)
-        call = self.client.post('/api/calls/', {'student': self.anna.id, 'title': 'x'}, format='json')
-        self.assertEqual(call.status_code, 400)
-
-    def test_owner_sees_all_students(self):
-        self.login_as(self.olga)
-        self.client.post('/api/accounts/', {'name': 'petya', 'password': 'petya-pass-1', 'role': 'student'}, format='json')
-        self.login_as(self.teacher)
-        data = self.client.get('/api/accounts/').data
-        names = {a['name'] for a in (data['results'] if isinstance(data, dict) else data)}
-        self.assertTrue({'olga', 'petya', 'anna', 'ivan'} <= names)
+        self.assertTrue({'anna', 'ivan'} <= names)
+        self.assertEqual(self.client.get(f'/api/typing-results/by-mode/?student={self.anna.id}').status_code, 200)
