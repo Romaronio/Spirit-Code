@@ -15,7 +15,7 @@ from django.test import override_settings
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
-from .models import Account, Assignment, AuthToken, Call, DataVersion, Homework, PushSubscription, Subject, LessonFile, StudentHomework, StudentHomeworkFile, TikzFigure, TypingResult
+from .models import Account, Assignment, AuthToken, Call, DataVersion, Homework, HomeworkFile, PushSubscription, Subject, LessonFile, StudentHomework, StudentHomeworkFile, TikzFigure, TypingResult
 from .tikz import MAX_SOURCE_LENGTH, TikzError, _in_points, _run as tikz_run, compile_svg, extract_figures, render_pending
 
 
@@ -1698,3 +1698,67 @@ class PushTests(AuthTestCase):
         self.assertTrue(headers['authorization'].startswith('vapid t='))
         self.assertGreater(len(post.call_args.kwargs['data']), 50)
 
+
+
+class ParentLinkTests(AuthTestCase):
+    """Ссылка для родителей: учитель выдаёт, родитель без входа видит процент выполнения ДЗ"""
+    def setUp(self):
+        super().setUp()
+        hw = Homework.objects.create(assignment=self.bio, description='', numbered_tasks=[
+            {'number': 1, 'latex': 'a'}, {'number': 2, 'latex': 'b'}, {'number': 3, 'latex': 'c'},
+            {'number': 4, 'latex': 'd'}, {'number': 5, 'latex': ''},  # пустой номер ученик не видит
+        ])
+        HomeworkFile.objects.create(homework=hw, name='6.txt', task_number=6)  # файл без номера в списке не считается
+        self.sh = StudentHomework.objects.create(
+            assignment=self.bio, student=self.anna, status='accepted',
+            task_answers={'hw-1': '42', 'hw-2': '  ', 'cw-1': '7'},
+        )
+        StudentHomeworkFile.objects.create(student_homework=self.sh, name='r.py', task_key='hw-3')
+        # Урок без ДЗ в таблицу не попадает
+        Assignment.objects.create(title='Клетка', subject='Биология')
+
+    def link(self, student, method='get'):
+        self.login_as(self.teacher)
+        response = getattr(self.client, method)(f'/api/accounts/{student.id}/parent-link/')
+        self.client.credentials()
+        return response
+
+    def test_parent_sees_homework_percent(self):
+        token = self.link(self.anna).data['token']
+        self.assertGreaterEqual(len(token), 30)
+        data = self.client.get(f'/api/parent/{token}/').data
+        self.assertEqual(data['student'], 'anna')
+        self.assertEqual(len(data['homeworks']), 1)
+        row = data['homeworks'][0]
+        self.assertEqual((row['title'], row['total'], row['done'], row['percent']), ('Фотосинтез', 4, 2, 50))
+        self.assertEqual(row['review'], 'accepted')
+        self.assertEqual(row['date'], '2026-11-01')
+        self.assertEqual(data['average'], 50)
+        # Ни заданий, ни ответов родителю не отдаём
+        self.assertNotIn('42', json.dumps(data, ensure_ascii=False))
+
+    def test_link_is_stable_and_can_be_replaced(self):
+        first = self.link(self.anna).data['token']
+        self.assertEqual(self.link(self.anna).data['token'], first)
+        second = self.link(self.anna, 'post').data['token']
+        self.assertNotEqual(first, second)
+        self.assertEqual(self.client.get(f'/api/parent/{first}/').status_code, 404)
+        self.assertEqual(self.client.get(f'/api/parent/{second}/').status_code, 200)
+
+    def test_only_teacher_gives_link_and_only_to_student(self):
+        self.login_as(self.anna)
+        self.assertEqual(self.client.get(f'/api/accounts/{self.anna.id}/parent-link/').status_code, 403)
+        self.client.credentials()
+        self.assertEqual(self.client.get(f'/api/accounts/{self.anna.id}/parent-link/').status_code, 401)
+        self.assertEqual(self.link(self.teacher).status_code, 400)
+        # Токен не виден в списке аккаунтов
+        self.link(self.anna)
+        self.login_as(self.teacher)
+        self.assertNotIn('parent_token', json.dumps(self.client.get('/api/accounts/').data))
+
+    def test_bad_token_and_stale_login_header(self):
+        self.assertEqual(self.client.get('/api/parent/nope/').status_code, 404)
+        token = self.link(self.anna).data['token']
+        # Устаревший токен входа в браузере родителя не мешает
+        self.client.credentials(HTTP_AUTHORIZATION='Token old')
+        self.assertEqual(self.client.get(f'/api/parent/{token}/').status_code, 200)

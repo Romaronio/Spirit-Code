@@ -270,3 +270,66 @@
   background: var(--accent);
   color: var(--on-accent);
 }
+
+/* Ссылка для родителей */
+.parentLink {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.parentInput {
+  flex: 1 1 280px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--inset);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.parentButton,
+.parentSecondary {
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.parentButton {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.parentButton:hover {
+  background: var(--accent-hover);
+}
+
+.parentSecondary {
+  background: transparent;
+  color: var(--text);
+}
+
+.parentSecondary:hover {
+  background: var(--surface-2);
+}
+
+.parentButton:disabled,
+.parentSecondary:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.parentError {
+  margin: 0;
+  color: var(--danger);
+  font-size: 14px;
+}

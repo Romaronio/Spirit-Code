@@ -1,0 +1,210 @@
+/* Страница родителя: по центру, до 960px; на телефоне поля 16px */
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 960px;
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: 28px 40px;
+  color: var(--text);
+}
+
+@media (max-width: 600px) {
+  .page {
+    padding: 16px;
+  }
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.brand {
+  margin: 0;
+  color: var(--accent-text);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.name {
+  margin: 0;
+  font-size: 28px;
+  overflow-wrap: anywhere;
+}
+
+.muted {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.error {
+  margin: 0;
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.tileValue {
+  font-size: 28px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.tileLabel {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+@media (max-width: 600px) {
+  .card {
+    padding: 14px;
+  }
+}
+
+.cardTitle {
+  margin: 0;
+  font-size: 18px;
+}
+
+/* Таблица шире экрана телефона прокручивается внутри карточки, а не вся страница */
+.tableWrap {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 15px;
+}
+
+.table th {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.table td {
+  padding: 10px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+}
+
+.table tr:last-child td {
+  border-bottom: none;
+}
+
+.lessonTitle {
+  display: block;
+  font-weight: 600;
+}
+
+.subject {
+  display: block;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.nowrap {
+  white-space: nowrap;
+}
+
+.progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 190px;
+}
+
+.percent {
+  width: 44px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.bar {
+  flex: 1;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: var(--surface-2);
+}
+
+.fill {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: currentColor;
+}
+
+.count {
+  color: var(--muted);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+/* Цвет процента: всё выполнено — зелёный, половина и больше — янтарный, меньше — красный */
+.full {
+  color: var(--success);
+}
+
+.half {
+  color: var(--amber);
+}
+
+.low {
+  color: var(--danger);
+}
+
+.accepted {
+  color: var(--success);
+  font-weight: 600;
+}
+
+.rejected {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.note {
+  margin: 0;
+  color: var(--faint);
+  font-size: 13px;
+}

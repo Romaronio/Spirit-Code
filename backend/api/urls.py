@@ -1,5 +1,6 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
+from .parent import ParentView
 from .views import AccountViewSet, AssignmentViewSet, LessonFileViewSet, HomeworkViewSet, HomeworkFileViewSet, StudentHomeworkViewSet, SubjectViewSet, PaymentViewSet, AnswerCommentViewSet, TypingResultViewSet, CallViewSet, PhotoLatexView, PushView, UpdatesView
 
 router = DefaultRouter()
@@ -19,5 +20,6 @@ urlpatterns = [
     path('photo-latex/', PhotoLatexView.as_view()),
     path('updates/', UpdatesView.as_view()),
     path('push/', PushView.as_view()),
+    path('parent/<str:token>/', ParentView.as_view()),
     path('', include(router.urls)),
 ]

@@ -513,3 +513,34 @@ export async function saveCallAnswer(
 export async function endCall(id: number): Promise<void> {
   return fetchAPI<void>(`/calls/${id}/end/`, { method: 'POST' });
 }
+
+// Ссылка для родителей ученика: GET — текущая (создаётся при первом запросе), POST — новая, старая перестаёт работать
+export async function getParentLink(studentId: number, renew = false): Promise<{ token: string }> {
+  return fetchAPI<{ token: string }>(`/accounts/${studentId}/parent-link/`, { method: renew ? 'POST' : 'GET' });
+}
+
+export interface ParentHomework {
+  id: number
+  title: string
+  subject: string
+  date: string // срок сдачи или день создания урока, YYYY-MM-DD
+  has_deadline: boolean
+  total: number // заданий в ДЗ
+  done: number // к скольким ученик прислал ответ или файл
+  percent: number
+  review: 'accepted' | 'rejected' | null // отметка учителя
+}
+
+export interface ParentStats {
+  student: string
+  average: number | null
+  homeworks: ParentHomework[]
+}
+
+// Страница родителя открывается без входа: токен входа не отправляем и на «/» не уводим
+export async function getParentStats(token: string): Promise<ParentStats> {
+  const response = await fetch(`${API_BASE_URL}/parent/${encodeURIComponent(token)}/`);
+  const body = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(errorMessage(body, response.status));
+  return body as ParentStats;
+}

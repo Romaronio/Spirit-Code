@@ -109,6 +109,8 @@ function StudentPage({ user, items, accounts }: Props) {
         </div>
       </header>
 
+      {seesPayments && <ParentLink studentId={student.id!} />}
+
       <section className={styles.tiles} aria-label="Статистика">
         <div className={`${styles.tile} ${styles.progressTile}`}>
           <ProgressDonut done={stats.accepted} total={stats.total} />
@@ -229,6 +231,70 @@ function StudentPage({ user, items, accounts }: Props) {
         </section>}
       </div>
     </div>
+  )
+}
+
+// Ссылка для родителей: по ней без входа видны все домашки ученика и процент выполнения.
+// Выдаёт учитель; «Сменить ссылку» — старая сразу перестаёт работать
+function ParentLink({ studentId }: { studentId: number }) {
+  const [url, setUrl] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const [error, setError] = useState('')
+
+  async function load(renew: boolean) {
+    if (renew && !window.confirm('Сделать новую ссылку? Старая сразу перестанет открываться — родителям нужно будет прислать новую.')) return
+    setBusy(true)
+    setError('')
+    try {
+      const { token } = await api.getParentLink(studentId, renew)
+      setUrl(`${window.location.origin}/parent/${token}`)
+      setCopied(false)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Не удалось получить ссылку')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(url)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      setError('Не удалось скопировать — выделите ссылку и скопируйте вручную')
+    }
+  }
+
+  return (
+    <section className={styles.card}>
+      <h2 className={styles.cardTitle}>Ссылка для родителей</h2>
+      <p className={styles.muted}>
+        По ссылке без входа видны все домашние задания ученика и процент их выполнения. Ответы и переписка не видны.
+      </p>
+      {url ? (
+        <div className={styles.parentLink}>
+          <input className={styles.parentInput} value={url} readOnly onFocus={(e) => e.currentTarget.select()} />
+          <button type="button" className={styles.parentButton} onClick={copy}>
+            {copied ? '✓ Скопировано' : 'Копировать'}
+          </button>
+          <a className={styles.parentButton} href={url} target="_blank" rel="noreferrer">
+            Открыть
+          </a>
+          <button type="button" className={styles.parentSecondary} onClick={() => load(true)} disabled={busy}>
+            Сменить ссылку
+          </button>
+        </div>
+      ) : (
+        <div className={styles.parentLink}>
+          <button type="button" className={styles.parentButton} onClick={() => load(false)} disabled={busy}>
+            {busy ? 'Загрузка…' : 'Показать ссылку'}
+          </button>
+        </div>
+      )}
+      {error && <p className={styles.parentError}>{error}</p>}
+    </section>
   )
 }
 

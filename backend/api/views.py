@@ -17,6 +17,7 @@ from rest_framework.views import APIView
 from .answer_check import snapshot_answers
 from .models import MAX_LATEX_LENGTH, Account, AnswerComment, Assignment, AuthToken, Call, CallAnswer, CallAnswerFile, DataVersion, LessonFile, PushSubscription, Subject, Homework, HomeworkFile, Payment, StudentHomework, StudentHomeworkFile, TypingResult
 from . import livekit, push
+from .parent import new_parent_token
 from .permissions import IsReviewer, IsStudent, IsTeacher
 from .photo_latex import PhotoLatexError, photo_to_latex
 from .uploads import check_student_quota, check_uploads
@@ -165,6 +166,18 @@ class AccountViewSet(viewsets.ModelViewSet):
         if account.is_owner and serializer.validated_data.get('role', account.role) != account.role:
             raise PermissionDenied('Создатель платформы остаётся учителем')
         serializer.save()
+
+    @action(detail=True, methods=['get', 'post'], url_path='parent-link')
+    def parent_link(self, request, pk=None):
+        """Ссылка для родителей ученика. GET — текущая (при первом запросе создаётся),
+        POST — новая: старая сразу перестаёт работать"""
+        student = self.get_object()
+        if student.role != 'student':
+            raise ValidationError({'detail': ['Ссылка для родителей есть только у ученика']})
+        if request.method == 'POST' or not student.parent_token:
+            student.parent_token = new_parent_token()
+            student.save(update_fields=['parent_token'])
+        return Response({'token': student.parent_token})
 
     @action(
         detail=False,

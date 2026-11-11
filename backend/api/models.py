@@ -39,6 +39,9 @@ class Account(models.Model):
         'self', symmetrical=False, related_name='curators', blank=True,
         limit_choices_to={'role': 'student'},
     )
+    # Секретная ссылка для родителей ученика (/parent/<token>): статистика домашек без входа.
+    # Выдаёт учитель, новая ссылка отменяет старую. None — ссылки нет
+    parent_token = models.CharField(max_length=64, unique=True, null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

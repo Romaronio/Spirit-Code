@@ -180,6 +180,7 @@ REST_FRAMEWORK = {
     'DEFAULT_THROTTLE_RATES': {
         'login': os.environ.get('DJANGO_LOGIN_RATE', '10/min'),  # защита от перебора паролей
         'photo_latex': os.environ.get('DJANGO_PHOTO_LATEX_RATE', '60/hour'),  # бережём лимит GigaChat
+        'parent': os.environ.get('DJANGO_PARENT_RATE', '60/min'),  # страница родителя без входа
     },
     # Сколько прокси стоит перед Django (Caddy = 1). Нужно, чтобы лимит входа
     # считался по настоящему IP пользователя, а не по IP прокси.
