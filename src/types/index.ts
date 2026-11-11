@@ -11,6 +11,7 @@ export interface Account extends User {
   password: string
   subjects?: string[] // предметы, которые изучает ученик
   is_owner?: boolean // создатель платформы: только он добавляет учителей и кураторов
+  students?: number[] // у куратора — закреплённые за ним ученики (видит и проверяет только их)
   created_at?: string
   updated_at?: string
 }

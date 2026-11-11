@@ -15,6 +15,7 @@ import { promptInstall, useCanInstall } from '../../utils/install'
 import { lessonForSubjects, normalize } from '../../utils/subjects'
 import { awaitsReview } from '../../utils/studentStats'
 import { canReview } from '../../utils/roles'
+import { usePush } from '../../utils/push'
 
 interface Props {
   user: User | null;
@@ -25,6 +26,7 @@ interface Props {
   onAddStudent: (student: Omit<Account, 'id'>) => Promise<void>;
   onDeleteStudent: (id: number) => void;
   onSetSubjects: (id: number, subjects: string[]) => void;
+  onSetCuratorStudents: (id: number, students: number[]) => Promise<void>;
   onReview: (assignmentId: number, answerId: number, status: ReviewStatus) => Promise<void>;
   commentActions: CommentActions;
   onAdd: (data: NewAssignment) => Promise<void>;
@@ -42,6 +44,7 @@ function HomePage({
   onAddStudent,
   onDeleteStudent,
   onSetSubjects,
+  onSetCuratorStudents,
   onReview,
   commentActions,
   subjects,
@@ -212,6 +215,7 @@ function HomePage({
             <h1 className={styles.greeting}>Добро пожаловать, {user.name}</h1>
             {/* Непроверенные ответы учеников — красным, чтобы учитель сразу заметил */}
             <p className={`${styles.lead} ${isReviewer && pendingReviewCount > 0 ? styles.leadAlert : ''}`}>{lead}</p>
+            {user.role === 'student' && <PushBanner />}
             {isReviewer && (
               <button type="button" className={styles.allButton} onClick={() => setShowAll(true)}>
                 Посмотреть все задания
@@ -266,6 +270,7 @@ function HomePage({
                     onAddStudent={onAddStudent}
                     onDeleteStudent={onDeleteStudent}
                     onSetSubjects={onSetSubjects}
+                    onSetCuratorStudents={onSetCuratorStudents}
                   />
                 </>
               )}
@@ -395,3 +400,31 @@ function PerRowSwitch({ value, onChange }: { value: number; onChange: (value: nu
 
 
 export default HomePage
+
+// Ученику: включить уведомления о начале урока — приходят, даже когда сайт закрыт
+function PushBanner() {
+  const { state, error, busy, enable } = usePush()
+  if (state === null || state === 'on' || state === 'unsupported') return null
+  return (
+    <div className={styles.pushBanner}>
+      {state === 'off' && (
+        <>
+          <span>🔔 Узнавайте о начале урока, даже когда сайт закрыт</span>
+          <button type="button" className={styles.pushButton} onClick={() => void enable()} disabled={busy}>
+            {busy ? 'Включаем…' : 'Включить уведомления'}
+          </button>
+        </>
+      )}
+      {state === 'needs-install' && (
+        <span>
+          🔔 Чтобы получать уведомления о начале урока на iPhone, добавьте сайт на экран «Домой»:
+          «Поделиться» → «На экран „Домой“», и откройте его оттуда
+        </span>
+      )}
+      {state === 'denied' && (
+        <span>🔕 Уведомления запрещены. Разрешите их для этого сайта в настройках браузера</span>
+      )}
+      {error && <span className={styles.pushError}>{error}</span>}
+    </div>
+  )
+}

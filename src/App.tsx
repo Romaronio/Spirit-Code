@@ -10,6 +10,7 @@ import type { Account, AnswerComment, Assignment, AssignmentChanges, CommentActi
 import * as api from './services/api'
 import { clearSession, loadUser } from './utils/session'
 import { canReview } from './utils/roles'
+import { disablePush } from './utils/push'
 
 // Как часто спрашиваем сервер, не изменилось ли что-то (крошечный запрос — только номер версии)
 const UPDATES_POLL_MS = 4000
@@ -108,6 +109,7 @@ function App() {
   }
 
   async function handleLogout() {
+    await disablePush() // на этом устройстве уведомления этого аккаунта больше не нужны
     try {
       await api.logout()
     } catch {
@@ -201,6 +203,12 @@ function App() {
   async function handleDeleteSubject(id: number) {
     await api.deleteSubject(id)
     setSubjects((prev) => prev.filter((s) => s.id !== id))
+  }
+
+  // Ученики, закреплённые за куратором (меняет только создатель)
+  async function handleSetCuratorStudents(id: number, students: number[]) {
+    const updated = await api.updateAccount(id, { students })
+    setAccounts((prev) => prev.map((a) => (a.id === id ? updated : a)))
   }
 
   async function handleSetSubjects(id: number, subjects: string[]) {
@@ -301,6 +309,7 @@ function App() {
             onAddStudent={handleAddStudent}
             onDeleteStudent={handleDeleteStudent}
             onSetSubjects={handleSetSubjects}
+            onSetCuratorStudents={handleSetCuratorStudents}
             onReview={handleReview}
             commentActions={commentActions}
             subjects={subjects}

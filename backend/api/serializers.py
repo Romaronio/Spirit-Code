@@ -9,9 +9,14 @@ MIN_PASSWORD_LENGTH = 5
 
 class AccountSerializer(serializers.ModelSerializer):
     """Сериализатор для Account"""
+    # Ученики, закреплённые за куратором
+    students = serializers.PrimaryKeyRelatedField(
+        many=True, required=False, queryset=Account.objects.filter(role='student'),
+    )
+
     class Meta:
         model = Account
-        fields = ['id', 'name', 'password', 'role', 'subjects', 'is_owner', 'created_at', 'updated_at']
+        fields = ['id', 'name', 'password', 'role', 'subjects', 'students', 'is_owner', 'created_at', 'updated_at']
         read_only_fields = ['is_owner']  # создателя через API не назначить
         extra_kwargs = {
             'password': {'write_only': True}  # пароль не возвращается при GET запросах
@@ -37,20 +42,40 @@ class AccountSerializer(serializers.ModelSerializer):
             )
         return value
 
+    def validate(self, attrs):
+        role = attrs.get('role', getattr(self.instance, 'role', None))
+        if attrs.get('students') and role != 'curator':
+            raise serializers.ValidationError({'students': 'Учеников можно закрепить только за куратором'})
+        if role != 'curator' and 'role' in attrs and self.instance is not None:
+            attrs['students'] = []  # перестал быть куратором — закреплённые ученики не нужны
+        return attrs
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if instance.role != 'curator':
+            data.pop('students', None)
+        return data
+
     def create(self, validated_data):
         password = validated_data.pop('password')
+        students = validated_data.pop('students', None)
         account = Account(**validated_data)
         account.set_password(password)
         account.save()
+        if students is not None:
+            account.students.set(students)
         return account
 
     def update(self, instance, validated_data):
         password = validated_data.pop('password', None)
+        students = validated_data.pop('students', None)
         for field, value in validated_data.items():
             setattr(instance, field, value)
         if password is not None:
             instance.set_password(password)
         instance.save()
+        if students is not None:
+            instance.students.set(students)
         if password is not None:
             instance.tokens.all().delete()  # со старым паролем больше не войти
         return instance
@@ -323,6 +348,8 @@ class AssignmentSerializer(serializers.ModelSerializer):
         if not getattr(user, 'can_review', False):
             user_id = getattr(user, 'id', None)
             answers = [sh for sh in answers if sh.student_id == user_id]
+        elif user.curated_ids is not None:  # куратор — только закреплённые за ним ученики
+            answers = [sh for sh in answers if sh.student_id in user.curated_ids]
         return StudentHomeworkSerializer(answers, many=True, context=self.context).data
 
 

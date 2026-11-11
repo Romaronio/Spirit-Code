@@ -1,3 +1,4 @@
+from django.utils.functional import cached_property
 import hashlib
 import secrets
 from datetime import timedelta
@@ -33,6 +34,11 @@ class Account(models.Model):
     # Создатель платформы: только он добавляет, меняет и удаляет учителей и кураторов
     # (учеников может добавлять любой учитель). Ставится миграцией 0039, через API не меняется
     is_owner = models.BooleanField(default=False)
+    # Ученики, закреплённые за куратором (из любых групп). Куратор видит и проверяет только их
+    students = models.ManyToManyField(
+        'self', symmetrical=False, related_name='curators', blank=True,
+        limit_choices_to={'role': 'student'},
+    )
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -58,8 +64,15 @@ class Account(models.Model):
 
     @property
     def can_review(self):
-        """Видит все уроки и ответы учеников и проверяет их: учитель и куратор"""
+        """Видит уроки и ответы учеников и проверяет их: учитель (всех) и куратор (своих)"""
         return self.role in ('teacher', 'curator')
+
+    @cached_property
+    def curated_ids(self):
+        """id учеников, которых видит проверяющий: None — всех (учитель), у куратора — закреплённых"""
+        if self.role == 'curator':
+            return set(self.students.values_list('id', flat=True))
+        return None
 
     def set_password(self, raw_password):
         """Сохраняет пароль в виде хэша (PBKDF2), а не открытым текстом"""
@@ -513,3 +526,21 @@ class DataVersion(models.Model):
     @classmethod
     def current(cls):
         return cls.objects.filter(pk=1).values_list('value', flat=True).first() or 0
+
+
+class PushKeys(models.Model):
+    """Ключи сайта для push-уведомлений (VAPID). Создаются сами при первом обращении (api/push.py)"""
+    private_pem = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
+class PushSubscription(models.Model):
+    """Подписка браузера на уведомления: телефон, компьютер — у каждого своя"""
+    account = models.ForeignKey(Account, related_name='push_subscriptions', on_delete=models.CASCADE)
+    endpoint = models.URLField(max_length=1000, unique=True)
+    p256dh = models.CharField(max_length=200)
+    auth = models.CharField(max_length=100)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Push: {self.account.name}"

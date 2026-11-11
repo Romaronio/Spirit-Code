@@ -447,3 +447,38 @@
     padding: 16px;
   }
 }
+
+/* Ученику: включить уведомления о начале урока */
+.pushBanner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-top: 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: 14px;
+}
+
+.pushButton {
+  padding: 6px 14px;
+  border: none;
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.pushButton:hover {
+  background: var(--accent-hover);
+}
+
+.pushError {
+  width: 100%;
+  color: var(--danger);
+}

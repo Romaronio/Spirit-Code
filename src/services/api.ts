@@ -460,6 +460,19 @@ export async function joinCall(id: number): Promise<CallJoin> {
 }
 
 // Номер версии данных: сменился — пора перезагрузить уроки и ответы
+// Push-уведомления: публичный ключ сайта и подписка этого устройства
+export async function getPushKey(): Promise<string> {
+  return (await fetchAPI<{ public_key: string }>('/push/')).public_key;
+}
+
+export async function savePushSubscription(subscription: PushSubscriptionJSON): Promise<void> {
+  await fetchAPI<void>('/push/', { method: 'POST', body: JSON.stringify(subscription) });
+}
+
+export async function deletePushSubscription(endpoint: string): Promise<void> {
+  await fetchAPI<void>('/push/', { method: 'DELETE', body: JSON.stringify({ endpoint }) });
+}
+
 export async function getUpdatesVersion(): Promise<number> {
   return (await fetchAPI<{ version: number }>('/updates/')).version;
 }

@@ -20,6 +20,7 @@ interface Props {
   onAddStudent: (student: Omit<Account, 'id'>) => Promise<void>
   onDeleteStudent: (id: number) => void
   onSetSubjects: (id: number, subjects: string[]) => void
+  onSetCuratorStudents?: (id: number, students: number[]) => Promise<void>
 }
 
 const MIN_PASSWORD_LENGTH = 8 // как на сервере (api/serializers.py)
@@ -69,7 +70,11 @@ function StudentsPanel({
   onAddStudent,
   onDeleteStudent,
   onSetSubjects,
+  onSetCuratorStudents,
 }: Props) {
+  // У какого куратора раскрыт выбор учеников
+  const [pickingFor, setPickingFor] = useState<number | null>(null)
+  const [pickError, setPickError] = useState('')
   const [name, setName] = useState('')
   const [password, setPassword] = useState('')
   const [newSubjects, setNewSubjects] = useState<string[]>([])
@@ -349,6 +354,28 @@ function StudentsPanel({
                         </p>
                       )
                     )}
+
+                    {/* Куратор видит и проверяет только закреплённых за ним учеников — из любых групп */}
+                    {c.role === 'curator' && onSetCuratorStudents && (
+                      <CuratorStudents
+                        curator={c}
+                        students={students}
+                        isOpen={pickingFor === c.id}
+                        error={pickingFor === c.id ? pickError : ''}
+                        onToggleOpen={() => {
+                          setPickingFor(pickingFor === c.id ? null : c.id!)
+                          setPickError('')
+                        }}
+                        onChange={async (ids) => {
+                          setPickError('')
+                          try {
+                            await onSetCuratorStudents(c.id!, ids)
+                          } catch (err) {
+                            setPickError(err instanceof Error ? err.message : 'Не удалось сохранить')
+                          }
+                        }}
+                      />
+                    )}
                   </li>
                 ))}
               </ul>
@@ -357,6 +384,60 @@ function StudentsPanel({
         </>
       )}
     </section>
+  )
+}
+
+interface CuratorStudentsProps {
+  curator: Account
+  students: Account[]
+  isOpen: boolean
+  error: string
+  onToggleOpen: () => void
+  onChange: (ids: number[]) => Promise<void>
+}
+
+// Ученики куратора: сколько закреплено и, по кнопке, список всех учеников с галочками
+function CuratorStudents({ curator, students, isOpen, error, onToggleOpen, onChange }: CuratorStudentsProps) {
+  const selected = new Set(curator.students ?? [])
+  const names = students.filter((s) => selected.has(s.id!)).map((s) => s.name)
+  const [query, setQuery] = useState('')
+  const shown = students.filter((s) => s.name.toLowerCase().includes(query.trim().toLowerCase()))
+
+  return (
+    <div className={styles.curatorStudents}>
+      <p className={styles.hint}>
+        {names.length ? `Ученики (${names.length}): ${names.join(', ')}` : 'Ученики не закреплены — куратор пока ничего не видит'}
+      </p>
+      <button type="button" className={styles.secondary} onClick={onToggleOpen} aria-expanded={isOpen}>
+        {isOpen ? 'Готово' : 'Выбрать учеников'}
+      </button>
+      {isOpen && (
+        <>
+          {students.length > 8 && (
+            <input type="search" placeholder="Найти ученика" value={query} onChange={(e) => setQuery(e.target.value)} />
+          )}
+          <div className={styles.subjects}>
+            {shown.map((s) => (
+              <label key={s.id} className={styles.subject}>
+                <input
+                  type="checkbox"
+                  checked={selected.has(s.id!)}
+                  onChange={() => {
+                    const next = new Set(selected)
+                    if (next.has(s.id!)) next.delete(s.id!)
+                    else next.add(s.id!)
+                    void onChange([...next])
+                  }}
+                />
+                {s.name}
+                {(s.subjects ?? []).length > 0 && <span className={styles.studentSubjects}> · {s.subjects!.join(', ')}</span>}
+              </label>
+            ))}
+          </div>
+        </>
+      )}
+      {error && <p className={styles.error}>{error}</p>}
+    </div>
   )
 }
 

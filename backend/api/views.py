@@ -15,8 +15,8 @@ from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.views import APIView
 from .answer_check import snapshot_answers
-from .models import MAX_LATEX_LENGTH, Account, AnswerComment, Assignment, AuthToken, Call, CallAnswer, CallAnswerFile, DataVersion, LessonFile, Subject, Homework, HomeworkFile, Payment, StudentHomework, StudentHomeworkFile, TypingResult
-from . import livekit
+from .models import MAX_LATEX_LENGTH, Account, AnswerComment, Assignment, AuthToken, Call, CallAnswer, CallAnswerFile, DataVersion, LessonFile, PushSubscription, Subject, Homework, HomeworkFile, Payment, StudentHomework, StudentHomeworkFile, TypingResult
+from . import livekit, push
 from .permissions import IsReviewer, IsStudent, IsTeacher
 from .photo_latex import PhotoLatexError, photo_to_latex
 from .uploads import check_student_quota, check_uploads
@@ -140,6 +140,14 @@ class AccountViewSet(viewsets.ModelViewSet):
         if self.action in ('list', 'retrieve'):
             return [IsReviewer()]
         return super().get_permissions()
+
+    def get_queryset(self):
+        queryset = Account.objects.prefetch_related('students')
+        user = self.request.user
+        if getattr(user, 'curated_ids', None) is not None:
+            # Куратор видит только себя и закреплённых за ним учеников
+            return queryset.filter(Q(id__in=user.curated_ids) | Q(id=user.id))
+        return queryset
 
     def _check_owner(self, *roles):
         """Учителей и кураторов добавляет, меняет и удаляет только создатель платформы,
@@ -266,7 +274,17 @@ class AssignmentViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(subject=subject)
 
         user = self.request.user
-        if not getattr(user, 'can_review', False):
+        if getattr(user, 'curated_ids', None) is not None:
+            # Куратор видит уроки своих учеников: по их предметам и те, к которым они прислали ответ
+            students = Account.objects.filter(id__in=user.curated_ids)
+            subjects = {str(s).strip().casefold() for st in students for s in (st.subjects or []) if str(s).strip()}
+            ids = [
+                a.id for a in Assignment.objects.only('id', 'subject', 'extra_subjects')
+                if any(str(s).strip().casefold() in subjects for s in a.all_subjects)
+            ]
+            ids += StudentHomework.objects.filter(student_id__in=user.curated_ids).values_list('assignment_id', flat=True)
+            queryset = queryset.filter(id__in=ids)
+        elif not getattr(user, 'can_review', False):
             subjects = {str(s).strip().casefold() for s in (getattr(user, 'subjects', None) or []) if str(s).strip()}
             # Урок виден, если любой из его предметов есть у ученика. Сравниваем в Python:
             # дополнительные предметы лежат в JSON, а iexact в SQLite не понимает регистр русских букв
@@ -539,9 +557,12 @@ class StudentHomeworkViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         queryset = super().get_queryset()
         user = self.request.user
-        # Ученику (он попадает сюда только в переписку) доступны только свои ответы
+        # Ученику (он попадает сюда только в переписку) доступны только свои ответы,
+        # куратору — ответы закреплённых за ним учеников
         if not getattr(user, 'can_review', False):
             queryset = queryset.filter(student=user)
+        elif user.curated_ids is not None:
+            queryset = queryset.filter(student_id__in=user.curated_ids)
         return queryset
 
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
@@ -645,6 +666,8 @@ class AnswerCommentViewSet(mixins.UpdateModelMixin, mixins.DestroyModelMixin, vi
         if not getattr(user, 'can_review', False):
             # ученику доступна только переписка по его собственным ответам
             queryset = queryset.filter(student_homework__student=user)
+        elif user.curated_ids is not None:
+            queryset = queryset.filter(student_homework__student_id__in=user.curated_ids)
         return queryset
 
     def perform_update(self, serializer):
@@ -683,6 +706,8 @@ class TypingResultViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, viewse
         user = self.request.user
         if not user.can_review:
             return queryset.filter(student=user)
+        if user.curated_ids is not None:
+            queryset = queryset.filter(student_id__in=user.curated_ids)
         student = self.request.query_params.get('student')
         if student:
             queryset = queryset.filter(student_id=student) if student.isdigit() else queryset.none()
@@ -711,7 +736,10 @@ class TypingResultViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, viewse
             by_student.setdefault(result.student_id, []).append(result)
 
         rows = []
-        for student in Account.objects.filter(role='student'):
+        students = Account.objects.filter(role='student')
+        if request.user.curated_ids is not None:
+            students = students.filter(id__in=request.user.curated_ids)
+        for student in students:
             rows.append({
                 'student': student.id,
                 'student_name': student.name,
@@ -726,6 +754,8 @@ class TypingResultViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, viewse
         student = request.query_params.get('student', '')
         if not student.isdigit():
             return Response({'error': 'Укажите ученика: ?student=<id>'}, status=status.HTTP_400_BAD_REQUEST)
+        if request.user.curated_ids is not None and int(student) not in request.user.curated_ids:
+            return Response({'error': 'Этот ученик не закреплён за вами'}, status=status.HTTP_404_NOT_FOUND)
 
         by_language = {}
         for result in TypingResult.objects.filter(student_id=student):  # от новых к старым
@@ -777,6 +807,32 @@ def _live_calls():
     )
 
 
+def _call_recipients(call):
+    """Ученики, которые могут войти в этот созвон (как в _student_calls)"""
+    if call.student_id:
+        return [call.student]
+    result = []
+    for student in Account.objects.filter(role='student'):
+        if not _calls_open_for(student):
+            continue
+        subjects = {str(s).strip().casefold() for s in (student.subjects or [])}
+        if not call.subject or any(s.strip().casefold() in subjects for s in call.all_subjects):
+            result.append(student)
+    return result
+
+
+def _notify_call_started(call):
+    """Push ученикам: начался урок — нажать и подключиться"""
+    name = call.title or (call.assignment.title if call.assignment_id else '') or call.subject or 'Онлайн-урок'
+    teacher = call.started_by.name if call.started_by_id else 'Учитель'
+    push.send_to(
+        _call_recipients(call),
+        title=f'Начался урок: {name}',
+        body=f'{teacher} начал(а) урок — нажмите, чтобы подключиться',
+        url=f'/call/{call.id}',
+    )
+
+
 def _student_calls(user):
     """Идущие созвоны, в которые может войти ученик"""
     queryset = _live_calls()
@@ -825,7 +881,8 @@ class CallViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retriev
         return _live_calls() if getattr(user, 'is_teacher', False) else _student_calls(user)
 
     def perform_create(self, serializer):
-        serializer.save(started_by=self.request.user)
+        call = serializer.save(started_by=self.request.user)
+        _notify_call_started(call)
 
     @action(detail=True, methods=['post'])
     def join(self, request, pk=None):
@@ -931,6 +988,38 @@ class CallViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retriev
             return Response(status=status.HTTP_204_NO_CONTENT)
         answer = self._call_answers(call, request.user).get(pk=answer.pk)
         return Response(CallAnswerSerializer(answer, context={'request': request}).data)
+
+
+class PushView(APIView):
+    """Push-уведомления браузера.
+
+    GET /api/push/ — публичный ключ сайта (applicationServerKey для pushManager.subscribe).
+    POST /api/push/ {endpoint, keys: {p256dh, auth}} — подписать это устройство.
+    DELETE /api/push/ {endpoint} — отписать (при выходе из аккаунта).
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        return Response({'public_key': push.public_key()})
+
+    def post(self, request):
+        endpoint = str(request.data.get('endpoint', '')).strip()
+        keys = request.data.get('keys') or {}
+        p256dh = str(keys.get('p256dh', '')).strip() if isinstance(keys, dict) else ''
+        auth = str(keys.get('auth', '')).strip() if isinstance(keys, dict) else ''
+        if not endpoint.startswith('https://') or len(endpoint) > 1000 or not p256dh or not auth \
+                or len(p256dh) > 200 or len(auth) > 100:
+            return Response({'error': 'Неверная подписка'}, status=status.HTTP_400_BAD_REQUEST)
+        # Устройство могло принадлежать другому аккаунту (вышли и вошли другим) — подписка переходит
+        PushSubscription.objects.update_or_create(
+            endpoint=endpoint, defaults={'account': request.user, 'p256dh': p256dh, 'auth': auth},
+        )
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    def delete(self, request):
+        endpoint = str(request.data.get('endpoint', '')).strip()
+        PushSubscription.objects.filter(endpoint=endpoint, account=request.user).delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class UpdatesView(APIView):

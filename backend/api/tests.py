@@ -15,7 +15,7 @@ from django.test import override_settings
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
-from .models import Account, Assignment, AuthToken, Call, DataVersion, Homework, Subject, LessonFile, StudentHomework, StudentHomeworkFile, TikzFigure, TypingResult
+from .models import Account, Assignment, AuthToken, Call, DataVersion, Homework, PushSubscription, Subject, LessonFile, StudentHomework, StudentHomeworkFile, TikzFigure, TypingResult
 from .tikz import MAX_SOURCE_LENGTH, TikzError, _in_points, _run as tikz_run, compile_svg, extract_figures, render_pending
 
 
@@ -144,23 +144,58 @@ class CuratorTests(AuthTestCase):
     def setUp(self):
         super().setUp()
         self.curator = self.make_account('olga', 'curator')
+        self.curator.students.set([self.anna])  # за куратором закреплена только Анна
         self.bio.numbered_tasks = [{'number': 5, 'latex': 'x', 'answer': '42'}]
         self.bio.save()
         self.sh = StudentHomework.objects.create(
             assignment=self.bio, student=self.anna, description='ответ', task_answers={'cw-5': '42'},
         )
 
-    def test_curator_sees_all_lessons_answers_and_correct_answers(self):
+    def test_curator_sees_lessons_answers_and_correct_answers_of_own_students(self):
         self.login_as(self.curator)
+        # Только уроки по предметам Анны; урок Ивана (английский) куратору не виден
         ids = {a['id'] for a in self.client.get('/api/assignments/').data['results']}
-        self.assertEqual(ids, {self.bio.id, self.eng.id})
+        self.assertEqual(ids, {self.bio.id})
         data = self.client.get(f'/api/assignments/{self.bio.id}/').data
         self.assertEqual(data['numbered_tasks'][0]['answer'], '42')
         self.assertEqual([sh['id'] for sh in data['student_homeworks']], [self.sh.id])
         self.assertEqual(data['student_homeworks'][0]['task_checks'], {'cw-5': True})
-        # Список учеников — чтобы видеть, кто прислал ответ
-        self.assertEqual(self.client.get('/api/accounts/').status_code, 200)
+        # Список учеников — только он сам и закреплённые ученики
+        names = {a['name'] for a in self.client.get('/api/accounts/').data['results']}             if isinstance(self.client.get('/api/accounts/').data, dict) else {a['name'] for a in self.client.get('/api/accounts/').data}
+        self.assertEqual(names, {'olga', 'anna'})
         self.assertEqual(self.client.get('/api/subjects/').status_code, 200)
+
+    def test_curator_does_not_see_other_students(self):
+        ivan_answer = StudentHomework.objects.create(assignment=self.bio, student=self.ivan, description='чужой')
+        self.login_as(self.curator)
+        data = self.client.get(f'/api/assignments/{self.bio.id}/').data
+        self.assertEqual([sh['student'] for sh in data['student_homeworks']], [self.anna.id])
+        url = f'/api/student-homeworks/{ivan_answer.id}/'
+        self.assertEqual(self.client.post(url + 'review/', {'status': 'accepted'}, format='json').status_code, 404)
+        self.assertEqual(self.client.post(url + 'comments/', {'text': 'x'}, format='json').status_code, 404)
+        self.assertEqual(self.client.get(f'/api/typing-results/by-mode/?student={self.ivan.id}').status_code, 404)
+        # Ученик ответил на урок не своего предмета — куратор этот урок тоже видит
+        StudentHomework.objects.create(assignment=self.eng, student=self.anna, description='x')
+        ids = {a['id'] for a in self.client.get('/api/assignments/').data['results']}
+        self.assertEqual(ids, {self.bio.id, self.eng.id})
+        # Без закреплённых учеников куратор не видит ничего
+        self.curator.students.clear()
+        self.assertEqual(self.client.get('/api/assignments/').data['results'], [])
+
+    def test_owner_assigns_students_to_curator(self):
+        self.login_as(self.teacher)
+        url = f'/api/accounts/{self.curator.id}/'
+        response = self.client.patch(url, {'students': [self.anna.id, self.ivan.id]}, format='json')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(sorted(response.data['students']), sorted([self.anna.id, self.ivan.id]))
+        # Учителя за куратором не закрепить, ученику учеников тоже
+        self.assertEqual(self.client.patch(url, {'students': [self.teacher.id]}, format='json').status_code, 400)
+        response = self.client.patch(f'/api/accounts/{self.anna.id}/', {'students': [self.ivan.id]}, format='json')
+        self.assertEqual(response.status_code, 400)
+        # Обычный учитель закреплять не может — кураторами управляет создатель
+        petr = self.make_account('petr', 'teacher')
+        self.login_as(petr)
+        self.assertEqual(self.client.patch(url, {'students': []}, format='json').status_code, 403)
 
     def test_curator_reviews_and_comments(self):
         self.login_as(self.curator)
@@ -1572,3 +1607,94 @@ class TikzFiguresTests(AuthTestCase):
 
     def test_svg_size_is_set_in_points(self):
         self.assertIn('width="10.5pt" height="20pt"', _in_points('<svg xmlns="a" width="10.5" height="20" viewBox="0 0 1 1">'))
+
+
+@override_settings(LIVEKIT_API_KEY='testkey', LIVEKIT_API_SECRET='testsecret', LIVEKIT_URL='', LIVEKIT_API_HOST='',
+                   CALLS_STUDENTS=['*'], PUSH_SYNC=True)
+class PushTests(AuthTestCase):
+    """Уведомления в браузер о начале урока"""
+    def subscribe(self, account, endpoint):
+        self.login_as(account)
+        return self.client.post('/api/push/', {
+            'endpoint': endpoint, 'keys': {'p256dh': 'BKey', 'auth': 'secret'},
+        }, format='json')
+
+    def test_public_key_and_subscribe(self):
+        self.login_as(self.anna)
+        key = self.client.get('/api/push/').data['public_key']
+        # Публичный ключ P-256 в несжатом виде: 65 байт → 87 знаков base64url
+        self.assertEqual(len(key), 87)
+        self.assertEqual(self.client.get('/api/push/').data['public_key'], key)  # ключ один и тот же
+        self.assertEqual(self.subscribe(self.anna, 'https://push.example/1').status_code, 204)
+        self.assertEqual(self.subscribe(self.anna, 'http://evil/1').status_code, 400)
+        # Тот же браузер под другим аккаунтом — подписка переходит к нему
+        self.subscribe(self.ivan, 'https://push.example/1')
+        self.assertEqual(PushSubscription.objects.get().account, self.ivan)
+        self.client.delete('/api/push/', {'endpoint': 'https://push.example/1'}, format='json')
+        self.assertFalse(PushSubscription.objects.exists())
+
+    def test_anonymous_cannot_subscribe(self):
+        self.assertEqual(self.client.get('/api/push/').status_code, 401)
+
+    @patch('pywebpush.webpush')
+    def test_call_start_notifies_students_of_subject(self, webpush):
+        self.subscribe(self.anna, 'https://push.example/anna')
+        self.subscribe(self.ivan, 'https://push.example/ivan')
+        self.login_as(self.teacher)
+        response = self.client.post('/api/calls/', {'subject': 'Биология', 'title': 'Фотосинтез'}, format='json')
+        self.assertEqual(response.status_code, 201)
+        # Урок по биологии — уведомление только Анне
+        self.assertEqual(webpush.call_count, 1)
+        kwargs = webpush.call_args.kwargs
+        self.assertEqual(kwargs['subscription_info']['endpoint'], 'https://push.example/anna')
+        payload = json.loads(kwargs['data'])
+        self.assertEqual(payload['title'], 'Начался урок: Фотосинтез')
+        self.assertEqual(payload['url'], f"/call/{response.data['id']}")
+
+    @patch('pywebpush.webpush')
+    def test_personal_call_notifies_only_student(self, webpush):
+        self.subscribe(self.anna, 'https://push.example/anna')
+        self.subscribe(self.ivan, 'https://push.example/ivan')
+        self.login_as(self.teacher)
+        with override_settings(CALLS_STUDENTS=[]):
+            self.client.post('/api/calls/', {'student': self.ivan.id, 'title': 'Личный'}, format='json')
+        self.assertEqual([c.kwargs['subscription_info']['endpoint'] for c in webpush.call_args_list],
+                         ['https://push.example/ivan'])
+
+    def test_gone_subscription_is_removed(self):
+        from pywebpush import WebPushException
+
+        class Gone:
+            status_code = 410
+        self.subscribe(self.anna, 'https://push.example/old')
+        self.login_as(self.teacher)
+        with patch('pywebpush.webpush', side_effect=WebPushException('gone', response=Gone())):
+            self.client.post('/api/calls/', {'subject': 'Биология'}, format='json')
+        self.assertFalse(PushSubscription.objects.exists())
+
+    def test_real_encryption_and_vapid_headers(self):
+        """Настоящее шифрование и подпись — без сети: запрос перехватываем"""
+        from cryptography.hazmat.primitives import serialization
+        from cryptography.hazmat.primitives.asymmetric import ec
+
+        browser_key = ec.generate_private_key(ec.SECP256R1())
+        p256dh = base64.urlsafe_b64encode(browser_key.public_key().public_bytes(
+            serialization.Encoding.X962, serialization.PublicFormat.UncompressedPoint)).rstrip(b'=').decode()
+        auth = base64.urlsafe_b64encode(os.urandom(16)).rstrip(b'=').decode()
+        self.login_as(self.anna)
+        self.client.post('/api/push/', {'endpoint': 'https://fcm.googleapis.com/fcm/send/x',
+                                        'keys': {'p256dh': p256dh, 'auth': auth}}, format='json')
+
+        class Ok:
+            status_code = 201
+            text = ''
+            headers = {}
+        with patch('requests.post', return_value=Ok()) as post:
+            self.login_as(self.teacher)
+            self.client.post('/api/calls/', {'subject': 'Биология', 'title': 'Урок'}, format='json')
+        self.assertEqual(post.call_count, 1)
+        headers = post.call_args.kwargs['headers']
+        self.assertEqual(headers['content-encoding'], 'aes128gcm')
+        self.assertTrue(headers['authorization'].startswith('vapid t='))
+        self.assertGreater(len(post.call_args.kwargs['data']), 50)
+
