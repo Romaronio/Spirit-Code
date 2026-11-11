@@ -86,6 +86,7 @@ export interface Assignment {
   subject: string
   extra_subjects?: string[] // ещё предметы, в которых есть этот же урок (не копия)
   deadline?: string | null // формат 'ГГГГ-ММ-ДД', может быть не задан
+  lesson_date?: string | null // день занятия 'ГГГГ-ММ-ДД' — по нему урок в календаре
   recording_url?: string
   numbered_tasks?: NumberedTask[] // задания по номерам — у каждого своя кнопка
   tasks_latex?: string // задания классной работы в LaTeX без номера
@@ -93,6 +94,8 @@ export interface Assignment {
   homework?: Homework
   student_homeworks?: StudentHomework[]
   figures?: TikzFigure[] // рисунки TikZ из заданий, их собирает сервер
+  topic?: string // папка-тема внутри курса: «№26», «Повторение»; '' — без темы
+  position?: number // место в теме, меньше — выше
   created_at?: string
   updated_at?: string
 }
@@ -124,6 +127,7 @@ export type NewAssignment = {
   title: string
   subject: string
   deadline?: string
+  lesson_date?: string
   recording_url?: string
   numbered_tasks?: NumberedTask[]
   tasks_latex?: string

@@ -261,3 +261,65 @@
   background: var(--danger-soft);
   color: var(--danger);
 }
+
+/* Папки-темы внутри предмета */
+.topics {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.topic {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.topicHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.topicHeader:hover {
+  border-color: var(--accent-line);
+}
+
+/* Бросят на заголовок — урок встанет в конец этой папки */
+.topicDrop {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.chevron {
+  width: 12px;
+  color: var(--muted);
+}
+
+.topicName {
+  flex: 1;
+  min-width: 0;
+}
+
+.topic .lessons {
+  padding-left: 12px;
+}
+
+/* Урок встанет над этим */
+.dropBefore {
+  box-shadow: 0 -3px 0 var(--accent);
+}
+
+.lesson {
+  flex-wrap: wrap;
+}

@@ -161,6 +161,8 @@ class Assignment(models.Model):
     # добавили в «ЕГЭ информатика». Ученик видит урок, если у него есть любой из предметов
     extra_subjects = models.JSONField(blank=True, default=list)
     deadline = models.DateField(blank=True, null=True)
+    # День, когда проходит занятие, — по нему урок стоит в календаре на главной
+    lesson_date = models.DateField(blank=True, null=True)
     recording_url = models.URLField(blank=True, null=True)
     # Описание урока больше нигде не показывается и не приходит в API; старые тексты лежат здесь
     description = models.TextField(blank=True, null=True)
@@ -170,6 +172,10 @@ class Assignment(models.Model):
     numbered_tasks = models.JSONField(blank=True, default=list)
     # Задания классной работы в LaTeX без номера — ученик открывает их прямо на сайте
     tasks_latex = models.TextField(blank=True, default='', validators=[MaxLengthValidator(MAX_LATEX_LENGTH)])
+    # Папка-тема внутри курса: «№26», «Повторение»… '' — «Без темы». Угадывается по названию (api/topics.py)
+    topic = models.CharField(max_length=60, blank=True, default='')
+    # Место урока в теме: меньше — выше. Учитель меняет перетаскиванием в «Базе уроков»
+    position = models.PositiveIntegerField(default=0)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -547,3 +553,13 @@ class PushSubscription(models.Model):
 
     def __str__(self):
         return f"Push: {self.account.name}"
+
+
+class ActivityDay(models.Model):
+    """День, когда ученик что-то делал на сайте, — для серии дней на главной (api/streak.py)"""
+    student = models.ForeignKey(Account, on_delete=models.CASCADE, related_name='activity_days')
+    day = models.DateField()  # по московскому времени
+
+    class Meta:
+        unique_together = [('student', 'day')]
+        ordering = ['-day']

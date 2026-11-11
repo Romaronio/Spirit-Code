@@ -3,16 +3,17 @@ import styles from './ProgressDonut.module.css'
 interface Props {
   done: number // сколько ДЗ сдано (учитель отметил «Сдано»)
   total: number // сколько всего заданий у ученика
+  size?: number // диаметр в пикселях, по умолчанию 64
 }
 
-const SIZE = 64
-const STROKE = 8
-const RADIUS = (SIZE - STROKE) / 2
-const CIRCUMFERENCE = 2 * Math.PI * RADIUS
 const GAP = 2 // зазор между сданной частью и остальной
 
 // Кольцо прогресса: оранжевым — доля сданных ДЗ, тёмной дорожкой — остальное
-function ProgressDonut({ done, total }: Props) {
+function ProgressDonut({ done, total, size = 64 }: Props) {
+  const SIZE = size
+  const STROKE = Math.round(size / 8)
+  const RADIUS = (SIZE - STROKE) / 2
+  const CIRCUMFERENCE = 2 * Math.PI * RADIUS
   const percent = total > 0 ? Math.round((done / total) * 100) : 0
   const doneLength = total > 0 ? (done / total) * CIRCUMFERENCE : 0
   const restLength = CIRCUMFERENCE - doneLength
@@ -52,7 +53,7 @@ function ProgressDonut({ done, total }: Props) {
           </>
         )}
       </svg>
-      <span className={styles.percent}>{total > 0 ? `${percent}%` : '—'}</span>
+      <span className={styles.percent} style={{ top: SIZE / 2, fontSize: Math.max(14, Math.round(size * 0.22)) }}>{total > 0 ? `${percent}%` : '—'}</span>
     </div>
   )
 }

@@ -3,6 +3,10 @@ import { Link, Navigate } from 'react-router-dom'
 import styles from './HomePage.module.css'
 import type { Account, Assignment, CommentActions, NewAssignment, ReviewStatus, Subject, User } from '../../types'
 import AssignmentCard from '../../components/AssignmentCard/AssignmentCard'
+import StudentLessons from '../../components/StudentLessons/StudentLessons'
+import LessonCalendar from '../../components/LessonCalendar/LessonCalendar'
+import StreakCard from '../../components/StreakCard/StreakCard'
+import SubjectSwitcher, { type SubjectOption } from '../../components/SubjectSwitcher/SubjectSwitcher'
 import CallsBar from '../../components/CallsBar/CallsBar'
 import AssignmentForm from '../../components/AssignmentForm/AssignmentForm'
 import StudentsPanel from '../../components/StudentsPanel/StudentsPanel'
@@ -12,7 +16,7 @@ import PaymentsPanel from '../../components/PaymentsPanel/PaymentsPanel'
 import ChatWindow from '../../components/ChatWindow/ChatWindow'
 import StudentsList from '../../components/StudentsList/StudentsList'
 import { promptInstall, useCanInstall } from '../../utils/install'
-import { lessonForSubjects, normalize } from '../../utils/subjects'
+import { lessonForSubjects, normalize, uniqueSubjects } from '../../utils/subjects'
 import { awaitsReview } from '../../utils/studentStats'
 import { canReview } from '../../utils/roles'
 import { usePush } from '../../utils/push'
@@ -57,6 +61,12 @@ function HomePage({
   // Окно «Все задания» (у учителя)
   const [showAll, setShowAll] = useState(false)
   const closeChat = useCallback(() => setOpenChat(null), [])
+  // Предмет, уроки которого ученик смотрит на главной. Выбор запоминаем в браузере
+  const [chosenSubject, setChosenSubject] = useState(() => readSubject())
+  const chooseSubject = (name: string) => {
+    setChosenSubject(name)
+    saveSubject(name)
+  }
 
   // Сколько уроков в одной строке на ПК. Выбор запоминаем в браузере
   const [perRow, setPerRow] = useState(() => readPerRow(PER_ROW_KEY))
@@ -99,9 +109,25 @@ function HomePage({
   const account = accounts.find((a) => normalize(a.name) === normalize(user.name))
   const mySubjects = account?.subjects ?? []
 
+  // Ученик смотрит уроки одного предмета — переключатель справа от приветствия.
+  // Не выбран или предмет убрали — первый предмет, где есть уроки
+  const isTodo = (item: Assignment) => !item.student_homeworks?.[0] || item.student_homeworks[0].status === 'rejected'
+  const subjectOptions: SubjectOption[] = isReviewer
+    ? []
+    : uniqueSubjects(mySubjects).map((name) => {
+        const lessons = items.filter((item) => lessonForSubjects([name], item))
+        return { name, total: lessons.length, todo: lessons.filter(isTodo).length }
+      })
+  const currentSubject =
+    subjectOptions.find((o) => normalize(o.name) === normalize(chosenSubject))?.name ??
+    subjectOptions.find((o) => o.total > 0)?.name ??
+    subjectOptions[0]?.name
+
   const visibleItems = isReviewer
     ? items
-    : items.filter((item) => lessonForSubjects(mySubjects, item))
+    : currentSubject
+      ? items.filter((item) => lessonForSubjects([currentSubject], item))
+      : []
 
   // Сданными считаем ДЗ, которые учитель отметил «Сдано».
   // Ученику сервер присылает только его собственный ответ.
@@ -138,7 +164,7 @@ function HomePage({
     ? 'Заданий пока нет'
     : mySubjects.length === 0
       ? 'Учитель пока не назначил вам предметы'
-      : 'Заданий по вашим предметам пока нет'
+      : `По предмету «${currentSubject}» уроков пока нет`
 
   // Задание и ответ для открытого чата берём из актуального списка —
   // так новые сообщения и отметки сразу видны в окне. Если ответ удалён, чата нет.
@@ -159,15 +185,23 @@ function HomePage({
       {sortedItems.length === 0 ? (
         <p>{emptyMessage}</p>
       ) : (
-        <div
-          className={`${styles.grid} ${styles.gridFixed}`}
-          style={{ '--per-row': perRow } as CSSProperties}
-          data-per-row={perRow}
-        >
-          {sortedItems.map((item) => (
+        // Ученику: папки-темы карточками в порядке учителя; при смене предмета папка закрывается
+        <StudentLessons
+          key={currentSubject}
+          items={sortedItems}
+          renderGrid={(children) => (
+            <div
+              className={`${styles.grid} ${styles.gridFixed}`}
+              style={{ '--per-row': perRow } as CSSProperties}
+              data-per-row={perRow}
+            >
+              {children}
+            </div>
+          )}
+          renderLesson={(item) => (
             <AssignmentCard key={item.id} assignment={item} user={user} onDelete={isTeacher ? onDelete : undefined} />
-          ))}
-        </div>
+          )}
+        />
       )}
     </section>
   )
@@ -192,6 +226,10 @@ function HomePage({
             <Link to="/typing" className={`${styles.navLink} ${styles.navAccent}`}>
               Тренажёр печати
             </Link>
+            {/* Ученик выбирает предмет: уроки и прогресс на главной — по нему */}
+            {currentSubject && (
+              <SubjectSwitcher options={subjectOptions} value={currentSubject} onChange={chooseSubject} />
+            )}
           </nav>
           {canInstall && (
             <button
@@ -215,6 +253,8 @@ function HomePage({
             <h1 className={styles.greeting}>Добро пожаловать, {user.name}</h1>
             {/* Непроверенные ответы учеников — красным, чтобы учитель сразу заметил */}
             <p className={`${styles.lead} ${isReviewer && pendingReviewCount > 0 ? styles.leadAlert : ''}`}>{lead}</p>
+            {/* Серия дней; перечитывается, когда обновились уроки и ответы */}
+            {user.role === 'student' && <StreakCard refreshKey={items} />}
             {user.role === 'student' && <PushBanner />}
             {isReviewer && (
               <button type="button" className={styles.allButton} onClick={() => setShowAll(true)}>
@@ -222,9 +262,11 @@ function HomePage({
               </button>
             )}
           </div>
+          {/* Календарь занятий: у ученика — по выбранному предмету, у учителя и куратора — все уроки */}
+          <LessonCalendar lessons={visibleItems} />
           {!isTeacher && (
             <div className={styles.progressCard}>
-              <ProgressDonut done={acceptedCount} total={visibleItems.length} />
+              <ProgressDonut done={acceptedCount} total={visibleItems.length} size={120} />
               <div className={styles.progressText}>
                 <span className={styles.progressLabel}>Прогресс</span>
                 <span className={styles.progressValue}>
@@ -427,4 +469,23 @@ function PushBanner() {
       {error && <span className={styles.pushError}>{error}</span>}
     </div>
   )
+}
+
+// Выбранный учеником предмет на главной
+const SUBJECT_KEY = 'spirit.home.subject'
+
+function readSubject() {
+  try {
+    return localStorage.getItem(SUBJECT_KEY) ?? ''
+  } catch {
+    return ''
+  }
+}
+
+function saveSubject(name: string) {
+  try {
+    localStorage.setItem(SUBJECT_KEY, name)
+  } catch {
+    // без localStorage выбор просто не запомнится
+  }
 }

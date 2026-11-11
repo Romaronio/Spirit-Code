@@ -161,6 +161,9 @@ export async function createAssignment(data: NewAssignment): Promise<Assignment>
   if (data.deadline) {
     formData.append('deadline', data.deadline);
   }
+  if (data.lesson_date) {
+    formData.append('lesson_date', data.lesson_date);
+  }
   if (data.recording_url) {
     formData.append('recording_url', data.recording_url);
   }
@@ -192,9 +195,11 @@ export async function updateAssignment(
     subject?: string
     extra_subjects?: string[]
     deadline?: string | null
+    lesson_date?: string | null
     recording_url?: string
     numbered_tasks?: NumberedTask[]
     tasks_latex?: string
+    topic?: string
     homework?: { numbered_tasks?: NumberedTask[]; tasks_latex?: string } & TaskFileChanges
     files?: File[]
     homework_files?: File[]
@@ -202,9 +207,11 @@ export async function updateAssignment(
 ): Promise<Assignment> {
   const formData = new FormData();
   if (data.title !== undefined) formData.append('title', data.title);
+  if (data.topic !== undefined) formData.append('topic', data.topic);
   if (data.subject !== undefined) formData.append('subject', data.subject);
   if (data.extra_subjects !== undefined) formData.append('extra_subjects', JSON.stringify(data.extra_subjects));
   if (data.deadline) formData.append('deadline', data.deadline);
+  if (data.lesson_date !== undefined) formData.append('lesson_date', data.lesson_date ?? ''); // '' — стереть
   if (data.recording_url !== undefined) formData.append('recording_url', data.recording_url || '');
   if (data.numbered_tasks !== undefined) formData.append('numbered_tasks', JSON.stringify(data.numbered_tasks));
   if (data.tasks_latex !== undefined) formData.append('tasks_latex', data.tasks_latex);
@@ -543,4 +550,21 @@ export async function getParentStats(token: string): Promise<ParentStats> {
   const body = await response.json().catch(() => null);
   if (!response.ok) throw new Error(errorMessage(body, response.status));
   return body as ParentStats;
+}
+
+// Порядок уроков в папке-теме: уроки встают в тему topic в порядке ids (так же урок переносят в другую тему)
+export async function reorderLessons(topic: string, ids: number[]): Promise<void> {
+  await fetchAPI<unknown>('/assignments/reorder/', { method: 'POST', body: JSON.stringify({ topic, ids }) });
+}
+
+export interface Streak {
+  current: number // дней подряд (сегодня или по вчера включительно)
+  best: number // самая длинная серия
+  active_today: boolean
+  week: { date: string; active: boolean }[] // последние 7 дней, сегодня — последний
+}
+
+// Серия дней ученика
+export async function getStreak(): Promise<Streak> {
+  return fetchAPI<Streak>('/accounts/streak/');
 }

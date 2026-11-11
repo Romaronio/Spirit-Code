@@ -1762,3 +1762,104 @@ class ParentLinkTests(AuthTestCase):
         # Устаревший токен входа в браузере родителя не мешает
         self.client.credentials(HTTP_AUTHORIZATION='Token old')
         self.assertEqual(self.client.get(f'/api/parent/{token}/').status_code, 200)
+
+
+class LessonTopicTests(AuthTestCase):
+    """Папки-темы уроков: тема по названию, порядок перетаскиванием"""
+    def test_guess_topic(self):
+        from .topics import guess_topic
+        self.assertEqual(guess_topic('26 задание урок 3'), '№26')
+        self.assertEqual(guess_topic('7 задание'), '№7')
+        self.assertEqual(guess_topic('27 задание итоговый тест'), '№27')
+        self.assertEqual(guess_topic('5, 6, 14 задание повторение'), 'Повторение')
+        self.assertEqual(guess_topic('подготовка к проверочной'), 'Проверочные')
+        self.assertEqual(guess_topic('Фотосинтез'), '')
+
+    def create(self, title, **extra):
+        return self.client.post('/api/assignments/', {'title': title, 'subject': 'Биология', **extra}, format='json')
+
+    def test_new_lesson_gets_topic_from_title_and_goes_last(self):
+        self.login_as(self.teacher)
+        first = self.create('26 задание урок 1').data
+        second = self.create('26 задание урок 2').data
+        self.assertEqual((first['topic'], second['topic']), ('№26', '№26'))
+        self.assertGreater(second['position'], first['position'])
+        self.assertEqual(self.create('Клетка', topic='  Своя   тема ').data['topic'], 'Своя тема')
+
+    def test_reorder_and_move_to_other_topic(self):
+        self.login_as(self.teacher)
+        a = self.create('26 задание урок 1').data['id']
+        b = self.create('26 задание урок 2').data['id']
+        c = self.create('27 задание урок 1').data['id']
+        response = self.client.post('/api/assignments/reorder/', {'topic': '№26', 'ids': [c, b, a]}, format='json')
+        self.assertEqual(response.status_code, 200)
+        lessons = {x.id: x for x in Assignment.objects.filter(id__in=[a, b, c])}
+        self.assertEqual([lessons[i].topic for i in (a, b, c)], ['№26'] * 3)
+        self.assertEqual([lessons[i].position for i in (c, b, a)], [1, 2, 3])
+        # Ученику порядок и тема приходят, менять их он не может
+        self.login_as(self.anna)
+        data = self.client.get(f'/api/assignments/{a}/').data
+        self.assertEqual((data['topic'], data['position']), ('№26', 3))
+        self.assertEqual(self.client.post('/api/assignments/reorder/', {'topic': 'x', 'ids': [a]}, format='json').status_code, 403)
+
+    def test_reorder_validates_ids(self):
+        self.login_as(self.teacher)
+        url = '/api/assignments/reorder/'
+        self.assertEqual(self.client.post(url, {'topic': 'x', 'ids': []}, format='json').status_code, 400)
+        self.assertEqual(self.client.post(url, {'topic': 'x', 'ids': [999999]}, format='json').status_code, 400)
+        self.assertEqual(self.client.post(url, {'topic': 'x', 'ids': [self.bio.id, self.bio.id]}, format='json').status_code, 400)
+
+
+class LessonDateTests(AuthTestCase):
+    """День занятия: задаётся при создании, меняется и стирается учителем, приходит ученику"""
+    def test_lesson_date(self):
+        self.login_as(self.teacher)
+        data = self.client.post('/api/assignments/', {'title': 'Клетка', 'subject': 'Биология', 'lesson_date': '2026-11-12'}).data
+        self.assertEqual(data['lesson_date'], '2026-11-12')
+        url = f"/api/assignments/{data['id']}/"
+        self.assertEqual(self.client.patch(url, {'lesson_date': '2026-11-19'}).data['lesson_date'], '2026-11-19')
+        self.assertIsNone(self.client.patch(url, {'lesson_date': ''}).data['lesson_date'])
+        self.assertEqual(self.client.post('/api/assignments/', {'title': 'x', 'subject': 'Биология', 'lesson_date': 'завтра'}).status_code, 400)
+        self.login_as(self.anna)
+        self.assertIn('lesson_date', self.client.get(url).data)
+
+
+class StreakTests(AuthTestCase):
+    """Серия дней: активность ученика отмечает день, серия считается от сегодня или вчера"""
+    def test_streak_counts_consecutive_days(self):
+        from .models import ActivityDay
+        from .streak import local_day
+        today = local_day()
+        for back in (1, 2, 3, 5, 6):  # вчера, позавчера, 3 дня назад; потом разрыв и ещё 2 дня
+            ActivityDay.objects.create(student=self.anna, day=today - timedelta(days=back))
+        self.login_as(self.anna)
+        data = self.client.get('/api/accounts/streak/').data
+        self.assertEqual((data['current'], data['best'], data['active_today']), (3, 3, False))
+        self.assertEqual(len(data['week']), 7)
+        self.assertEqual(data['week'][-1], {'date': today.isoformat(), 'active': False})
+        # Ответ к заданию — сегодня тоже в серии
+        self.bio.numbered_tasks = [{'number': 1, 'latex': 'x'}]
+        self.bio.save()
+        self.client.post(f'/api/assignments/{self.bio.id}/submit-task/', {'task': 'cw-1', 'text': '42'})
+        data = self.client.get('/api/accounts/streak/').data
+        self.assertEqual((data['current'], data['active_today']), (4, True))
+
+    def test_broken_streak_and_teacher(self):
+        from .models import ActivityDay
+        from .streak import local_day
+        ActivityDay.objects.create(student=self.anna, day=local_day() - timedelta(days=2))
+        self.login_as(self.anna)
+        self.assertEqual(self.client.get('/api/accounts/streak/').data['current'], 0)
+        self.login_as(self.teacher)
+        self.assertEqual(self.client.get('/api/accounts/streak/').status_code, 403)
+
+    def test_typing_and_comment_mark_day(self):
+        from .models import ActivityDay
+        sh = StudentHomework.objects.create(assignment=self.bio, student=self.anna, description='x')
+        self.login_as(self.anna)
+        self.client.post(f'/api/student-homeworks/{sh.id}/comments/', {'text': 'Вопрос'}, format='json')
+        self.assertEqual(ActivityDay.objects.filter(student=self.anna).count(), 1)
+        # Учитель пишет — в серию ученика это не идёт, а у учителя серии нет
+        self.login_as(self.teacher)
+        self.client.post(f'/api/student-homeworks/{sh.id}/comments/', {'text': 'Ответ'}, format='json')
+        self.assertEqual(ActivityDay.objects.count(), 1)

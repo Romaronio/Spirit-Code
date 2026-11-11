@@ -1,0 +1,79 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Карточка папки — кнопка, но выглядит как карточка урока */
+.folderCard {
+  width: 100%;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+}
+
+.badge,
+.badgeDone,
+.badgeFix {
+  flex-shrink: 0;
+  padding: 3px 10px;
+  border-radius: 8px;
+  font-size: var(--card-small, 14px);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.badge {
+  background: var(--surface-2);
+  color: var(--muted);
+}
+
+.badgeDone {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.badgeFix {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+/* Открытая папка: «← Все темы» и название */
+.folderBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}
+
+.back {
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.back:hover {
+  border-color: var(--accent);
+}
+
+.folderTitle {
+  margin: 0;
+  font-size: 22px;
+}
+
+/* Номер задания на карточке папки — крупно; высота карточки та же, что у уроков */
+/* Двойной класс: стили карточки урока подключаются позже и иначе перебили бы размер */
+.folderName.folderName {
+  min-height: calc(2 * 1.3 * var(--card-title, 28px));
+  font-size: calc(var(--card-title, 28px) * 1.8);
+  font-weight: 800;
+  line-height: 1.15;
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
+}

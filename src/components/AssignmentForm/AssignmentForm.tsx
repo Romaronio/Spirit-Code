@@ -12,6 +12,12 @@ interface AssignmentFormProps {
   onDeleteSubject: (id: number) => Promise<void>
 }
 
+// Сегодня в формате поля даты: 'ГГГГ-ММ-ДД' по местному времени
+function today() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 const MAX_SUBJECT_LENGTH = 100 // как Assignment.subject на сервере
 const NEW_SUBJECT = '__new__' // значение пункта «Новый предмет» — с настоящим предметом не совпадёт
 
@@ -21,6 +27,7 @@ function AssignmentForm({ onAdd, subjects, onDeleteSubject }: AssignmentFormProp
   const [subject, setSubject] = useState('')
   const [newSubject, setNewSubject] = useState('')
   const [deadline, setDeadline] = useState('')
+  const [lessonDate, setLessonDate] = useState(today) // день занятия — по умолчанию сегодня
   const [recordingUrl, setRecordingUrl] = useState('')
   const [numberedTasks, setNumberedTasks] = useState<NumberedTask[]>([])
   const [error, setError] = useState('')
@@ -48,6 +55,7 @@ function AssignmentForm({ onAdd, subjects, onDeleteSubject }: AssignmentFormProp
         title: title.trim(),
         subject: finalSubject,
         deadline: deadline || undefined,
+        lesson_date: lessonDate || undefined,
         recording_url: recordingUrl.trim() || undefined,
         numbered_tasks: numberedTasks,
         homework:
@@ -64,6 +72,7 @@ function AssignmentForm({ onAdd, subjects, onDeleteSubject }: AssignmentFormProp
       setSubject('')
       setNewSubject('')
       setDeadline('')
+      setLessonDate(today())
       setRecordingUrl('')
       setNumberedTasks([])
       setHomeworkTasks([])
@@ -160,6 +169,15 @@ function AssignmentForm({ onAdd, subjects, onDeleteSubject }: AssignmentFormProp
               )}
             </div>
           </div>
+
+          <label className={styles.label}>
+            День занятия
+            <input
+              type="date"
+              value={lessonDate}
+              onChange={(e) => setLessonDate(e.target.value)}
+            />
+          </label>
 
           <label className={styles.label}>
             Срок сдачи (необязательно)

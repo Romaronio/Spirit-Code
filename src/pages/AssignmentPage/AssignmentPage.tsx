@@ -359,6 +359,19 @@ function AssignmentDetails({ assignment, user, studentId, students, onUpdate, on
               )}
             </div>
           )}
+          {canEdit ? (
+            <label className={styles.deadline}>
+              День занятия:{' '}
+              <input
+                type="date"
+                className={styles.lessonDateInput}
+                value={assignment.lesson_date ?? ''}
+                onChange={(e) => void onUpdate(assignment.id!, { lesson_date: e.target.value || null })}
+              />
+            </label>
+          ) : (
+            assignment.lesson_date && <p className={styles.deadline}>День занятия: {formatDay(assignment.lesson_date)}</p>
+          )}
           {assignment.deadline && <p className={styles.deadline}>Сдать до: {assignment.deadline}</p>}
 
           {/* «Ответы учеников» — у учителя сразу под названием урока; ответ открывается справа */}
@@ -1185,4 +1198,10 @@ function StudentAnswerPanel({
       )}
     </TasksViewer>
   )
+}
+
+// '2026-11-12' → '12.11.2026'
+function formatDay(value: string) {
+  const [y, m, d] = value.split('-')
+  return d && m && y ? `${d}.${m}.${y}` : value
 }

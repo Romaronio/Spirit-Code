@@ -18,6 +18,8 @@ from .answer_check import snapshot_answers
 from .models import MAX_LATEX_LENGTH, Account, AnswerComment, Assignment, AuthToken, Call, CallAnswer, CallAnswerFile, DataVersion, LessonFile, PushSubscription, Subject, Homework, HomeworkFile, Payment, StudentHomework, StudentHomeworkFile, TypingResult
 from . import livekit, push
 from .parent import new_parent_token
+from .topics import clean_topic
+from .streak import mark_active, streak_info
 from .permissions import IsReviewer, IsStudent, IsTeacher
 from .photo_latex import PhotoLatexError, photo_to_latex
 from .uploads import check_student_quota, check_uploads
@@ -226,6 +228,11 @@ class AccountViewSet(viewsets.ModelViewSet):
         """Данные вошедшего пользователя"""
         return Response(self.get_serializer(request.user).data)
 
+    @action(detail=False, methods=['get'], permission_classes=[IsStudent])
+    def streak(self, request):
+        """Серия дней ученика: {current, best, active_today, week}"""
+        return Response(streak_info(request.user))
+
     @action(detail=True, methods=['post'])
     def reset_password(self, request, pk=None):
         """Учитель сбрасывает пароль ученику или куратору: сервер придумывает новый,
@@ -380,6 +387,23 @@ class AssignmentViewSet(viewsets.ModelViewSet):
         """Перечитываем из БД, чтобы в ответе были свежие homework и files"""
         return self.get_serializer(self.get_queryset().get(pk=assignment.pk)).data
 
+    @action(detail=False, methods=['post'])
+    @transaction.atomic
+    def reorder(self, request):
+        """Порядок уроков в папке-теме: {topic: «№26», ids: [id, ...]} — уроки встают в тему
+        в этом порядке (так же урок переносят в другую тему). Только учитель"""
+        topic = clean_topic(request.data.get('topic'))
+        ids = request.data.get('ids')
+        if not isinstance(ids, list) or not ids or not all(isinstance(i, int) for i in ids) or len(ids) > 500:
+            raise ValidationError({'ids': ['Нужен список уроков']})
+        if len(set(ids)) != len(ids) or Assignment.objects.filter(id__in=ids).count() != len(ids):
+            raise ValidationError({'ids': ['Таких уроков нет']})
+        # update(), а не save(): не пересобираем рисунки TikZ ради перестановки
+        for position, lesson_id in enumerate(ids, start=1):
+            Assignment.objects.filter(id=lesson_id).update(topic=topic, position=position)
+        DataVersion.bump()
+        return Response({'topic': topic, 'ids': ids})
+
     @transaction.atomic
     def create(self, request, *args, **kwargs):
         """Создание урока с возможным домашним заданием"""
@@ -473,6 +497,7 @@ class AssignmentViewSet(viewsets.ModelViewSet):
         # Отправленные краткие ответы — по ним ученик теперь видит результат автопроверки
         sh.submitted_answers = snapshot_answers(sh)
         sh.save(update_fields=['submitted_answers'])
+        mark_active(request.user)
 
         sh.refresh_from_db()
         serializer = StudentHomeworkSerializer(sh, context=self.get_serializer_context())
@@ -528,6 +553,7 @@ class AssignmentViewSet(viewsets.ModelViewSet):
         StudentHomeworkFile.objects.filter(id__in=delete_ids).delete()
         for f in files:
             StudentHomeworkFile.objects.create(student_homework=sh, name=f.name, file=f, task_key=task)
+        mark_active(request.user)
 
         # Ученик стёр всё, что написал, — пустой ответ учителю проверять нечего
         if _is_empty_answer(sh):
@@ -588,6 +614,7 @@ class StudentHomeworkViewSet(viewsets.ModelViewSet):
         serializer = AnswerCommentSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save(student_homework=sh, author=request.user)
+        mark_active(request.user)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=['post'])
@@ -731,6 +758,7 @@ class TypingResultViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, viewse
 
     def perform_create(self, serializer):
         serializer.save(student=self.request.user)
+        mark_active(self.request.user)
 
     def _stats(self, results):
         """Лучший, последний и средний результат по списку попыток (от новых к старым)"""
@@ -997,6 +1025,7 @@ class CallViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retriev
         CallAnswerFile.objects.filter(id__in=delete_ids).delete()
         for f in files:
             CallAnswerFile.objects.create(answer=answer, name=f.name, file=f)
+        mark_active(request.user)
 
         # Стёр всё — пустой ответ не храним
         if not text and not answer.files.exists():

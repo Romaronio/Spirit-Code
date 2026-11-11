@@ -27,7 +27,7 @@
 
 .percent {
   position: absolute;
-  top: 32px; /* центр кольца 64px */
+  /* top и размер шрифта задаются в компоненте по диаметру */
   left: 50%;
   transform: translate(-50%, -50%);
   color: var(--text);

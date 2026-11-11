@@ -3,6 +3,7 @@ from .answer_check import task_checks
 from .media import signed_url
 from .models import MAX_LATEX_LENGTH, MAX_TOTAL_LATEX_LENGTH, Account, AnswerComment, Assignment, Call, CallAnswer, CallAnswerFile, Subject, LessonFile, Homework, HomeworkFile, Payment, StudentHomework, StudentHomeworkFile, TikzFigure, TypingResult
 from .tikz import assignment_sources, source_key
+from .topics import clean_topic, guess_topic, next_position
 
 MIN_PASSWORD_LENGTH = 5
 
@@ -288,14 +289,30 @@ class AssignmentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Assignment
         fields = [
-            'id', 'title', 'subject', 'extra_subjects', 'deadline',
+            'id', 'title', 'subject', 'extra_subjects', 'deadline', 'lesson_date',
             'recording_url', 'numbered_tasks', 'tasks_latex', 'files', 'homework',
-            'student_homeworks', 'figures', 'created_at', 'updated_at'
+            'student_homeworks', 'figures', 'topic', 'position', 'created_at', 'updated_at'
         ]
+        read_only_fields = ['position']  # порядок меняется через /api/assignments/reorder/
 
     def validate_numbered_tasks(self, value):
         # Классную работу можно не решать — развёрнутый ответ к ней не бывает обязательным
         return clean_numbered_tasks(value, allow_required=False)
+
+    def validate_topic(self, value):
+        return clean_topic(value)
+
+    def create(self, validated_data):
+        # Тема не выбрана — угадываем по названию; новый урок встаёт в конец темы
+        topic = validated_data.get('topic') or guess_topic(validated_data.get('title'))
+        validated_data['topic'] = topic
+        validated_data['position'] = next_position(topic)
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        if 'topic' in validated_data and validated_data['topic'] != instance.topic:
+            validated_data['position'] = next_position(validated_data['topic'])
+        return super().update(instance, validated_data)
 
     def validate_extra_subjects(self, value):
         return clean_subject_list(value)

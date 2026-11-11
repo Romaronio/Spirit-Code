@@ -453,3 +453,13 @@
   font-size: 12px;
   font-weight: 600;
 }
+
+/* День занятия: учитель меняет прямо в шапке урока */
+.lessonDateInput {
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--inset);
+  color: var(--text);
+  font: inherit;
+}

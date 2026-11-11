@@ -135,6 +135,19 @@ function App() {
     }
   }
 
+  // Порядок уроков в папке-теме (База уроков): сразу показываем, потом сохраняем
+  async function handleReorder(topic: string, ids: number[]) {
+    const place = new Map(ids.map((id, i) => [id, i + 1]))
+    const before = items
+    setItems((prev) => prev.map((a) => (a.id && place.has(a.id) ? { ...a, topic, position: place.get(a.id) } : a)))
+    try {
+      await api.reorderLessons(topic, ids)
+    } catch (err) {
+      setItems(before)
+      throw err
+    }
+  }
+
   async function handleUpdate(id: Assignment['id'], changes: AssignmentChanges) {
     if (!id) return
 
@@ -343,6 +356,7 @@ function App() {
             subjects={subjects}
             onUpdate={handleUpdate}
             onAddSubject={handleAddSubject}
+            onReorder={handleReorder}
           />
         }
       />

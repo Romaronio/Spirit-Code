@@ -1,0 +1,174 @@
+/* Карточка как «Добро пожаловать» и «Прогресс» рядом */
+.calendar {
+  display: flex;
+  flex: 1 1 280px;
+  flex-direction: column;
+  gap: 10px;
+  box-sizing: border-box;
+  max-width: 340px;
+  padding: 20px;
+  border: 1px solid var(--line-soft);
+  border-radius: 28px;
+  background: var(--surface);
+  backdrop-filter: blur(16px);
+}
+
+/* На телефоне — во всю ширину */
+@media (max-width: 700px) {
+  .calendar {
+    max-width: none;
+  }
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.month {
+  font-weight: 700;
+}
+
+.arrow {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.arrow:hover {
+  border-color: var(--accent);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.weekday {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.day {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 100%;
+  aspect-ratio: 1;
+  min-width: 0;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* В этот день есть занятие — оранжевый, нажатие открывает урок */
+.hasLesson {
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.hasLesson:hover {
+  background: var(--accent-hover);
+}
+
+.today {
+  border-color: var(--text);
+}
+
+/* Несколько уроков в один день */
+.count {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--text);
+  color: var(--surface);
+  font-size: 10px;
+  line-height: 16px;
+}
+
+/* Подсказка с уроками дня: при наведении, при фокусе с клавиатуры и закреплённая (несколько уроков) */
+.dayWrap {
+  position: relative;
+}
+
+.tooltip {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  z-index: 30;
+  display: none;
+  flex-direction: column;
+  gap: 4px;
+  width: max-content;
+  max-width: 240px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.alignRight .tooltip {
+  right: 0;
+  left: auto;
+}
+
+/* Мостик под подсказкой: мышь доходит до неё, не теряя наведения */
+.tooltip::after {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  left: 0;
+  height: 8px;
+  content: '';
+}
+
+.dayWrap:hover .tooltip,
+.dayWrap:focus-within .tooltip,
+.pinned .tooltip {
+  display: flex;
+}
+
+.tooltipDate {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.tooltipLesson {
+  display: block;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: var(--accent-soft);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
+  text-decoration: none;
+}
+
+.tooltipLesson:hover {
+  background: var(--accent-soft-strong);
+}
