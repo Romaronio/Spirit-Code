@@ -192,10 +192,10 @@ class CuratorTests(AuthTestCase):
         self.assertEqual(self.client.patch(url, {'students': [self.teacher.id]}, format='json').status_code, 400)
         response = self.client.patch(f'/api/accounts/{self.anna.id}/', {'students': [self.ivan.id]}, format='json')
         self.assertEqual(response.status_code, 400)
-        # Обычный учитель закреплять не может — кураторами управляет создатель
+        # Обычный учитель закреплять не может — кураторами управляет создатель; чужой куратор ему даже не виден
         petr = self.make_account('petr', 'teacher')
         self.login_as(petr)
-        self.assertEqual(self.client.patch(url, {'students': []}, format='json').status_code, 403)
+        self.assertEqual(self.client.patch(url, {'students': []}, format='json').status_code, 404)
 
     def test_curator_reviews_and_comments(self):
         self.login_as(self.curator)
@@ -260,15 +260,18 @@ class OwnerTests(AuthTestCase):
         self.assertEqual(self.client.delete(f'/api/accounts/{self.petr.id}/').status_code, 204)
 
     def test_other_teacher_manages_only_students(self):
+        # Свои ученики — те, кого учитель добавил сам
+        Account.objects.filter(id__in=[self.anna.id, self.ivan.id]).update(added_by=self.petr)
         self.login_as(self.petr)
         self.assertEqual(self.create('Новый ученик', 'student').status_code, 201)
         self.assertEqual(self.client.post(f'/api/accounts/{self.anna.id}/reset_password/').status_code, 200)
         self.assertEqual(self.client.delete(f'/api/accounts/{self.ivan.id}/').status_code, 204)
         self.assertEqual(self.create('Учитель 2', 'teacher').status_code, 403)
         self.assertEqual(self.create('Куратор 2', 'curator').status_code, 403)
-        self.assertEqual(self.client.post(f'/api/accounts/{self.curator.id}/reset_password/').status_code, 403)
-        self.assertEqual(self.client.delete(f'/api/accounts/{self.curator.id}/').status_code, 403)
-        self.assertEqual(self.client.delete(f'/api/accounts/{self.teacher.id}/').status_code, 403)
+        # Кураторы и другие учителя такому учителю не видны
+        self.assertEqual(self.client.post(f'/api/accounts/{self.curator.id}/reset_password/').status_code, 404)
+        self.assertEqual(self.client.delete(f'/api/accounts/{self.curator.id}/').status_code, 404)
+        self.assertEqual(self.client.delete(f'/api/accounts/{self.teacher.id}/').status_code, 404)
         # Ученика в учителя не превратить
         response = self.client.patch(f'/api/accounts/{self.anna.id}/', {'role': 'teacher'}, format='json')
         self.assertEqual(response.status_code, 403)
