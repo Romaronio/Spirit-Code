@@ -150,6 +150,9 @@ class AccountViewSet(viewsets.ModelViewSet):
         if getattr(user, 'curated_ids', None) is not None:
             # Куратор видит только себя и закреплённых за ним учеников
             return queryset.filter(Q(id__in=user.curated_ids) | Q(id=user.id))
+        if getattr(user, 'own_lessons_only', False):
+            # Учитель (не создатель платформы) — только себя и учеников, которых добавил сам
+            return queryset.filter(Q(id=user.id) | Q(role='student', added_by=user))
         return queryset
 
     def _check_owner(self, *roles):
@@ -160,7 +163,7 @@ class AccountViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         self._check_owner(serializer.validated_data.get('role', ''))
-        serializer.save()
+        serializer.save(added_by=self.request.user)
 
     def perform_update(self, serializer):
         account = serializer.instance
@@ -682,6 +685,8 @@ class PaymentViewSet(viewsets.GenericViewSet):
         payments = Payment.objects.filter(
             Q(year=start, month__gte=9) | Q(year=start + 1, month__lte=8)
         )
+        if request.user.own_student_ids is not None:
+            payments = payments.filter(student_id__in=request.user.own_student_ids)
         return Response(self.get_serializer(payments, many=True).data)
 
     @action(detail=False, methods=['post'])
@@ -692,6 +697,9 @@ class PaymentViewSet(viewsets.GenericViewSet):
         serializer.validators = []
         serializer.is_valid(raise_exception=True)
         key = serializer.validated_data
+        own = request.user.own_student_ids
+        if own is not None and key['student'].id not in own:
+            return Response({'error': 'Ученик не найден'}, status=status.HTTP_404_NOT_FOUND)
 
         if request.data.get('paid') in (True, 'true', '1', 1):
             Payment.objects.get_or_create(**key)
@@ -763,6 +771,8 @@ class TypingResultViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, viewse
             return queryset.filter(student=user)
         if user.curated_ids is not None:
             queryset = queryset.filter(student_id__in=user.curated_ids)
+        if user.own_student_ids is not None:
+            queryset = queryset.filter(student_id__in=user.own_student_ids)
         student = self.request.query_params.get('student')
         if student:
             queryset = queryset.filter(student_id=student) if student.isdigit() else queryset.none()
@@ -795,6 +805,8 @@ class TypingResultViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, viewse
         students = Account.objects.filter(role='student')
         if request.user.curated_ids is not None:
             students = students.filter(id__in=request.user.curated_ids)
+        if request.user.own_student_ids is not None:
+            students = students.filter(id__in=request.user.own_student_ids)
         for student in students:
             rows.append({
                 'student': student.id,
@@ -812,6 +824,8 @@ class TypingResultViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, viewse
             return Response({'error': 'Укажите ученика: ?student=<id>'}, status=status.HTTP_400_BAD_REQUEST)
         if request.user.curated_ids is not None and int(student) not in request.user.curated_ids:
             return Response({'error': 'Этот ученик не закреплён за вами'}, status=status.HTTP_404_NOT_FOUND)
+        if request.user.own_student_ids is not None and int(student) not in request.user.own_student_ids:
+            return Response({'error': 'Ученик не найден'}, status=status.HTTP_404_NOT_FOUND)
 
         by_language = {}
         for result in TypingResult.objects.filter(student_id=student):  # от новых к старым
@@ -944,6 +958,10 @@ class CallViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retriev
         return _live_calls() if getattr(user, 'is_teacher', False) else _student_calls(user)
 
     def perform_create(self, serializer):
+        student = serializer.validated_data.get('student')
+        own = self.request.user.own_student_ids
+        if student is not None and own is not None and student.id not in own:
+            raise ValidationError({'student': ['Ученик не найден']})
         call = serializer.save(started_by=self.request.user)
         _notify_call_started(call)
 

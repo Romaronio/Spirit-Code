@@ -1914,3 +1914,37 @@ class OwnLessonsTests(AuthTestCase):
         self.login_as(self.anna)
         ids = {a['id'] for a in self.client.get('/api/assignments/').data['results']}
         self.assertTrue({theirs['id'], self.bio.id} <= ids)
+
+
+class OwnStudentsTests(AuthTestCase):
+    """Учитель (не создатель платформы) видит и меняет только учеников, которых добавил сам"""
+    def setUp(self):
+        super().setUp()
+        self.olga = self.make_account('olga', 'teacher')
+
+    def test_other_teacher_sees_only_own_students(self):
+        self.login_as(self.olga)
+        created = self.client.post(
+            '/api/accounts/', {'name': 'petya', 'password': 'petya-pass-1', 'role': 'student'}, format='json',
+        )
+        self.assertEqual(created.status_code, 201)
+        data = self.client.get('/api/accounts/').data
+        names = {a['name'] for a in (data['results'] if isinstance(data, dict) else data)}
+        self.assertEqual(names, {'olga', 'petya'})
+        # Чужой ученик — как будто его нет
+        self.assertEqual(self.client.get(f'/api/accounts/{self.anna.id}/').status_code, 404)
+        self.assertEqual(self.client.delete(f'/api/accounts/{self.anna.id}/').status_code, 404)
+        self.assertEqual(self.client.get(f'/api/accounts/{self.anna.id}/parent-link/').status_code, 404)
+        self.assertEqual(self.client.get(f'/api/typing-results/by-mode/?student={self.anna.id}').status_code, 404)
+        paid = self.client.post('/api/payments/set/', {'student': self.anna.id, 'year': 2026, 'month': 9, 'paid': True}, format='json')
+        self.assertEqual(paid.status_code, 404)
+        call = self.client.post('/api/calls/', {'student': self.anna.id, 'title': 'x'}, format='json')
+        self.assertEqual(call.status_code, 400)
+
+    def test_owner_sees_all_students(self):
+        self.login_as(self.olga)
+        self.client.post('/api/accounts/', {'name': 'petya', 'password': 'petya-pass-1', 'role': 'student'}, format='json')
+        self.login_as(self.teacher)
+        data = self.client.get('/api/accounts/').data
+        names = {a['name'] for a in (data['results'] if isinstance(data, dict) else data)}
+        self.assertTrue({'olga', 'petya', 'anna', 'ivan'} <= names)
