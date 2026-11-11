@@ -66,6 +66,11 @@ class Account(models.Model):
         return self.role == 'curator'
 
     @property
+    def own_lessons_only(self):
+        """Учитель, кроме создателя платформы, видит и меняет только уроки, которые создал сам"""
+        return self.role == 'teacher' and not self.is_owner
+
+    @property
     def can_review(self):
         """Видит уроки и ответы учеников и проверяет их: учитель (всех) и куратор (своих)"""
         return self.role in ('teacher', 'curator')
@@ -131,6 +136,11 @@ class Subject(models.Model):
     из выбора — уроки по нему и предметы, уже назначенные ученикам, не меняются.
     """
     name = models.CharField(max_length=100)
+    # Учитель, который создал предмет: другие учителя (кроме создателя платформы) выбирают
+    # на главной только свои предметы. None — неизвестно (тогда предмет виден только создателю платформы)
+    created_by = models.ForeignKey(
+        'Account', on_delete=models.SET_NULL, null=True, blank=True, related_name='created_subjects',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -140,7 +150,7 @@ class Subject(models.Model):
         return self.name
 
     @classmethod
-    def ensure(cls, name):
+    def ensure(cls, name, creator=None):
         """Предмет с таким названием без учёта регистра; нет — создаётся.
         Сравниваем в Python: iexact в SQLite не понимает регистр русских букв"""
         name = ' '.join(str(name).split())
@@ -150,7 +160,7 @@ class Subject(models.Model):
         for subject in cls.objects.all():
             if subject.name.casefold() == key:
                 return subject
-        return cls.objects.create(name=name)
+        return cls.objects.create(name=name, created_by=creator if getattr(creator, 'role', None) == 'teacher' else None)
 
 
 class Assignment(models.Model):
@@ -176,6 +186,11 @@ class Assignment(models.Model):
     topic = models.CharField(max_length=60, blank=True, default='')
     # Место урока в теме: меньше — выше. Учитель меняет перетаскиванием в «Базе уроков»
     position = models.PositiveIntegerField(default=0)
+    # Учитель, который создал урок: другие учителя (кроме создателя платформы) его не видят.
+    # None — неизвестно (виден только создателю платформы)
+    created_by = models.ForeignKey(
+        'Account', on_delete=models.SET_NULL, null=True, blank=True, related_name='created_lessons',
+    )
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

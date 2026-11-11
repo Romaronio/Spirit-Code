@@ -16,7 +16,7 @@ import PaymentsPanel from '../../components/PaymentsPanel/PaymentsPanel'
 import ChatWindow from '../../components/ChatWindow/ChatWindow'
 import StudentsList from '../../components/StudentsList/StudentsList'
 import { promptInstall, useCanInstall } from '../../utils/install'
-import { lessonForSubjects, normalize, uniqueSubjects } from '../../utils/subjects'
+import { hasSubject, lessonForSubjects, lessonSubjects, normalize, uniqueSubjects } from '../../utils/subjects'
 import { awaitsReview } from '../../utils/studentStats'
 import { canReview } from '../../utils/roles'
 import { usePush } from '../../utils/push'
@@ -62,10 +62,12 @@ function HomePage({
   const [showAll, setShowAll] = useState(false)
   const closeChat = useCallback(() => setOpenChat(null), [])
   // Предмет, уроки которого ученик смотрит на главной. Выбор запоминаем в браузере
-  const [chosenSubject, setChosenSubject] = useState(() => readSubject())
+  // У учителя и куратора выбор хранится отдельно (у них есть «Все предметы»)
+  const subjectKey = canReview(user?.role) ? TEACHER_SUBJECT_KEY : SUBJECT_KEY
+  const [chosenSubject, setChosenSubject] = useState(() => readSubject(subjectKey))
   const chooseSubject = (name: string) => {
     setChosenSubject(name)
-    saveSubject(name)
+    saveSubject(subjectKey, name)
   }
 
   // Сколько уроков в одной строке на ПК. Выбор запоминаем в браузере
@@ -112,22 +114,41 @@ function HomePage({
   // Ученик смотрит уроки одного предмета — переключатель справа от приветствия.
   // Не выбран или предмет убрали — первый предмет, где есть уроки
   const isTodo = (item: Assignment) => !item.student_homeworks?.[0] || item.student_homeworks[0].status === 'rejected'
-  const subjectOptions: SubjectOption[] = isReviewer
-    ? []
+  // Создатель платформы (и куратор) — «Все предметы» и все предметы; другой учитель — только предметы,
+  // которые создал сам. В списке — сколько ответов ждут проверки
+  const reviewCount = (lessons: Assignment[]) =>
+    lessons.flatMap((item) => item.student_homeworks ?? []).filter(awaitsReview).length
+  const reviewOption = (name: string): SubjectOption => {
+    const lessons = items.filter((item) => lessonForSubjects([name], item))
+    return { name, total: lessons.length, todo: reviewCount(lessons) }
+  }
+  const ownOnly = isTeacher && !account?.is_owner
+  const subjectOptions: SubjectOption[] = ownOnly
+    ? uniqueSubjects(subjects.filter((s) => s.created_by === user.id).map((s) => s.name)).map(reviewOption)
+    : isReviewer
+    ? [
+        { name: ALL_SUBJECTS, total: items.length, todo: reviewCount(items) },
+        ...uniqueSubjects([...subjects.map((s) => s.name), ...items.flatMap(lessonSubjects)]).map(reviewOption),
+      ]
     : uniqueSubjects(mySubjects).map((name) => {
         const lessons = items.filter((item) => lessonForSubjects([name], item))
         return { name, total: lessons.length, todo: lessons.filter(isTodo).length }
       })
   const currentSubject =
     subjectOptions.find((o) => normalize(o.name) === normalize(chosenSubject))?.name ??
-    subjectOptions.find((o) => o.total > 0)?.name ??
+    (isReviewer && !ownOnly ? ALL_SUBJECTS : subjectOptions.find((o) => o.total > 0)?.name) ??
     subjectOptions[0]?.name
+  const allSubjects = isReviewer && !ownOnly && currentSubject === ALL_SUBJECTS
 
-  const visibleItems = isReviewer
+  const visibleItems = allSubjects
     ? items
     : currentSubject
       ? items.filter((item) => lessonForSubjects([currentSubject], item))
       : []
+  // Учителю — ученики выбранного предмета (учителя и кураторы остаются: по ним подписаны ответы)
+  const visibleAccounts = allSubjects || (!currentSubject && !ownOnly)
+    ? accounts
+    : accounts.filter((a) => a.role !== 'student' || (currentSubject !== undefined && hasSubject(a.subjects, currentSubject)))
 
   // Сданными считаем ДЗ, которые учитель отметил «Сдано».
   // Ученику сервер присылает только его собственный ответ.
@@ -142,9 +163,7 @@ function HomePage({
   ).length
   const todoCount =
     visibleItems.filter((item) => !item.student_homeworks?.[0]).length + rejectedCount
-  const pendingReviewCount = items
-    .flatMap((item) => item.student_homeworks ?? [])
-    .filter(awaitsReview).length
+  const pendingReviewCount = reviewCount(visibleItems)
 
   // Предметы для учеников и созвонов — список с сервера (можно удалять в форме урока)
   const subjectList = subjects.map((s) => s.name)
@@ -161,7 +180,11 @@ function HomePage({
   const sortedItems = [...visibleItems].sort((a, b) => (b.id ?? 0) - (a.id ?? 0))
 
   const emptyMessage = isReviewer
-    ? 'Заданий пока нет'
+    ? allSubjects
+      ? 'Заданий пока нет'
+      : currentSubject
+        ? `По предмету «${currentSubject}» заданий пока нет`
+        : 'У вас пока нет своих предметов — создайте урок по новому предмету'
     : mySubjects.length === 0
       ? 'Учитель пока не назначил вам предметы'
       : `По предмету «${currentSubject}» уроков пока нет`
@@ -228,7 +251,12 @@ function HomePage({
             </Link>
             {/* Ученик выбирает предмет: уроки и прогресс на главной — по нему */}
             {currentSubject && (
-              <SubjectSwitcher options={subjectOptions} value={currentSubject} onChange={chooseSubject} />
+              <SubjectSwitcher
+                options={subjectOptions}
+                value={currentSubject}
+                onChange={chooseSubject}
+                todoLabel={isReviewer ? 'ждут проверки' : undefined}
+              />
             )}
           </nav>
           {canInstall && (
@@ -295,7 +323,7 @@ function HomePage({
             {isTeacher && <AssignmentForm onAdd={onAdd} subjects={subjects} onDeleteSubject={onDeleteSubject} />}
             <div className={styles.sideColumn}>
               <AnswersPanel
-                items={items}
+                items={visibleItems}
                 accounts={accounts}
                 onReview={onReview}
                 activeAnswerId={chat?.answer.id}
@@ -330,7 +358,7 @@ function HomePage({
               </div>
             ) : (
               <div className={styles.assignmentsColumn}>
-                <StudentsList accounts={accounts} items={items} />
+                <StudentsList accounts={visibleAccounts} items={visibleItems} />
               </div>
             )}
           </div>
@@ -471,20 +499,22 @@ function PushBanner() {
   )
 }
 
-// Выбранный учеником предмет на главной
+// Выбранный предмет на главной: у ученика и у учителя — свой
 const SUBJECT_KEY = 'spirit.home.subject'
+const TEACHER_SUBJECT_KEY = 'spirit.home.teacherSubject'
+const ALL_SUBJECTS = 'Все предметы' // пункт учителя: без фильтра
 
-function readSubject() {
+function readSubject(key: string) {
   try {
-    return localStorage.getItem(SUBJECT_KEY) ?? ''
+    return localStorage.getItem(key) ?? ''
   } catch {
     return ''
   }
 }
 
-function saveSubject(name: string) {
+function saveSubject(key: string, name: string) {
   try {
-    localStorage.setItem(SUBJECT_KEY, name)
+    localStorage.setItem(key, name)
   } catch {
     // без localStorage выбор просто не запомнится
   }

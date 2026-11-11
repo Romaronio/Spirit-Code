@@ -435,7 +435,8 @@ class SubjectSerializer(serializers.ModelSerializer):
     """Предмет в списках выбора"""
     class Meta:
         model = Subject
-        fields = ['id', 'name']
+        fields = ['id', 'name', 'created_by']
+        read_only_fields = ['created_by']
 
     def validate_name(self, value):
         value = ' '.join(value.split())

@@ -1863,3 +1863,54 @@ class StreakTests(AuthTestCase):
         self.login_as(self.teacher)
         self.client.post(f'/api/student-homeworks/{sh.id}/comments/', {'text': 'Ответ'}, format='json')
         self.assertEqual(ActivityDay.objects.count(), 1)
+
+
+class SubjectCreatorTests(AuthTestCase):
+    """У предмета запоминается учитель, который его создал"""
+    def test_creator_is_saved(self):
+        other = self.make_account('olga', 'teacher')
+        self.login_as(other)
+        self.client.post('/api/assignments/', {'title': 'x', 'subject': 'Химия'}, format='json')
+        self.client.post('/api/subjects/', {'name': 'Физика'}, format='json')
+        # Уже существующий предмет автора не меняет
+        Subject.objects.create(name='География', created_by=self.teacher)
+        self.client.post('/api/subjects/', {'name': 'география'}, format='json')
+        by_name = {s['name']: s['created_by'] for s in self.client.get('/api/subjects/').data}
+        self.assertEqual((by_name['Химия'], by_name['Физика'], by_name['География']), (other.id, other.id, self.teacher.id))
+
+
+class OwnLessonsTests(AuthTestCase):
+    """Учитель (не создатель платформы) видит и меняет только свои уроки и ответы к ним"""
+    def setUp(self):
+        super().setUp()
+        self.olga = self.make_account('olga', 'teacher')
+        self.bio.created_by = self.teacher
+        self.bio.save()
+        self.sh = StudentHomework.objects.create(assignment=self.bio, student=self.anna, description='x')
+
+    def test_other_teacher_sees_only_own_lessons(self):
+        self.login_as(self.olga)
+        mine = self.client.post('/api/assignments/', {'title': 'Мой урок', 'subject': 'Биология'}, format='json').data
+        ids = {a['id'] for a in self.client.get('/api/assignments/').data['results']}
+        self.assertEqual(ids, {mine['id']})
+        self.assertEqual(self.client.get(f'/api/assignments/{self.bio.id}/').status_code, 404)
+        self.assertEqual(self.client.patch(f'/api/assignments/{self.bio.id}/', {'title': 'x'}, format='json').status_code, 404)
+        self.assertEqual(self.client.delete(f'/api/assignments/{self.bio.id}/').status_code, 404)
+        url = f'/api/student-homeworks/{self.sh.id}/'
+        self.assertEqual(self.client.post(url + 'review/', {'status': 'accepted'}, format='json').status_code, 404)
+        self.assertEqual(self.client.post(url + 'comments/', {'text': 'x'}, format='json').status_code, 404)
+        self.assertEqual(
+            self.client.post('/api/assignments/reorder/', {'topic': 'x', 'ids': [self.bio.id]}, format='json').status_code, 400,
+        )
+
+    def test_owner_sees_everything(self):
+        self.login_as(self.olga)
+        theirs = self.client.post('/api/assignments/', {'title': 'Урок Ольги', 'subject': 'Биология'}, format='json').data
+        self.login_as(self.teacher)
+        ids = {a['id'] for a in self.client.get('/api/assignments/').data['results']}
+        self.assertTrue({theirs['id'], self.bio.id} <= ids)
+        self.assertEqual(self.client.patch(f"/api/assignments/{theirs['id']}/", {'title': 'y'}, format='json').status_code, 200)
+        # Ученик видит уроки по своим предметам, кто бы их ни создал
+        self.login_as(self.anna)
+        ids = {a['id'] for a in self.client.get('/api/assignments/').data['results']}
+        self.assertTrue({theirs['id'], self.bio.id} <= ids)

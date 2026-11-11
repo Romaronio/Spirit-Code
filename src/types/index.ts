@@ -211,6 +211,7 @@ export interface PhotoLatexResult {
 export interface Subject {
   id: number
   name: string
+  created_by?: number | null // учитель, который создал предмет
 }
 
 export interface Call {

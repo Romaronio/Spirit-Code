@@ -294,7 +294,10 @@ class AssignmentViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(subject=subject)
 
         user = self.request.user
-        if getattr(user, 'curated_ids', None) is not None:
+        if getattr(user, 'own_lessons_only', False):
+            # Учитель (не создатель платформы) — только свои уроки
+            queryset = queryset.filter(created_by=user)
+        elif getattr(user, 'curated_ids', None) is not None:
             # Куратор видит уроки своих учеников: по их предметам и те, к которым они прислали ответ
             students = Account.objects.filter(id__in=user.curated_ids)
             subjects = {str(s).strip().casefold() for st in students for s in (st.subjects or []) if str(s).strip()}
@@ -396,7 +399,7 @@ class AssignmentViewSet(viewsets.ModelViewSet):
         ids = request.data.get('ids')
         if not isinstance(ids, list) or not ids or not all(isinstance(i, int) for i in ids) or len(ids) > 500:
             raise ValidationError({'ids': ['Нужен список уроков']})
-        if len(set(ids)) != len(ids) or Assignment.objects.filter(id__in=ids).count() != len(ids):
+        if len(set(ids)) != len(ids) or self.get_queryset().filter(id__in=ids).count() != len(ids):
             raise ValidationError({'ids': ['Таких уроков нет']})
         # update(), а не save(): не пересобираем рисунки TikZ ради перестановки
         for position, lesson_id in enumerate(ids, start=1):
@@ -410,9 +413,9 @@ class AssignmentViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         self._check_files(request)
-        assignment = serializer.save()
+        assignment = serializer.save(created_by=request.user)
         for name in assignment.all_subjects:  # новый предмет появляется в списках выбора
-            Subject.ensure(name)
+            Subject.ensure(name, request.user)
 
         self._save_homework(request, assignment)
         self._save_lesson_files(request, assignment)
@@ -433,7 +436,7 @@ class AssignmentViewSet(viewsets.ModelViewSet):
         self._check_files(request)
         assignment = serializer.save()
         for name in assignment.all_subjects:  # урок перенесли в новый предмет — он появляется в списках
-            Subject.ensure(name)
+            Subject.ensure(name, request.user)
 
         self._save_homework(request, assignment)
         self._save_lesson_files(request, assignment)
@@ -572,6 +575,9 @@ class LessonFileViewSet(viewsets.ModelViewSet):
     parser_classes = [MultiPartParser, FormParser, JSONParser]
     permission_classes = [IsTeacher]
 
+    def get_queryset(self):
+        return _own_lessons(super().get_queryset(), self.request.user, 'assignment__created_by')
+
 
 class HomeworkViewSet(viewsets.ModelViewSet):
     """API endpoint для работы с домашними заданиями"""
@@ -580,6 +586,9 @@ class HomeworkViewSet(viewsets.ModelViewSet):
     parser_classes = [MultiPartParser, FormParser, JSONParser]
     permission_classes = [IsTeacher]
 
+    def get_queryset(self):
+        return _own_lessons(super().get_queryset(), self.request.user, 'assignment__created_by')
+
 
 class HomeworkFileViewSet(viewsets.ModelViewSet):
     """API endpoint для работы с файлами домашних заданий"""
@@ -587,6 +596,9 @@ class HomeworkFileViewSet(viewsets.ModelViewSet):
     serializer_class = HomeworkFileSerializer
     parser_classes = [MultiPartParser, FormParser, JSONParser]
     permission_classes = [IsTeacher]
+
+    def get_queryset(self):
+        return _own_lessons(super().get_queryset(), self.request.user, 'homework__assignment__created_by')
 
 
 class StudentHomeworkViewSet(viewsets.ModelViewSet):
@@ -605,7 +617,7 @@ class StudentHomeworkViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(student=user)
         elif user.curated_ids is not None:
             queryset = queryset.filter(student_id__in=user.curated_ids)
-        return queryset
+        return _own_lessons(queryset, user, 'assignment__created_by')
 
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
     def comments(self, request, pk=None):
@@ -649,7 +661,7 @@ class SubjectViewSet(mixins.ListModelMixin, mixins.DestroyModelMixin, viewsets.G
     def create(self, request):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        subject = Subject.ensure(serializer.validated_data['name'])
+        subject = Subject.ensure(serializer.validated_data['name'], request.user)
         return Response(SubjectSerializer(subject).data, status=status.HTTP_201_CREATED)
 
 
@@ -711,7 +723,7 @@ class AnswerCommentViewSet(mixins.UpdateModelMixin, mixins.DestroyModelMixin, vi
             queryset = queryset.filter(student_homework__student=user)
         elif user.curated_ids is not None:
             queryset = queryset.filter(student_homework__student_id__in=user.curated_ids)
-        return queryset
+        return _own_lessons(queryset, user, 'student_homework__assignment__created_by')
 
     def perform_update(self, serializer):
         if serializer.instance.author_id != self.request.user.pk:
@@ -877,6 +889,13 @@ def _notify_call_started(call):
     )
 
 
+def _own_lessons(queryset, user, field):
+    """Учителю, кроме создателя платформы, — только то, что относится к его урокам"""
+    if getattr(user, 'own_lessons_only', False):
+        return queryset.filter(**{field: user})
+    return queryset
+
+
 def _student_calls(user):
     """Идущие созвоны, в которые может войти ученик"""
     queryset = _live_calls()
@@ -963,7 +982,8 @@ class CallViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retriev
         raw_id = request.data.get('assignment')
         assignment = None
         if raw_id not in (None, ''):
-            assignment = Assignment.objects.filter(pk=raw_id).first() if str(raw_id).isdigit() else None
+            lessons = _own_lessons(Assignment.objects.all(), request.user, 'created_by')
+            assignment = lessons.filter(pk=raw_id).first() if str(raw_id).isdigit() else None
             if assignment is None:
                 raise ValidationError({'assignment': ['Урок не найден']})
         task = str(request.data.get('task') or '')

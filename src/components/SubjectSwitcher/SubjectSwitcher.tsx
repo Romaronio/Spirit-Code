@@ -4,17 +4,18 @@ import styles from './SubjectSwitcher.module.css'
 export interface SubjectOption {
   name: string
   total: number // уроков по предмету
-  todo: number // ждут решения: не отправлены или на доработке
+  todo: number // ученику — ждут решения, учителю — ответы ждут проверки
 }
 
 interface Props {
   options: SubjectOption[]
   value: string
   onChange: (name: string) => void
+  todoLabel?: string // подпись к todo в списке
 }
 
 // Кнопка с выпадающим списком предметов ученика на главной: уроки и прогресс показываются по выбранному
-function SubjectSwitcher({ options, value, onChange }: Props) {
+function SubjectSwitcher({ options, value, onChange, todoLabel = 'ждут решения' }: Props) {
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
 
@@ -63,7 +64,7 @@ function SubjectSwitcher({ options, value, onChange }: Props) {
               >
                 <span className={styles.optionName}>{o.name}</span>
                 <span className={styles.optionMeta}>
-                  {o.total === 0 ? 'уроков пока нет' : o.todo > 0 ? `ждут решения: ${o.todo}` : `уроков: ${o.total}`}
+                  {o.total === 0 ? 'уроков пока нет' : o.todo > 0 ? `${todoLabel}: ${o.todo}` : `уроков: ${o.total}`}
                 </span>
               </button>
             </li>
