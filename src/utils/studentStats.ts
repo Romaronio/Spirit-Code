@@ -88,3 +88,9 @@ export function formatActivity(iso: string | null) {
   if (date.toDateString() === yesterday.toDateString()) return `вчера в ${time}`
   return date.toLocaleDateString('ru-RU')
 }
+
+// Номера, где отправленный краткий ответ неверен или учитель отметил задание неверным
+// (есть, пока ученик не отправит верный ответ). Порядок — как у уроков
+export function mistakesOf(items: Assignment[]) {
+  return items.flatMap((lesson) => (lesson.student_homeworks?.[0]?.wrong_tasks ?? []).map((key) => ({ lesson, key })))
+}

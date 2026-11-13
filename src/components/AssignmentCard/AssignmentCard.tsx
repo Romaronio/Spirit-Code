@@ -48,7 +48,10 @@ function AssignmentCard({ assignment, user, onDelete }: Props) {
         </div>
 
         {/* Заголовок всегда занимает ровно две строки, длинный обрезается */}
-        <h3 className={styles.title} title={assignment.title}>{assignment.title}</h3>
+        <h3 className={styles.title} title={assignment.title}>
+          {assignment.exam_minutes ? '⏱ ' : ''}
+          {assignment.title}
+        </h3>
 
         <div className={styles.footer}>
           {assignment.deadline && (

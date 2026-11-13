@@ -1,4 +1,4 @@
-import type { Account, AnswerComment, Assignment, Call, CallAnswer, Subject, CallJoin, NewCall, LessonFile, Homework, HomeworkFile, NewAssignment, NumberedTask, Payment, TaskFileChanges, PhotoLatexResult, ReviewStatus, StudentHomework, TypingModeSummary, TypingResult, TypingStats, TypingSummary } from "../types";
+import type { Account, AnswerComment, Assignment, Call, CallAnswer, Subject, CallJoin, ExamResults, NewCall, LessonFile, Homework, HomeworkFile, NewAssignment, NumberedTask, Payment, TaskFileChanges, PhotoLatexResult, ReviewStatus, StudentHomework, TypingModeSummary, TypingResult, TypingStats, TypingSummary } from "../types";
 import { clearSession, loadToken } from "../utils/session";
 
 // Адрес API. По умолчанию относительный путь: и локально (через прокси Vite),
@@ -167,6 +167,11 @@ export async function createAssignment(data: NewAssignment): Promise<Assignment>
   if (data.recording_url) {
     formData.append('recording_url', data.recording_url);
   }
+  formData.append('topic', data.topic);
+  if (data.exam_minutes) {
+    formData.append('exam_minutes', String(data.exam_minutes));
+    if (data.exam_results) formData.append('exam_results', data.exam_results);
+  }
   if (data.numbered_tasks?.length) {
     formData.append('numbered_tasks', JSON.stringify(data.numbered_tasks));
   }
@@ -196,6 +201,8 @@ export async function updateAssignment(
     extra_subjects?: string[]
     deadline?: string | null
     lesson_date?: string | null
+    exam_minutes?: number | null
+    exam_results?: ExamResults
     recording_url?: string
     numbered_tasks?: NumberedTask[]
     tasks_latex?: string
@@ -212,6 +219,8 @@ export async function updateAssignment(
   if (data.extra_subjects !== undefined) formData.append('extra_subjects', JSON.stringify(data.extra_subjects));
   if (data.deadline) formData.append('deadline', data.deadline);
   if (data.lesson_date !== undefined) formData.append('lesson_date', data.lesson_date ?? ''); // '' — стереть
+  if (data.exam_results !== undefined) formData.append('exam_results', data.exam_results);
+  if (data.exam_minutes !== undefined) formData.append('exam_minutes', data.exam_minutes ? String(data.exam_minutes) : ''); // '' — не пробник
   if (data.recording_url !== undefined) formData.append('recording_url', data.recording_url || '');
   if (data.numbered_tasks !== undefined) formData.append('numbered_tasks', JSON.stringify(data.numbered_tasks));
   if (data.tasks_latex !== undefined) formData.append('tasks_latex', data.tasks_latex);
@@ -327,6 +336,15 @@ export async function submitStudentHomework(data: {
   );
 }
 
+// Пробник: ученик начинает (пошло его время) и сдаёт (ответы больше не меняются)
+export async function startExam(assignmentId: number): Promise<StudentHomework> {
+  return fetchAPI<StudentHomework>(`/assignments/${assignmentId}/start-exam/`, { method: 'POST' });
+}
+
+export async function finishExam(assignmentId: number): Promise<StudentHomework> {
+  return fetchAPI<StudentHomework>(`/assignments/${assignmentId}/finish-exam/`, { method: 'POST' });
+}
+
 // Ответ ученика к одному заданию урока (ключ задания как в StudentHomework.task_answers)
 export async function submitTaskAnswer(data: {
   assignmentId: number
@@ -355,6 +373,14 @@ export async function reviewStudentHomework(id: number, status: ReviewStatus): P
   return fetchAPI<StudentHomework>(`/student-homeworks/${id}/review/`, {
     method: 'POST',
     body: JSON.stringify({ status }),
+  });
+}
+
+// Отметка учителя/куратора к одному заданию: верно / неверно / снять (null)
+export async function markTask(id: number, task: string, mark: boolean | null): Promise<StudentHomework> {
+  return fetchAPI<StudentHomework>(`/student-homeworks/${id}/mark-task/`, {
+    method: 'POST',
+    body: JSON.stringify({ task, mark }),
   });
 }
 

@@ -1145,13 +1145,16 @@ class TasksLatexTests(AuthTestCase):
 
         self.assertIn(self.client.post(url + 'submit/', {'description': ''}).status_code, (200, 201))
         self.assertEqual(mine()['task_checks'], {'cw-1': True, 'cw-2': False})
+        self.assertEqual(mine()['wrong_tasks'], ['cw-2'])  # в «Работе над ошибками»
         self.assertNotIn('42', json.dumps(self.client.get(url).data['numbered_tasks']))  # верный ответ не утёк
 
-        # Исправил ответ — результата по номеру нет, пока не отправит снова
+        # Исправил ответ — результата по номеру нет, пока не отправит снова; из РНО номер ещё не ушёл
         self.client.post(task, {'task': 'cw-2', 'text': '7'})
         self.assertEqual(mine()['task_checks'], {'cw-1': True})
+        self.assertEqual(mine()['wrong_tasks'], ['cw-2'])
         self.client.post(url + 'submit/', {'description': ''})
         self.assertEqual(mine()['task_checks'], {'cw-1': True, 'cw-2': True})
+        self.assertEqual(mine()['wrong_tasks'], [])
 
         # Учитель видит текущие ответы и номер без ответа ученика — как неверный
         self.client.post(task, {'task': 'cw-2', 'text': ''})
@@ -1774,6 +1777,18 @@ class LessonTopicTests(AuthTestCase):
         self.assertEqual(guess_topic('5, 6, 14 задание повторение'), 'Повторение')
         self.assertEqual(guess_topic('подготовка к проверочной'), 'Проверочные')
         self.assertEqual(guess_topic('Фотосинтез'), '')
+        self.assertEqual(guess_topic('пробник 3'), 'Пробники')
+        self.assertEqual(guess_topic('ЕГЭ вариант 1', is_exam=True), 'Пробники')
+
+    def test_exam_goes_to_exams_folder(self):
+        """Пробник без выбранной папки — в «Пробники»; ставший пробником урок без папки — тоже"""
+        self.login_as(self.teacher)
+        self.assertEqual(self.create('Вариант 1', exam_minutes=235).data['topic'], 'Пробники')
+        self.assertEqual(self.create('Вариант 2', exam_minutes=235, topic='Своя').data['topic'], 'Своя')
+        lesson = self.create('Фотосинтез').data
+        self.assertEqual(lesson['topic'], '')
+        data = self.client.patch(f"/api/assignments/{lesson['id']}/", {'exam_minutes': 60}, format='json').data
+        self.assertEqual(data['topic'], 'Пробники')
 
     def create(self, title, **extra):
         return self.client.post('/api/assignments/', {'title': title, 'subject': 'Биология', **extra}, format='json')
@@ -1925,3 +1940,193 @@ class AllStudentsVisibleTests(AuthTestCase):
         names = {a['name'] for a in (data['results'] if isinstance(data, dict) else data)}
         self.assertTrue({'anna', 'ivan'} <= names)
         self.assertEqual(self.client.get(f'/api/typing-results/by-mode/?student={self.anna.id}').status_code, 200)
+
+
+class ExamTests(AuthTestCase):
+    """Пробник: задания скрыты до начала, ответы принимаются только пока идёт время,
+    результат ученик видит после сдачи"""
+
+    def setUp(self):
+        super().setUp()
+        self.bio.exam_minutes = 60
+        self.bio.numbered_tasks = [{'number': 1, 'latex': 'x', 'answer': '42'}, {'number': 2, 'latex': 'y', 'answer': '7'}]
+        self.bio.save()
+        self.url = f'/api/assignments/{self.bio.id}/'
+
+    def mine(self):
+        return self.client.get(self.url).data['student_homeworks'][0]
+
+    def test_teacher_sets_minutes(self):
+        self.login_as(self.teacher)
+        self.assertEqual(self.client.patch(self.url, {'exam_minutes': 235}, format='json').status_code, 200)
+        self.bio.refresh_from_db()
+        self.assertEqual(self.bio.exam_minutes, 235)
+        self.assertEqual(self.client.patch(self.url, {'exam_minutes': None}, format='json').status_code, 200)
+        self.bio.refresh_from_db()
+        self.assertIsNone(self.bio.exam_minutes)
+        # Сайт шлёт форму: пустое поле — не пробник
+        self.client.patch(self.url, {'exam_minutes': 90}, format='multipart')
+        self.client.patch(self.url, {'exam_minutes': ''}, format='multipart')
+        self.bio.refresh_from_db()
+        self.assertIsNone(self.bio.exam_minutes)
+
+    def test_create_exam(self):
+        """Пробник создаётся сразу из формы «Новое задание» (сайт шлёт форму)"""
+        self.login_as(self.teacher)
+        response = self.client.post('/api/assignments/', {
+            'title': 'Пробник ЕГЭ №1', 'subject': 'Биология', 'exam_minutes': '235',
+            'numbered_tasks': json.dumps([{'number': 1, 'latex': 'x', 'answer': '1'}]),
+        }, format='multipart')
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(Assignment.objects.get(id=response.data['id']).exam_minutes, 235)
+        # Без времени — обычный урок
+        response = self.client.post('/api/assignments/', {'title': 'Урок', 'subject': 'Биология'}, format='multipart')
+        self.assertIsNone(Assignment.objects.get(id=response.data['id']).exam_minutes)
+
+    def test_exam_flow(self):
+        self.login_as(self.anna)
+        data = self.client.get(self.url).data
+        self.assertEqual(data['numbered_tasks'], [])  # до начала заданий не видно
+        self.assertEqual(data['exam_task_count'], 2)
+        # Отвечать до начала нельзя
+        self.assertEqual(self.client.post(self.url + 'submit-task/', {'task': 'cw-1', 'text': '42'}).status_code, 400)
+
+        self.assertEqual(self.client.post(self.url + 'start-exam/').status_code, 201)
+        started = self.mine()['exam_started_at']
+        self.assertEqual(len(self.client.get(self.url).data['numbered_tasks']), 2)
+        self.client.post(self.url + 'start-exam/')  # повторное нажатие время не сбрасывает
+        self.assertEqual(self.mine()['exam_started_at'], started)
+
+        self.client.post(self.url + 'submit-task/', {'task': 'cw-1', 'text': '42'})
+        self.client.post(self.url + 'submit-task/', {'task': 'cw-2', 'text': '8'})
+        self.client.post(self.url + 'submit-task/', {'task': 'cw-2', 'text': ''})  # стёр — работа не удаляется
+        self.assertEqual(self.mine()['task_checks'], {})  # во время пробника результата нет
+        self.assertFalse(self.mine()['exam_over'])
+
+        self.assertEqual(self.client.post(self.url + 'finish-exam/').status_code, 200)
+        sh = self.mine()
+        self.assertTrue(sh['exam_over'])
+        self.assertEqual(sh['task_checks'], {'cw-1': True, 'cw-2': False})
+        self.assertEqual(sh['wrong_tasks'], ['cw-2'])
+        # После сдачи ответы не меняются
+        self.assertEqual(self.client.post(self.url + 'submit-task/', {'task': 'cw-2', 'text': '7'}).status_code, 400)
+
+    def test_results_after_review(self):
+        """«Показать после проверки»: сдал — ✓/✗ не видно, пока учитель или куратор не отметит работу"""
+        self.bio.exam_results = 'review'
+        self.bio.save(update_fields=['exam_results'])
+        self.login_as(self.anna)
+        self.client.post(self.url + 'start-exam/')
+        self.client.post(self.url + 'submit-task/', {'task': 'cw-1', 'text': '42'})
+        self.client.post(self.url + 'finish-exam/')
+        sh = self.mine()
+        self.assertTrue(sh['exam_over'])
+        self.assertEqual(sh['task_checks'], {})
+        self.assertEqual(sh['wrong_tasks'], [])
+
+        self.login_as(self.teacher)
+        self.assertEqual(self.client.get(self.url).data['student_homeworks'][0]['task_checks'], {'cw-1': True, 'cw-2': False})
+        StudentHomework.objects.filter(id=sh['id']).update(status='accepted')  # отметка учителя
+
+        self.login_as(self.anna)
+        self.assertEqual(self.mine()['task_checks'], {'cw-1': True, 'cw-2': False})
+
+    def test_time_is_up(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        self.login_as(self.anna)
+        self.client.post(self.url + 'start-exam/')
+        StudentHomework.objects.filter(student=self.anna).update(exam_started_at=timezone.now() - timedelta(minutes=61))
+        self.assertTrue(self.mine()['exam_over'])
+        self.assertEqual(self.client.post(self.url + 'submit-task/', {'task': 'cw-1', 'text': '42'}).status_code, 400)
+        self.assertEqual(self.mine()['task_checks'], {'cw-1': False, 'cw-2': False})
+
+    def test_other_student_does_not_unlock(self):
+        """Начал один ученик — другому задания по-прежнему не видны"""
+        self.make_account('olga', 'student', ['Биология'])
+        self.login_as(self.anna)
+        self.client.post(self.url + 'start-exam/')
+        olga = Account.objects.get(name='olga')
+        self.login_as(olga)
+        self.assertEqual(self.client.get(self.url).data['numbered_tasks'], [])
+
+
+class TaskMarkTests(AuthTestCase):
+    """Учитель или куратор отмечает отдельное задание верным или неверным — важнее автопроверки"""
+
+    def setUp(self):
+        super().setUp()
+        self.bio.numbered_tasks = [{'number': 1, 'latex': 'x', 'answer': '42'}, {'number': 2, 'latex': 'y'}]
+        self.bio.save()
+        self.url = f'/api/assignments/{self.bio.id}/'
+        self.answer = StudentHomework.objects.create(
+            assignment=self.bio, student=self.anna,
+            task_answers={'cw-1': '41', 'cw-2': 'развёрнутое решение'}, submitted_answers={'cw-1': '41'},
+        )
+
+    def mark(self, task, value):
+        return self.client.post(
+            f'/api/student-homeworks/{self.answer.id}/mark-task/', {'task': task, 'mark': value}, format='json'
+        )
+
+    def mine(self):
+        return self.client.get(self.url).data['student_homeworks'][0]
+
+    def test_teacher_marks_task(self):
+        self.login_as(self.teacher)
+        response = self.mark('cw-1', True)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['task_marks'], {'cw-1': True})
+        self.assertEqual(response.data['task_checks'], {'cw-1': True})  # важнее автопроверки
+        # Задание без верного ответа тоже можно отметить
+        self.assertEqual(self.mark('cw-2', False).data['task_checks'], {'cw-1': True, 'cw-2': False})
+
+        self.login_as(self.anna)
+        sh = self.mine()
+        self.assertEqual(sh['task_checks'], {'cw-1': True, 'cw-2': False})
+        self.assertEqual(sh['wrong_tasks'], ['cw-2'])
+
+        self.login_as(self.teacher)
+        response = self.mark('cw-1', None)  # снять отметку — снова автопроверка
+        self.assertEqual(response.data['task_checks'], {'cw-1': False, 'cw-2': False})
+
+    def test_curator_marks_task(self):
+        curator = self.make_account('olga', 'curator')
+        curator.students.set([self.anna])
+        self.login_as(curator)
+        self.assertEqual(self.mark('cw-1', True).status_code, 200)
+
+    def test_student_cannot_mark(self):
+        self.login_as(self.anna)
+        self.assertEqual(self.mark('cw-1', True).status_code, 403)
+
+    def test_bad_task_or_mark(self):
+        self.login_as(self.teacher)
+        self.assertEqual(self.mark('cw-9', True).status_code, 400)
+        self.assertEqual(self.mark('cw-1', 'да').status_code, 400)
+
+    def test_changed_answer_drops_mark(self):
+        self.answer.task_marks = {'cw-1': False, 'cw-2': True}
+        self.answer.save()
+        self.login_as(self.anna)
+        self.client.post(self.url + 'submit-task/', {'task': 'cw-1', 'text': '42'})
+        self.answer.refresh_from_db()
+        self.assertEqual(self.answer.task_marks, {'cw-2': True})
+
+    def test_exam_marks_hidden_until_results(self):
+        """Пробник «после проверки»: отметки по заданиям ученик не видит, пока работа не отмечена"""
+        self.bio.exam_minutes = 60
+        self.bio.exam_results = 'review'
+        self.bio.save()
+        from django.utils import timezone
+        self.answer.exam_started_at = self.answer.exam_finished_at = timezone.now()
+        self.answer.task_marks = {'cw-2': True}
+        self.answer.save()
+        self.login_as(self.anna)
+        sh = self.mine()
+        self.assertEqual(sh['task_checks'], {})
+        self.assertEqual(sh['task_marks'], {})
+        StudentHomework.objects.filter(id=self.answer.id).update(status='accepted')
+        sh = self.mine()
+        self.assertEqual(sh['task_checks'], {'cw-1': False, 'cw-2': True})
+        self.assertEqual(sh['wrong_tasks'], ['cw-1'])

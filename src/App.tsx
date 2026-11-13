@@ -345,7 +345,7 @@ function App() {
           />
         }
       />
-      <Route path="/typing" element={<TypingPage user={user} />} />
+      <Route path="/typing" element={<TypingPage user={user} onLogout={handleLogout} />} />
       <Route path="/student/:id" element={<StudentPage user={user} items={items} accounts={accounts} />} />
       <Route
         path="/lessons"

@@ -1,12 +1,13 @@
-import { useCallback, useEffect, useState, type CSSProperties } from 'react'
-import { Link, Navigate } from 'react-router-dom'
+import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } from 'react'
+import { Navigate } from 'react-router-dom'
 import styles from './HomePage.module.css'
 import type { Account, Assignment, CommentActions, NewAssignment, ReviewStatus, Subject, User } from '../../types'
 import AssignmentCard from '../../components/AssignmentCard/AssignmentCard'
-import StudentLessons from '../../components/StudentLessons/StudentLessons'
+import StudentLessons, { MistakesList } from '../../components/StudentLessons/StudentLessons'
 import LessonCalendar from '../../components/LessonCalendar/LessonCalendar'
 import StreakCard from '../../components/StreakCard/StreakCard'
 import SubjectSwitcher, { type SubjectOption } from '../../components/SubjectSwitcher/SubjectSwitcher'
+import SiteHeader from '../../components/SiteHeader/SiteHeader'
 import CallsBar from '../../components/CallsBar/CallsBar'
 import AssignmentForm from '../../components/AssignmentForm/AssignmentForm'
 import StudentsPanel from '../../components/StudentsPanel/StudentsPanel'
@@ -15,9 +16,8 @@ import ProgressDonut from '../../components/ProgressDonut/ProgressDonut'
 import PaymentsPanel from '../../components/PaymentsPanel/PaymentsPanel'
 import ChatWindow from '../../components/ChatWindow/ChatWindow'
 import StudentsList from '../../components/StudentsList/StudentsList'
-import { promptInstall, useCanInstall } from '../../utils/install'
 import { hasSubject, lessonForSubjects, lessonSubjects, normalize, uniqueSubjects } from '../../utils/subjects'
-import { awaitsReview } from '../../utils/studentStats'
+import { awaitsReview, mistakesOf } from '../../utils/studentStats'
 import { canReview } from '../../utils/roles'
 import { usePush } from '../../utils/push'
 
@@ -56,10 +56,10 @@ function HomePage({
 }: Props) {
   // Открытая переписка (у учителя): показывается вместо колонки с заданиями
   const [openChat, setOpenChat] = useState<{ assignmentId: number; answerId: number } | null>(null)
-  // Кнопка «Установить приложение» — пока сайт не установлен и браузер это умеет
-  const canInstall = useCanInstall()
   // Окно «Все задания» (у учителя)
   const [showAll, setShowAll] = useState(false)
+  // Ученику: «Работа над ошибками» вместо уроков (оранжевая кнопка «РНО» рядом с выбором курса)
+  const [showMistakes, setShowMistakes] = useState(false)
   const closeChat = useCallback(() => setOpenChat(null), [])
   // Предмет, уроки которого ученик смотрит на главной. Выбор запоминаем в браузере
   // У учителя и куратора выбор хранится отдельно (у них есть «Все предметы»)
@@ -146,7 +146,7 @@ function HomePage({
       ? items.filter((item) => lessonForSubjects([currentSubject], item))
       : []
   // Учителю — ученики выбранного предмета (учителя и кураторы остаются: по ним подписаны ответы)
-  const visibleAccounts = allSubjects || (!currentSubject && !ownOnly)
+  const visibleAccounts = allSubjects || !currentSubject
     ? accounts
     : accounts.filter((a) => a.role !== 'student' || (currentSubject !== undefined && hasSubject(a.subjects, currentSubject)))
 
@@ -178,6 +178,24 @@ function HomePage({
 
   // Сортируем по ID в обратном порядке (последние добавленные первыми)
   const sortedItems = [...visibleItems].sort((a, b) => (b.id ?? 0) - (a.id ?? 0))
+  const mistakeCount = isReviewer ? 0 : mistakesOf(sortedItems).length
+  const mistakesOpen = showMistakes && !isReviewer
+
+  function openMistakes() {
+    setShowMistakes(true)
+    // На телефоне уроки ниже приветствия и календаря — прокручиваем к списку
+    requestAnimationFrame(() => document.getElementById('lessons')?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+  }
+
+  const renderGrid = (children: ReactNode) => (
+    <div
+      className={`${styles.grid} ${styles.gridFixed}`}
+      style={{ '--per-row': perRow } as CSSProperties}
+      data-per-row={perRow}
+    >
+      {children}
+    </div>
+  )
 
   const emptyMessage = isReviewer
     ? allSubjects
@@ -196,7 +214,7 @@ function HomePage({
   const chat = chatAssignment && chatAnswer ? { assignment: chatAssignment, answer: chatAnswer } : null
 
   const assignmentsSection = (
-    <section className={styles.assignmentsColumn}>
+    <section id="lessons" className={styles.assignmentsColumn}>
       {/* Заголовок слева, справа — выбор числа уроков в строке (только на ПК) */}
       <div className={`${styles.headingRow} ${isReviewer ? styles.headingRowTeacher : ''}`}>
         {!isReviewer && <h2 className={styles.heading}>Задания</h2>}
@@ -205,22 +223,16 @@ function HomePage({
         )}
       </div>
 
-      {sortedItems.length === 0 ? (
+      {mistakesOpen ? (
+        <MistakesList items={sortedItems} renderGrid={renderGrid} onClose={() => setShowMistakes(false)} />
+      ) : sortedItems.length === 0 ? (
         <p>{emptyMessage}</p>
       ) : (
         // Ученику: папки-темы карточками в порядке учителя; при смене предмета папка закрывается
         <StudentLessons
           key={currentSubject}
           items={sortedItems}
-          renderGrid={(children) => (
-            <div
-              className={`${styles.grid} ${styles.gridFixed}`}
-              style={{ '--per-row': perRow } as CSSProperties}
-              data-per-row={perRow}
-            >
-              {children}
-            </div>
-          )}
+          renderGrid={renderGrid}
           renderLesson={(item) => (
             <AssignmentCard key={item.id} assignment={item} user={user} onDelete={isTeacher ? onDelete : undefined} />
           )}
@@ -231,49 +243,32 @@ function HomePage({
 
   return (
     <div className={styles.page}>
-      <header className={styles.topbar}>
-        <div className={styles.topbarInner}>
-          <Link to="/home" className={styles.logo}>
-            <span className={styles.logoMark} aria-hidden="true">&gt;_</span>
-            Spirit Code
-          </Link>
-          <nav className={styles.nav} aria-label="Основная навигация">
-            <Link to="/home" className={`${styles.navLink} ${styles.navActive}`} aria-current="page">
-              Задания
-            </Link>
-            {isTeacher && (
-              <Link to="/lessons" className={`${styles.navLink} ${styles.navAccent}`}>
-                База уроков
-              </Link>
-            )}
-            <Link to="/typing" className={`${styles.navLink} ${styles.navAccent}`}>
-              Тренажёр печати
-            </Link>
-            {/* Ученик выбирает предмет: уроки и прогресс на главной — по нему */}
-            {currentSubject && (
-              <SubjectSwitcher
-                options={subjectOptions}
-                value={currentSubject}
-                onChange={chooseSubject}
-                todoLabel={isReviewer ? 'ждут проверки' : undefined}
-              />
-            )}
-          </nav>
-          {canInstall && (
-            <button
-              type="button"
-              className={styles.install}
-              onClick={() => void promptInstall()}
-              title="Ярлык на рабочем столе и отдельное окно, как у обычной программы"
-            >
-              ⤓ Установить приложение
-            </button>
-          )}
-          <button type="button" className={styles.logout} onClick={onLogout}>
-            Выйти
-          </button>
-        </div>
-      </header>
+      <SiteHeader
+        user={user}
+        current={mistakesOpen ? 'mistakes' : 'home'}
+        onLogout={onLogout}
+        onHome={() => {
+          setShowMistakes(false)
+          requestAnimationFrame(() => document.getElementById('lessons')?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+        }}
+        subjectSwitcher={
+          // Ученик выбирает предмет: уроки и прогресс на главной — по нему
+          currentSubject && (
+            <SubjectSwitcher
+              options={subjectOptions}
+              value={currentSubject}
+              onChange={chooseSubject}
+              todoLabel={isReviewer ? 'ждут проверки' : undefined}
+            />
+          )
+        }
+        // Ученику: все неверно решённые номера выбранного курса
+        mistakes={
+          !isReviewer && currentSubject
+            ? { count: mistakeCount, onToggle: () => (mistakesOpen ? setShowMistakes(false) : openMistakes()) }
+            : undefined
+        }
+      />
 
       <main className={styles.main}>
         <section className={styles.hero}>
@@ -320,7 +315,7 @@ function HomePage({
         {isReviewer ? (
           // Учитель: форма | ответы и ученики | список учеников (уроки — кнопкой «Посмотреть все задания»)
           <div className={styles.tools}>
-            {isTeacher && <AssignmentForm onAdd={onAdd} subjects={subjects} onDeleteSubject={onDeleteSubject} />}
+            {isTeacher && <AssignmentForm onAdd={onAdd} subjects={subjects} onDeleteSubject={onDeleteSubject} items={items} />}
             <div className={styles.sideColumn}>
               <AnswersPanel
                 items={visibleItems}

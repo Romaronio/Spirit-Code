@@ -191,6 +191,15 @@ class Assignment(models.Model):
     topic = models.CharField(max_length=60, blank=True, default='')
     # Место урока в теме: меньше — выше. Учитель меняет перетаскиванием в «Базе уроков»
     position = models.PositiveIntegerField(default=0)
+    # Пробник: время на работу в минутах (None — обычный урок). Отсчёт у каждого ученика свой —
+    # с нажатия «Начать пробник»; до начала задания ученик не видит (api/exam.py)
+    exam_minutes = models.PositiveSmallIntegerField(null=True, blank=True)
+    # Когда ученик видит ✓/✗ в пробнике: сразу после сдачи или когда учитель/куратор отметит работу
+    EXAM_RESULTS_CHOICES = [
+        ('finish', 'После сдачи'),
+        ('review', 'После проверки учителем'),
+    ]
+    exam_results = models.CharField(max_length=10, choices=EXAM_RESULTS_CHOICES, default='finish')
     # Учитель, который создал урок: другие учителя (кроме создателя платформы) его не видят.
     # None — неизвестно (виден только создателю платформы)
     created_by = models.ForeignKey(
@@ -309,10 +318,16 @@ class StudentHomework(models.Model):
     # Краткие ответы на момент «Отправить ответ»: {"hw-5": "42"}. Результат автопроверки ученик
     # видит только по ним — и только пока не изменил ответ (см. answer_check.task_checks)
     submitted_answers = models.JSONField(blank=True, default=dict)
+    # Отметки учителя/куратора по отдельным заданиям: {"hw-5": true, "cw-2": false}.
+    # Важнее автопроверки; снимается, когда ученик меняет ответ к этому заданию
+    task_marks = models.JSONField(blank=True, default=dict)
     submitted_at = models.DateTimeField(auto_now_add=True)
     # Отметка учителя после проверки
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
     checked_at = models.DateTimeField(null=True, blank=True)
+    # Пробник: когда ученик начал и когда сдал (сам или по окончании времени)
+    exam_started_at = models.DateTimeField(null=True, blank=True)
+    exam_finished_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ['-submitted_at']

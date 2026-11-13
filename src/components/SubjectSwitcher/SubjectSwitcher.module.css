@@ -10,7 +10,7 @@
   gap: 8px;
   max-width: min(420px, calc(100vw - 32px));
   padding: 10px 14px;
-  border: none;
+  border: 1px solid transparent; /* открытый список — белая кнопка с рамкой, высота та же */
   border-radius: 12px;
   background: var(--accent);
   color: var(--on-accent);
@@ -22,9 +22,16 @@
   cursor: pointer;
 }
 
-.button:hover,
-.button[aria-expanded='true'] {
+.button:hover {
   background: var(--accent-hover);
+}
+
+/* Список открыт — белая, как открытый раздел в шапке («Задания», «РНО») */
+.button[aria-expanded='true'],
+.button[aria-expanded='true']:hover {
+  border-color: var(--accent);
+  background: #fff;
+  color: var(--accent-text);
 }
 
 .value {
@@ -35,6 +42,21 @@
 
 .chevron {
   opacity: 0.75;
+}
+
+/* Телефон: кнопка курса во всю ячейку сетки шапки, текст по центру */
+@media (max-width: 600px) {
+  .button {
+    justify-content: center;
+    width: 100%;
+    max-width: none;
+    min-height: 44px;
+  }
+
+  .menu {
+    right: 0;
+    max-width: none;
+  }
 }
 
 .menu {

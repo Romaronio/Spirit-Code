@@ -5,18 +5,6 @@
   color: var(--text);
 }
 
-.back {
-  display: inline-block;
-  margin-bottom: 16px;
-  color: var(--text);
-  font-weight: 600;
-  text-decoration: none;
-}
-
-.back:hover {
-  text-decoration: underline;
-}
-
 .title {
   margin-bottom: 4px;
 }

@@ -66,3 +66,15 @@ export function reorderedIds(items: Assignment[], topic: string, lessonId: numbe
   ids.splice(at === -1 ? ids.length : at, 0, lessonId)
   return ids
 }
+
+export const EXAMS_TOPIC = 'Пробники'
+
+// Папка по названию урока — как guess_topic на сервере (backend/api/topics.py); '' — не понятно
+export function guessTopic(title: string, isExam = false) {
+  const low = title.toLocaleLowerCase('ru')
+  if (isExam || low.includes('пробник')) return EXAMS_TOPIC
+  if (low.includes('повтор')) return 'Повторение'
+  if (low.includes('проверочн') || low.includes('контрольн')) return 'Проверочные'
+  const number = /^\s*(\d{1,2})\s*(?:-?е\s*)?задани/i.exec(title)
+  return number ? `№${Number(number[1])}` : ''
+}

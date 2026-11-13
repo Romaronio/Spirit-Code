@@ -16,17 +16,19 @@ export function TaskAnswerContent({ answer, taskKey, liveText }: { answer: Stude
   const files = (answer.files ?? []).filter((f) => f.task_key === taskKey)
   // Пока ученик печатает, результат проверки относится к старому ответу — не показываем
   const check = liveText === undefined ? answer.task_checks?.[taskKey] : undefined
+  // Отметку поставил учитель или куратор, а не автопроверка
+  const manual = liveText === undefined && answer.task_marks?.[taskKey] !== undefined
   return (
     <>
       {text.trim() ? (
         <p className={styles.answerText}>
           <span className={styles.answerLabel}>Ответ:</span> <strong>{text}</strong>
-          {check !== undefined && <> <CheckMark ok={check} /></>}
+          {check !== undefined && <> <CheckMark ok={check} manual={manual} /></>}
         </p>
       ) : (
-        check === false && (
+        check !== undefined && (
           <p className={styles.answerText}>
-            <CheckMark ok={false} label="краткого ответа нет" />
+            <CheckMark ok={check} manual={manual} label={manual ? undefined : 'краткого ответа нет'} />
           </p>
         )
       )}
@@ -53,9 +55,12 @@ export function TaskAnswerContent({ answer, taskKey, liveText }: { answer: Stude
 }
 
 // Результат автопроверки краткого ответа
-export function CheckMark({ ok, label }: { ok: boolean; label?: string }) {
+export function CheckMark({ ok, label, manual }: { ok: boolean; label?: string; manual?: boolean }) {
   return (
-    <span className={ok ? styles.checkOk : styles.checkBad}>{ok ? '✓ верно' : `✗ ${label ?? 'неверно'}`}</span>
+    <span className={ok ? styles.checkOk : styles.checkBad}>
+      {ok ? '✓ верно' : `✗ ${label ?? 'неверно'}`}
+      {manual && ' (отметка учителя)'}
+    </span>
   )
 }
 
@@ -125,6 +130,7 @@ interface TaskAnswerFormProps {
   taskKey: string
   shortOnly?: boolean // учитель просит только краткий ответ — без программы и файлов
   detailedRequired?: boolean // без программы или файла ДЗ не отправить
+  locked?: boolean // пробник закончен — ответ только посмотреть
   onSave: (task: string, text: string, files: File[], deleteFileIds: Array<number | string>) => Promise<void>
   // Текст по мере набора, ещё до сохранения (в созвоне — учителю вживую)
   onDraft?: (task: string, text: string) => void
@@ -137,7 +143,7 @@ type SaveState = 'idle' | 'saving' | 'saved' | 'error'
 
 // Ученику под заданием — ответ к этому заданию: текст и файлы.
 // Кнопки «Сохранить» нет: текст сохраняется после паузы в вводе, файлы — сразу
-export function TaskAnswerForm({ answer, taskKey, shortOnly, detailedRequired, onSave, onDraft }: TaskAnswerFormProps) {
+export function TaskAnswerForm({ answer, taskKey, shortOnly, detailedRequired, locked, onSave, onDraft }: TaskAnswerFormProps) {
   const [parts, setParts] = useState(() => splitTaskAnswer(answer?.task_answers?.[taskKey]))
   const text = joinTaskAnswer(parts)
   const [uploading, setUploading] = useState<FileEntry[]>([])
@@ -259,13 +265,19 @@ export function TaskAnswerForm({ answer, taskKey, shortOnly, detailedRequired, o
           className={styles.input}
           placeholder={shortOnly ? 'Только краткий ответ, например: 42' : 'Например: 42'}
           value={parts.answer}
+          readOnly={locked}
           onChange={(e) => handleChange({ answer: e.target.value })}
           onBlur={() => save().catch(() => {})}
         />
       </label>
       {showCheck && (
         <p className={check ? styles.checkResultOk : styles.checkResultBad}>
-          {check ? '✓ Ответ верный' : '✗ Ответ неверный — исправьте его и снова нажмите «Отправить ответ»'}
+          {answer?.task_marks?.[taskKey] !== undefined && 'Учитель проверил: '}
+          {check
+            ? '✓ Ответ верный'
+            : locked
+              ? '✗ Ответ неверный'
+              : '✗ Ответ неверный — исправьте его и снова нажмите «Отправить ответ»'}
         </p>
       )}
       {/* Только краткий ответ — без программы и файлов (так решил учитель) */}
@@ -281,16 +293,19 @@ export function TaskAnswerForm({ answer, taskKey, shortOnly, detailedRequired, o
               autoCapitalize="off"
               autoCorrect="off"
               value={parts.code}
+              readOnly={locked}
               onChange={(e) => handleChange({ code: e.target.value })}
               onKeyDown={handleCodeKeyDown}
               onBlur={() => save().catch(() => {})}
             />
           </label>
           <CodeRunner code={parts.code} />
-          <label className={styles.fileButton}>
-            📎 Прикрепить файлы
-            <input type="file" multiple accept={ACCEPT} className={styles.hiddenInput} onChange={handleFilesChange} />
-          </label>
+          {!locked && (
+            <label className={styles.fileButton}>
+              📎 Прикрепить файлы
+              <input type="file" multiple accept={ACCEPT} className={styles.hiddenInput} onChange={handleFilesChange} />
+            </label>
+          )}
         </>
       )}
       {(savedFiles.length > 0 || uploading.length > 0) && (
@@ -300,9 +315,11 @@ export function TaskAnswerForm({ answer, taskKey, shortOnly, detailedRequired, o
               <a className={styles.link} href={f.url} download={f.name}>
                 📎 {f.name}
               </a>
-              <button type="button" className={styles.linkButton} onClick={() => handleRemoveSaved(f.id)}>
-                Удалить
-              </button>
+              {!locked && (
+                <button type="button" className={styles.linkButton} onClick={() => handleRemoveSaved(f.id)}>
+                  Удалить
+                </button>
+              )}
             </li>
           ))}
           {uploading.map((f) => (
@@ -315,7 +332,9 @@ export function TaskAnswerForm({ answer, taskKey, shortOnly, detailedRequired, o
       )}
       {error && <p className={styles.error}>{error}</p>}
       <p className={styles.saveState}>
-        {saveState === 'saving'
+        {locked
+          ? 'Пробник сдан — ответ больше не меняется'
+          : saveState === 'saving'
           ? 'Сохранение…'
           : saveState === 'saved'
             ? '✓ Ответ сохранён'

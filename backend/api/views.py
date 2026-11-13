@@ -15,6 +15,7 @@ from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.views import APIView
 from .answer_check import snapshot_answers
+from .exam import exam_over, finish_exam, is_exam
 from .models import MAX_LATEX_LENGTH, Account, AnswerComment, Assignment, AuthToken, Call, CallAnswer, CallAnswerFile, DataVersion, LessonFile, PushSubscription, Subject, Homework, HomeworkFile, Payment, StudentHomework, StudentHomeworkFile, TypingResult
 from . import livekit, push
 from .parent import new_parent_token
@@ -276,7 +277,7 @@ class AssignmentViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         if self.action in ('list', 'retrieve'):
             return [IsAuthenticated()]
-        if self.action in ('submit', 'submit_task'):
+        if self.action in ('submit', 'submit_task', 'start_exam', 'finish_exam'):
             return [IsStudent()]
         return [IsTeacher()]
 
@@ -448,6 +449,8 @@ class AssignmentViewSet(viewsets.ModelViewSet):
     def submit(self, request, pk=None):
         """Отправка ответа учеником по заданию (всегда от имени вошедшего ученика)"""
         assignment = self.get_object()  # чужой предмет → 404
+        if is_exam(assignment):  # в пробнике «Отправить» — это «Завершить пробник»
+            return self.finish_exam(request, pk)
         files = request.FILES.getlist('files')
 
         # Учитель отметил номера, где развёрнутый ответ обязателен, — без него ДЗ не отправить
@@ -538,34 +541,86 @@ class AssignmentViewSet(viewsets.ModelViewSet):
             assignment=assignment,
             student=request.user,
         )
+        if is_exam(assignment):
+            if not sh.exam_started_at:
+                raise ValidationError({'detail': ['Сначала нажмите «Начать пробник»']})
+            if exam_over(sh, grace=True):
+                raise ValidationError({'detail': ['Пробник закончен — ответы больше не меняются']})
         answers = dict(sh.task_answers or {})
+        changed = answers.get(task, '') != text or bool(files) or bool(delete_ids)
         if text:
             answers[task] = text
         else:
             answers.pop(task, None)
         sh.task_answers = answers
+        fields = ['task_answers']
+        # Отметка учителя к заданию относилась к прежнему ответу — снимаем
+        if changed and task in (sh.task_marks or {}):
+            sh.task_marks = {k: v for k, v in sh.task_marks.items() if k != task}
+            fields.append('task_marks')
         if task == 'classwork' or task.startswith('cw-'):
             # Классную работу можно не решать, учитель её не проверяет — отметка урока остаётся
-            sh.save(update_fields=['task_answers'])
+            sh.save(update_fields=fields)
         else:
             # Ответ к ДЗ изменился — учителю нужно проверить его заново
             sh.status = 'pending'
             sh.checked_at = None
-            sh.save(update_fields=['task_answers', 'status', 'checked_at'])
+            sh.save(update_fields=fields + ['status', 'checked_at'])
 
         StudentHomeworkFile.objects.filter(id__in=delete_ids).delete()
         for f in files:
             StudentHomeworkFile.objects.create(student_homework=sh, name=f.name, file=f, task_key=task)
         mark_active(request.user)
 
-        # Ученик стёр всё, что написал, — пустой ответ учителю проверять нечего
-        if _is_empty_answer(sh):
+        # Ученик стёр всё, что написал, — пустой ответ учителю проверять нечего.
+        # В пробнике работу не удаляем: в ней записано, когда ученик начал
+        if not is_exam(assignment) and _is_empty_answer(sh):
             sh.delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
 
         sh.refresh_from_db()
         serializer = StudentHomeworkSerializer(sh, context=self.get_serializer_context())
         return Response(serializer.data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+
+
+    @action(detail=True, methods=['post'], url_path='start-exam')
+    @transaction.atomic
+    def start_exam(self, request, pk=None):
+        """Ученик начинает пробник: с этого момента идёт его время. Повторное нажатие время не сбрасывает"""
+        assignment = self.get_object()
+        if not is_exam(assignment):
+            raise ValidationError({'detail': ['Этот урок — не пробник']})
+        sh, created = StudentHomework.objects.select_for_update().get_or_create(
+            assignment=assignment,
+            student=request.user,
+        )
+        if not sh.exam_started_at:
+            sh.exam_started_at = timezone.now()
+            sh.status = 'pending'
+            sh.checked_at = None
+            sh.save(update_fields=['exam_started_at', 'status', 'checked_at'])
+        mark_active(request.user)
+        serializer = StudentHomeworkSerializer(sh, context=self.get_serializer_context())
+        return Response(serializer.data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'], url_path='finish-exam')
+    @transaction.atomic
+    def finish_exam(self, request, pk=None):
+        """Ученик сдаёт пробник (или время вышло): ответы больше не меняются, виден результат"""
+        assignment = self.get_object()
+        if not is_exam(assignment):
+            raise ValidationError({'detail': ['Этот урок — не пробник']})
+        sh = StudentHomework.objects.select_for_update().filter(assignment=assignment, student=request.user).first()
+        if sh is None or not sh.exam_started_at:
+            raise ValidationError({'detail': ['Пробник ещё не начат']})
+        if not sh.exam_finished_at:
+            finish_exam(sh)
+            # Сданные краткие ответы — по ним работает папка «Работа над ошибками»
+            sh.submitted_answers = snapshot_answers(sh)
+            sh.save(update_fields=['submitted_answers'])
+        sh.refresh_from_db()
+        serializer = StudentHomeworkSerializer(sh, context=self.get_serializer_context())
+        return Response(serializer.data)
 
 
 class LessonFileViewSet(viewsets.ModelViewSet):
@@ -642,6 +697,26 @@ class StudentHomeworkViewSet(viewsets.ModelViewSet):
         sh.status = new_status
         sh.checked_at = None if new_status == 'pending' else timezone.now()
         sh.save(update_fields=['status', 'checked_at'])
+        return Response(self.get_serializer(sh).data)
+
+    @action(detail=True, methods=['post'], url_path='mark-task')
+    def mark_task(self, request, pk=None):
+        """Отметка учителя/куратора к одному заданию: {task: 'hw-5', mark: true | false | null}.
+        true — верно, false — неверно, null — снять отметку (снова решает автопроверка)"""
+        sh = self.get_object()
+        task = str(request.data.get('task', ''))
+        if task not in _task_keys(sh.assignment):
+            raise ValidationError({'task': ['Такого задания нет в уроке']})
+        mark = request.data.get('mark')
+        if mark not in (True, False, None):
+            raise ValidationError({'mark': ['Отметка: true, false или null']})
+        marks = dict(sh.task_marks or {})
+        if mark is None:
+            marks.pop(task, None)
+        else:
+            marks[task] = mark
+        sh.task_marks = marks
+        sh.save(update_fields=['task_marks'])
         return Response(self.get_serializer(sh).data)
 
 

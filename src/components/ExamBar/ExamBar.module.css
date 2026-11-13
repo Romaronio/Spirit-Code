@@ -1,0 +1,142 @@
+.bar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 12px 0;
+  padding: 14px 16px;
+  border: 1px solid var(--accent-line);
+  border-radius: 14px;
+  background: var(--accent-soft);
+}
+
+/* Идёт пробник — таймер всегда на виду при прокрутке */
+.running {
+  position: sticky;
+  top: 8px;
+  z-index: 5;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: var(--shadow);
+}
+
+.urgent {
+  border-color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.done {
+  border-color: var(--line);
+  background: var(--success-soft);
+}
+
+.title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.text {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.score {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.timerRow {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.timer {
+  font-family: var(--font-mono);
+  font-size: 26px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.urgent .timer {
+  color: var(--danger);
+}
+
+.primary,
+.secondary {
+  align-self: flex-start;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.primary {
+  border: none;
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.primary:hover {
+  background: var(--accent-hover);
+}
+
+.secondary {
+  border: 1px solid var(--accent-line);
+  background: var(--inset);
+  color: var(--text);
+}
+
+.primary:disabled,
+.secondary:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.error {
+  margin: 0;
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.settings {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  margin: 6px 0;
+}
+
+.settingsLabel {
+  font-weight: 600;
+}
+
+.minutes {
+  width: 80px;
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--inset);
+  color: var(--text);
+  font: inherit;
+}
+
+.hint {
+  color: var(--faint);
+  font-size: 13px;
+}
+
+.select {
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--inset);
+  color: var(--text);
+  font: inherit;
+  font-weight: 400;
+}

@@ -154,3 +154,45 @@
   cursor: pointer;
   font-size: 14px;
 }
+
+/* Что добавляем: урок или пробник */
+.kind {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--inset);
+}
+
+.kindOption,
+.kindActive {
+  flex: 1;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 7px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.kindOption {
+  background: none;
+  color: var(--muted);
+}
+
+.kindOption:hover {
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+.kindActive {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.hint {
+  color: var(--faint);
+  font-size: 13px;
+  font-weight: 400;
+}

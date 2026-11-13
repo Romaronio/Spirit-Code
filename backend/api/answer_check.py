@@ -71,23 +71,44 @@ def expected_answers(assignment):
     return result
 
 
+def task_marks(sh):
+    """Отметки учителя/куратора по заданиям: {'hw-5': True}"""
+    return {key: bool(ok) for key, ok in (sh.task_marks or {}).items() if ok is not None}
+
+
 def task_checks(sh, for_teacher):
-    """Результаты автопроверки: {'hw-5': True, 'hw-6': False}.
+    """Результаты проверки: {'hw-5': True, 'hw-6': False}.
     Учитель видит проверку всех номеров с верным ответом по текущим ответам ученика (нет ответа — False).
-    Ученик — только по номерам, которые он отправил кнопкой «Отправить ответ» и с тех пор не менял"""
+    Ученик — только по номерам, которые он отправил кнопкой «Отправить ответ» и с тех пор не менял.
+    Отметка учителя/куратора к заданию важнее автопроверки и видна обоим"""
     expected = expected_answers(sh.assignment)
     answers = sh.task_answers or {}
     if for_teacher:
-        return {key: answers_match(short_answer(answers.get(key)), correct) for key, correct in expected.items()}
-    submitted = sh.submitted_answers or {}
-    result = {}
-    for key, correct in expected.items():
-        current = short_answer(answers.get(key))
-        if key in submitted and current and submitted[key] == current:
-            result[key] = answers_match(current, correct)
+        result = {key: answers_match(short_answer(answers.get(key)), correct) for key, correct in expected.items()}
+    else:
+        submitted = sh.submitted_answers or {}
+        result = {}
+        for key, correct in expected.items():
+            current = short_answer(answers.get(key))
+            if key in submitted and current and submitted[key] == current:
+                result[key] = answers_match(current, correct)
+    result.update(task_marks(sh))
     return result
 
 
 def snapshot_answers(sh):
     """Краткие ответы на момент «Отправить ответ» — по ним ученик видит результат проверки"""
     return {key: short for key, text in (sh.task_answers or {}).items() if (short := short_answer(text))}
+
+
+def wrong_tasks(sh):
+    """Номера для «Работы над ошибками»: краткий ответ отправлен кнопкой «Отправить ответ» и неверен,
+    или учитель/куратор отметил задание неверным. Номер уходит отсюда, когда ученик отправит верный
+    ответ (правка без отправки не считается) или учитель отметит его верным"""
+    submitted = sh.submitted_answers or {}
+    marks = task_marks(sh)
+    wrong = [
+        key for key, correct in expected_answers(sh.assignment).items()
+        if key not in marks and key in submitted and not answers_match(submitted[key], correct)
+    ]
+    return wrong + [key for key, ok in marks.items() if not ok]

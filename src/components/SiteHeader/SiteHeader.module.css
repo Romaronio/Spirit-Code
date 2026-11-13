@@ -1,0 +1,215 @@
+/* Шапка во всю ширину: логотип, навигация, «Выйти» */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  border-bottom: 1px solid var(--line);
+  background: rgba(241, 232, 218, 0.85);
+  backdrop-filter: blur(16px);
+}
+
+.topbarInner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 32px;
+  padding: 14px 48px; /* по краям как у содержимого страницы */
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.logoMark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--text);
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 14px;
+}
+
+.nav {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.navLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border: 1px solid transparent; /* у белой кнопки рамка — высота у всех одна */
+  border-radius: 12px;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.navLink:hover {
+  color: var(--text);
+  background: var(--surface-2);
+}
+
+/* Открытый раздел — белая кнопка с оранжевой рамкой; остальные кнопки шапки — оранжевые */
+.navActive,
+.navActive:hover {
+  border: 1px solid var(--accent);
+  background: #fff;
+  color: var(--accent-text);
+}
+
+/* «База уроков» и «Тренажёр печати» — оранжевые кнопки */
+.navAccent {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.navAccent:hover {
+  background: var(--accent-hover);
+  color: var(--on-accent);
+}
+
+/* «РНО» у ученика — оранжевая, как «Тренажёр печати»; открыта — белая (.navActive) */
+.mistakesButton {
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.mistakesButton:hover {
+  border-color: var(--accent-hover);
+  background: var(--accent-hover);
+  color: var(--on-accent);
+}
+
+/* Открытая РНО — белая, как открытый раздел */
+.mistakesButton.navActive,
+.mistakesButton.navActive:hover {
+  border-color: var(--accent);
+  background: #fff;
+  color: var(--accent-text);
+}
+
+.mistakesCount,
+.mistakesZero {
+  min-width: 22px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 12px;
+  text-align: center;
+}
+
+.mistakesCount {
+  background: var(--danger);
+  color: #fff;
+}
+
+.mistakesZero {
+  background: var(--surface-2);
+  color: var(--muted);
+}
+
+/* «Установить приложение» — рядом с «Выйти», без заливки, чтобы не спорить с ней */
+.install {
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--text);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.install:hover {
+  background: var(--text);
+  color: var(--surface);
+}
+
+.logout {
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--accent);
+  border-radius: 12px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.logout:hover {
+  border-color: var(--accent-hover);
+  background: var(--accent-hover);
+}
+
+@media (max-width: 600px) {
+  /* Телефон: сверху логотип и «Выйти», ниже — кнопки ровной сеткой по 2 в ряд */
+  .topbarInner {
+    gap: 12px;
+    padding: 12px 16px;
+  }
+
+  .logo {
+    flex: 1 1 auto;
+  }
+
+  .logout {
+    order: 1;
+    min-height: 38px;
+    padding: 0 14px;
+    border-color: var(--line);
+    background: var(--surface);
+    color: var(--text);
+  }
+
+  .logout:hover {
+    border-color: var(--accent);
+    background: var(--surface);
+  }
+
+  .install {
+    order: 2;
+    width: 100%;
+  }
+
+  .nav {
+    order: 3;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .navLink {
+    justify-content: center;
+    min-height: 44px;
+    padding: 10px 8px;
+  }
+
+  /* Нечётная последняя кнопка (обычно выбор курса) — на всю ширину */
+  .nav > :last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+}

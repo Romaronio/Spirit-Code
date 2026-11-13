@@ -7,16 +7,20 @@ import re
 
 REVIEW = 'Повторение'
 TESTS = 'Проверочные'
+EXAMS = 'Пробники'
 MAX_TOPIC_LENGTH = 60
 
 _NUMBER = re.compile(r'^\s*(\d{1,2})\s*(?:-?е\s*)?задани', re.IGNORECASE)
 _LESSON = re.compile(r'урок\s*(\d{1,3})', re.IGNORECASE)
 
 
-def guess_topic(title):
-    """Тема по названию урока; '' — не понятно (урок попадёт в «Без темы»)"""
+def guess_topic(title, is_exam=False):
+    """Тема по названию урока; '' — не понятно (урок попадёт в «Без темы»).
+    Пробник (урок с таймером или «пробник» в названии) — всегда в «Пробники»"""
     title = title or ''
     low = title.casefold()
+    if is_exam or 'пробник' in low:
+        return EXAMS
     if 'повтор' in low:
         return REVIEW
     if 'проверочн' in low or 'контрольн' in low:

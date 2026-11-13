@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link, Navigate, useParams } from 'react-router-dom'
+import { Link, Navigate, useParams, useSearchParams } from 'react-router-dom'
 import styles from './AssignmentPage.module.css'
 import panel from '../../components/AnswersPanel/AnswersPanel.module.css'
 import * as api from '../../services/api'
 import { lessonForSubjects, normalize } from '../../utils/subjects'
 import { awaitsReview } from '../../utils/studentStats'
 import type { Account, Assignment, AssignmentChanges, CommentActions, NumberedTask, ReviewStatus, StudentHomework, User } from '../../types'
-import { ReviewButtons, StatusBadge } from '../../components/AnswerStatus/AnswerStatus'
+import { ReviewButtons, StatusBadge, TaskMarkButtons } from '../../components/AnswerStatus/AnswerStatus'
 import CommentThread from '../../components/CommentThread/CommentThread'
 import { TaskAnswerContent, TaskAnswerForm, TaskAnswersList } from '../../components/TaskAnswers/TaskAnswers'
 import { answerKeyTitle, hasDetailedAnswer, hasTaskAnswer } from '../../utils/lessonTasks'
@@ -18,6 +18,8 @@ import LatexEditor from '../../components/LatexEditor/LatexEditor'
 import NumberedTasksEditor from '../../components/NumberedTasksEditor/NumberedTasksEditor'
 import TasksViewer from '../../components/TasksViewer/TasksViewer'
 import { canReview } from '../../utils/roles'
+import { ExamBar, ExamSettings } from '../../components/ExamBar/ExamBar'
+import { formatMinutes } from '../../utils/examTime'
 
 const MAX_TITLE_LENGTH = 255 // как Assignment.title на сервере
 
@@ -27,6 +29,13 @@ type TasksKey = number | 'classwork' | 'homework' | `hw-${number}`
 // Ключ задания в ответе ученика (StudentHomework.task_answers): номер классной работы — 'cw-5'
 function answerKey(key: TasksKey): string {
   return typeof key === 'number' ? `cw-${key}` : key
+}
+
+// Обратно: ключ ответа ('cw-5', 'hw-3', 'classwork') — что открыть в панели. Для ссылок вида ?task=cw-5
+function tasksKeyOf(key: string | null): TasksKey | null {
+  const m = key ? /^(cw|hw)-(\d+)$/.exec(key) : null
+  if (m) return m[1] === 'cw' ? Number(m[2]) : `hw-${Number(m[2])}`
+  return key === 'classwork' || key === 'homework' ? key : null
 }
 
 interface PageProps {
@@ -124,7 +133,9 @@ function AssignmentDetails({ assignment, user, studentId, students, onUpdate, on
 
   // Какие задания открыты в панели: по номеру, классной работы без номера или домашние
   // Номера ДЗ — ключи вида 'hw-5', чтобы не путать с номерами классной работы
-  const [openTasks, setOpenTasks] = useState<TasksKey | null>(null)
+  // Ссылка ?task=hw-5 (например, из «Работы над ошибками») сразу открывает этот номер
+  const [searchParams] = useSearchParams()
+  const [openTasks, setOpenTasks] = useState<TasksKey | null>(() => tasksKeyOf(searchParams.get('task')))
   // Номер виден ученику, если у него есть LaTeX или файлы для выполнения
   const lessonFiles = assignment.files ?? []
   const homeworkFilesSaved = assignment.homework?.files ?? []
@@ -176,6 +187,10 @@ function AssignmentDetails({ assignment, user, studentId, students, onUpdate, on
   const myAnswer = assignment.student_homeworks?.find((sh) => sh.student === studentId)
   const [submitError, setSubmitError] = useState('')
   const [submitSuccess, setSubmitSuccess] = useState(false)
+  // Пробник: у ученика «Отправить ответ» заменяет «Завершить» в плашке с таймером,
+  // после окончания ответы не меняются
+  const isExam = Boolean(assignment.exam_minutes)
+  const examLocked = isExam && Boolean(myAnswer?.exam_over)
 
   // Порядок заданий в ответах учеников у учителя — как у кнопок заданий
   const answerOrder = [...classworkOrder, ...homeworkOrder].map(answerKey)
@@ -219,7 +234,8 @@ function AssignmentDetails({ assignment, user, studentId, students, onUpdate, on
         answer={myAnswer}
         taskKey={answerKey(key)}
         shortOnly={isShortOnly(key)}
-        detailedRequired={isDetailedRequired(key)}
+        detailedRequired={isDetailedRequired(key) && !isExam}
+        locked={examLocked}
         onSave={handleSaveTaskAnswer}
       />
     ) : isReviewer ? (
@@ -373,6 +389,21 @@ function AssignmentDetails({ assignment, user, studentId, students, onUpdate, on
             assignment.lesson_date && <p className={styles.deadline}>День занятия: {formatDay(assignment.lesson_date)}</p>
           )}
           {assignment.deadline && <p className={styles.deadline}>Сдать до: {assignment.deadline}</p>}
+          {canEdit ? (
+            <ExamSettings
+              assignment={assignment}
+              onSave={(changes) => onUpdate(assignment.id!, changes)}
+            />
+          ) : isReviewer && assignment.exam_minutes ? (
+            <p className={styles.deadline}>⏱ Пробник · {formatMinutes(assignment.exam_minutes)}</p>
+          ) : null}
+          {user.role === 'student' && (
+            <ExamBar
+              assignment={assignment}
+              answer={myAnswer}
+              onChanged={() => onSubmitStudentHomework?.(assignment.id!)}
+            />
+          )}
 
           {/* «Ответы учеников» — у учителя сразу под названием урока; ответ открывается справа */}
           {isReviewer && (
@@ -717,7 +748,7 @@ function AssignmentDetails({ assignment, user, studentId, students, onUpdate, on
               )}
               {submitSuccess && <p className={styles.success}>Ответ сохранён!</p>}
               {submitError && <p className={styles.error}>{submitError}</p>}
-              {missingDetailed.length > 0 && (
+              {!isExam && missingDetailed.length > 0 && (
                 <div className={styles.missingDetailed} role="alert">
                   <p>
                     У вас не прикреплён развёрнутый ответ к{' '}
@@ -736,16 +767,18 @@ function AssignmentDetails({ assignment, user, studentId, students, onUpdate, on
                   </p>
                 </div>
               )}
-              <div className={styles.actions}>
-                <button
-                  type="button"
-                  className={styles.primary}
-                  onClick={handleSubmitAnswer}
-                  disabled={isSubmitting || missingDetailed.length > 0}
-                >
-                  {isSubmitting ? 'Отправка...' : 'Отправить ответ'}
-                </button>
-              </div>
+              {!isExam && (
+                <div className={styles.actions}>
+                  <button
+                    type="button"
+                    className={styles.primary}
+                    onClick={handleSubmitAnswer}
+                    disabled={isSubmitting || missingDetailed.length > 0}
+                  >
+                    {isSubmitting ? 'Отправка...' : 'Отправить ответ'}
+                  </button>
+                </div>
+              )}
             </section>
           )}
         </div>
@@ -759,6 +792,7 @@ function AssignmentDetails({ assignment, user, studentId, students, onUpdate, on
             correctAnswer={correctAnswer}
             currentUserId={user.id}
             onReview={onReview}
+            onRefresh={onSubmitStudentHomework}
             commentActions={commentActions}
             onOpen={openAnswer}
             onClose={closeAnswer}
@@ -1080,6 +1114,7 @@ interface StudentAnswerPanelProps {
   correctAnswer: (key: string) => string | undefined
   currentUserId?: number
   onReview?: (assignmentId: number, answerId: number, status: ReviewStatus) => Promise<void>
+  onRefresh?: (assignmentId: number) => Promise<void> | void // перечитать урок после отметки задания
   commentActions?: CommentActions
   onOpen: (studentId: number) => void
   onClose: () => void
@@ -1090,7 +1125,7 @@ interface StudentAnswerPanelProps {
 // «Следующий ученик» открывает ответ следующего приславшего, а в фильтре «Ждут проверки» —
 // следующего непроверенного: отметили ответ — ученик уходит из списка, кнопка ведёт к первому оставшемуся
 function StudentAnswerPanel({
-  assignment, students, studentId, answerOrder, correctAnswer, currentUserId, onReview, commentActions, onOpen, onClose, filter,
+  assignment, students, studentId, answerOrder, correctAnswer, currentUserId, onReview, onRefresh, commentActions, onOpen, onClose, filter,
 }: StudentAnswerPanelProps) {
   const [chatOf, setChatOf] = useState<number | null>(null) // у какого ученика раскрыта переписка
   const isChatOpen = chatOf === studentId
@@ -1131,9 +1166,20 @@ function StudentAnswerPanel({
             <p className={panel.empty}>Без описания</p>
           )}
 
+          {sh.exam_started_at && (
+            <p className={panel.date}>
+              ⏱ Пробник: начал(а) {formatAnswerDate(sh.exam_started_at)}
+              {sh.exam_finished_at
+                ? `, сдал(а) ${formatAnswerDate(sh.exam_finished_at)}`
+                : sh.exam_over
+                  ? ', время вышло'
+                  : ', ещё решает'}
+            </p>
+          )}
+
           {sh.task_checks && Object.keys(sh.task_checks).length > 0 && (
             <p className={styles.autoCheck}>
-              Автопроверка: верно {Object.values(sh.task_checks).filter(Boolean).length} из{' '}
+              Проверка: верно {Object.values(sh.task_checks).filter(Boolean).length} из{' '}
               {Object.keys(sh.task_checks).length}
             </p>
           )}
@@ -1149,6 +1195,15 @@ function StudentAnswerPanel({
                       <span className={styles.taskAnswerCorrect}> · верный ответ: {correctAnswer(key)}</span>
                     )}
                     <TaskAnswerContent answer={sh} taskKey={key} />
+                    {onReview && (
+                      <TaskMarkButtons
+                        mark={sh.task_marks?.[key]}
+                        onChange={async (mark) => {
+                          await api.markTask(sh.id!, key, mark)
+                          await onRefresh?.(assignment.id!)
+                        }}
+                      />
+                    )}
                   </li>
                 ))}
             </ul>

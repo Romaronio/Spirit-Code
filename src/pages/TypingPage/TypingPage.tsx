@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link, Navigate } from 'react-router-dom'
+import { Navigate } from 'react-router-dom'
 import styles from './TypingPage.module.css'
 import type { TypingResult, TypingStats, User } from '../../types'
 import * as api from '../../services/api'
@@ -8,9 +8,11 @@ import TypingHistory from '../../components/TypingHistory/TypingHistory'
 import TypingResultsPanel from '../../components/TypingResultsPanel/TypingResultsPanel'
 import Celebration from '../../components/Celebration/Celebration'
 import { canReview } from '../../utils/roles'
+import SiteHeader from '../../components/SiteHeader/SiteHeader'
 
 interface Props {
   user: User | null
+  onLogout: () => void
 }
 
 type SaveState =
@@ -18,7 +20,7 @@ type SaveState =
   | { kind: 'saved'; result: TypingResult; previousBest: number | null }
   | { kind: 'error'; message: string }
 
-function TypingPage({ user }: Props) {
+function TypingPage({ user, onLogout }: Props) {
   const isTeacher = canReview(user?.role) // учитель и куратор видят результаты учеников
   const [history, setHistory] = useState<TypingResult[] | null>(null)
   const [saveState, setSaveState] = useState<SaveState | null>(null)
@@ -86,11 +88,10 @@ function TypingPage({ user }: Props) {
   const best = history && history.length > 0 ? Math.max(...history.map((r) => r.wpm)) : null
 
   return (
+    <>
+    <SiteHeader user={user} current="typing" onLogout={onLogout} />
     <div className={styles.page}>
       {celebration > 0 && <Celebration key={celebration} onDone={() => setCelebration(0)} />}
-      <Link to="/home" className={styles.back}>
-        ← На главную
-      </Link>
       <h1 className={styles.title}>Тренажёр печати</h1>
       <p className={styles.subtitle}>
         Печатайте слова и нажимайте пробел после каждого. Опечатку можно исправить до пробела — ошибкой считается только слово, отправленное с ошибкой. В «ЕГЭ сложный» набираются целые строки кода: строку отправляет Enter, а слово для скорости — 5 знаков.
@@ -112,6 +113,7 @@ function TypingPage({ user }: Props) {
         )}
       </div>
     </div>
+    </>
   )
 }
 

@@ -64,3 +64,54 @@ export function ReviewButtons({ status = 'pending', onChange }: ReviewProps) {
     </div>
   )
 }
+
+// Отметка учителя/куратора к одному заданию: верно / неверно. Повторное нажатие снимает отметку —
+// тогда снова действует автопроверка
+export function TaskMarkButtons({
+  mark,
+  onChange,
+}: {
+  mark?: boolean
+  onChange: (mark: boolean | null) => Promise<void>
+}) {
+  const [isSaving, setIsSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  async function handleClick(value: boolean) {
+    setIsSaving(true)
+    setError('')
+    try {
+      await onChange(mark === value ? null : value)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Не удалось сохранить отметку')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  return (
+    <div className={styles.review}>
+      <button
+        type="button"
+        className={`${styles.button} ${styles.small} ${mark === true ? styles.accepted : ''}`}
+        onClick={() => handleClick(true)}
+        disabled={isSaving}
+        aria-pressed={mark === true}
+        title="Отметить задание верным"
+      >
+        ✓ верно
+      </button>
+      <button
+        type="button"
+        className={`${styles.button} ${styles.small} ${mark === false ? styles.rejected : ''}`}
+        onClick={() => handleClick(false)}
+        disabled={isSaving}
+        aria-pressed={mark === false}
+        title="Отметить задание неверным"
+      >
+        ✗ неверно
+      </button>
+      {error && <span className={styles.error}>{error}</span>}
+    </div>
+  )
+}

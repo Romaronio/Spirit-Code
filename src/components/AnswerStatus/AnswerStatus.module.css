@@ -63,3 +63,9 @@
   color: var(--danger);
   font-size: 13px;
 }
+
+/* Отметка к одному заданию — кнопки поменьше */
+.small {
+  padding: 2px 8px;
+  font-size: 12px;
+}

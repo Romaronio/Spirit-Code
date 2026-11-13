@@ -1,9 +1,10 @@
 from rest_framework import serializers
-from .answer_check import task_checks
+from .answer_check import task_checks, task_marks, wrong_tasks
+from .exam import exam_deadline, exam_over, hide_exam_tasks, is_exam, results_visible
 from .media import signed_url
 from .models import MAX_LATEX_LENGTH, MAX_TOTAL_LATEX_LENGTH, Account, AnswerComment, Assignment, Call, CallAnswer, CallAnswerFile, Subject, LessonFile, Homework, HomeworkFile, Payment, StudentHomework, StudentHomeworkFile, TikzFigure, TypingResult
 from .tikz import assignment_sources, source_key
-from .topics import clean_topic, guess_topic, next_position
+from .topics import EXAMS, clean_topic, guess_topic, next_position
 
 MIN_PASSWORD_LENGTH = 5
 
@@ -257,19 +258,50 @@ class StudentHomeworkSerializer(serializers.ModelSerializer):
     comments = AnswerCommentSerializer(many=True, read_only=True)
     student_name = serializers.CharField(source='student.name', read_only=True)
     task_checks = serializers.SerializerMethodField()
+    # Отметки учителя/куратора по заданиям (в task_checks они уже учтены): {'hw-5': True}
+    task_marks = serializers.SerializerMethodField()
+    # Номера с неверным отправленным кратким ответом — для папки «Работа над ошибками» у ученика
+    wrong_tasks = serializers.SerializerMethodField()
+    # Пробник: когда заканчивается время у ученика и закончен ли он (сдал или время вышло)
+    exam_deadline = serializers.SerializerMethodField()
+    exam_over = serializers.SerializerMethodField()
 
     class Meta:
         model = StudentHomework
         fields = [
             'id', 'assignment', 'student', 'student_name', 'description', 'task_answers', 'task_checks',
-            'files', 'submitted_at', 'status', 'checked_at', 'comments',
+            'task_marks', 'wrong_tasks', 'files', 'submitted_at', 'status', 'checked_at', 'comments',
+            'exam_started_at', 'exam_finished_at', 'exam_deadline', 'exam_over',
         ]
-        read_only_fields = ['status', 'checked_at', 'task_answers']
+        read_only_fields = ['status', 'checked_at', 'task_answers', 'exam_started_at', 'exam_finished_at']
 
     def get_task_checks(self, obj):
-        """Автопроверка кратких ответов: {'hw-5': True, 'hw-6': False}"""
+        """Автопроверка кратких ответов: {'hw-5': True, 'hw-6': False}.
+        В пробнике ученик ничего не видит, пока не закончит, а после — проверку всех номеров"""
         user = getattr(self.context.get('request'), 'user', None)
-        return task_checks(obj, for_teacher=getattr(user, 'can_review', False))
+        for_teacher = getattr(user, 'can_review', False)
+        if not for_teacher and is_exam(obj.assignment):
+            return task_checks(obj, for_teacher=True) if results_visible(obj) else {}
+        return task_checks(obj, for_teacher=for_teacher)
+
+    def get_task_marks(self, obj):
+        user = getattr(self.context.get('request'), 'user', None)
+        if not getattr(user, 'can_review', False) and is_exam(obj.assignment) and not results_visible(obj):
+            return {}
+        return task_marks(obj)
+
+    def get_exam_deadline(self, obj):
+        deadline = exam_deadline(obj)
+        return deadline.isoformat() if deadline else None
+
+    def get_exam_over(self, obj):
+        return exam_over(obj)
+
+    def get_wrong_tasks(self, obj):
+        # Пробник: после окончания — все нерешённые номера, до окончания — ничего
+        if is_exam(obj.assignment):
+            return [key for key, ok in task_checks(obj, for_teacher=True).items() if not ok] if results_visible(obj) else []
+        return wrong_tasks(obj)
 
 
 class StudentHomeworkCreateSerializer(serializers.ModelSerializer):
@@ -291,7 +323,7 @@ class AssignmentSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'title', 'subject', 'extra_subjects', 'deadline', 'lesson_date',
             'recording_url', 'numbered_tasks', 'tasks_latex', 'files', 'homework',
-            'student_homeworks', 'figures', 'topic', 'position', 'created_at', 'updated_at'
+            'student_homeworks', 'figures', 'topic', 'position', 'exam_minutes', 'exam_results', 'created_at', 'updated_at'
         ]
         read_only_fields = ['position']  # порядок меняется через /api/assignments/reorder/
 
@@ -304,12 +336,17 @@ class AssignmentSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         # Тема не выбрана — угадываем по названию; новый урок встаёт в конец темы
-        topic = validated_data.get('topic') or guess_topic(validated_data.get('title'))
+        topic = validated_data.get('topic') or guess_topic(
+            validated_data.get('title'), is_exam=bool(validated_data.get('exam_minutes'))
+        )
         validated_data['topic'] = topic
         validated_data['position'] = next_position(topic)
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
+        # Урок сделали пробником, а папки у него нет — кладём в «Пробники»
+        if validated_data.get('exam_minutes') and not validated_data.get('topic', instance.topic):
+            validated_data['topic'] = EXAMS
         if 'topic' in validated_data and validated_data['topic'] != instance.topic:
             validated_data['position'] = next_position(validated_data['topic'])
         return super().update(instance, validated_data)
@@ -337,7 +374,17 @@ class AssignmentSerializer(serializers.ModelSerializer):
             data['numbered_tasks'] = without_answers(data.get('numbered_tasks'))
             if data.get('homework'):
                 data['homework']['numbered_tasks'] = without_answers(data['homework'].get('numbered_tasks'))
+            # Пробник: задания видны только после «Начать пробник»
+            if is_exam(instance):
+                mine = next((sh for sh in instance.student_homeworks.all() if sh.student_id == getattr(user, 'id', None)), None)
+                if mine is None or not mine.exam_started_at:
+                    hide_exam_tasks(data)
         return data
+
+    def validate_exam_minutes(self, value):
+        if value is not None and not 1 <= value <= 600:
+            raise serializers.ValidationError('Время пробника — от 1 до 600 минут')
+        return value or None
 
     def get_figures(self, obj):
         """Рисунки TikZ заданий; страница находит свой рисунок по его тексту (source).

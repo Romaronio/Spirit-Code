@@ -73,12 +73,22 @@ export interface StudentHomework {
   // 'classwork' / 'homework' — задания без номера
   task_answers?: Record<string, string>
   task_checks?: Record<string, boolean> // автопроверка кратких ответов: true — верно (учителю — всегда, ученику — после отправки)
+  task_marks?: Record<string, boolean> // отметки учителя/куратора по заданиям — уже учтены в task_checks
+  wrong_tasks?: string[] // номера с неверным отправленным кратким ответом — кнопка «🔁 Ошибки» у ученика
   files?: StudentHomeworkFile[]
   submitted_at?: string
   status?: ReviewStatus // отметка учителя после проверки
   checked_at?: string | null
   comments?: AnswerComment[]
+  // Пробник: когда ученик начал и сдал, когда у него кончается время, закончен ли (сдал или время вышло)
+  exam_started_at?: string | null
+  exam_finished_at?: string | null
+  exam_deadline?: string | null
+  exam_over?: boolean
 }
+
+// Пробник: ответы видны сразу после сдачи или только после отметки учителя/куратора
+export type ExamResults = 'finish' | 'review'
 
 export interface Assignment {
   id?: number
@@ -96,6 +106,9 @@ export interface Assignment {
   figures?: TikzFigure[] // рисунки TikZ из заданий, их собирает сервер
   topic?: string // папка-тема внутри курса: «№26», «Повторение»; '' — без темы
   position?: number // место в теме, меньше — выше
+  exam_minutes?: number | null // пробник: время на работу в минутах; null — обычный урок
+  exam_results?: ExamResults // когда ученик видит ✓/✗ в пробнике
+  exam_task_count?: number // пробник не начат: заданий ученику не присылают, только их число
   created_at?: string
   updated_at?: string
 }
@@ -129,6 +142,9 @@ export type NewAssignment = {
   deadline?: string
   lesson_date?: string
   recording_url?: string
+  exam_minutes?: number // пробник: время на работу в минутах
+  exam_results?: ExamResults
+  topic: string // папка-тема в курсе: «№26», «Пробники»…
   numbered_tasks?: NumberedTask[]
   tasks_latex?: string
   homework?: { numbered_tasks?: NumberedTask[]; tasks_latex?: string } & TaskFileChanges
