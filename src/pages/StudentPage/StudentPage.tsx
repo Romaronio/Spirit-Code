@@ -149,21 +149,23 @@ function StudentPage({ user, items, accounts }: Props) {
             {shownLessons.map(({ lesson, answer }) => {
               const answered = taskAnswerCount(answer)
               return (
-                <li key={lesson.id} className={styles.lesson}>
-                  <div className={styles.lessonText}>
-                    <Link to={`/assignment/${lesson.id}`} className={styles.lessonTitle}>{lesson.title}</Link>
-                    <span className={styles.muted}>
-                      {[
-                        lesson.subject,
-                        answer?.submitted_at && `отправлен ${new Date(answer.submitted_at).toLocaleDateString('ru-RU')}`,
-                        answered > 0 && `ответов к заданиям: ${answered}`,
-                        lesson.deadline && `сдать до ${lesson.deadline}`,
-                      ]
-                        .filter(Boolean)
-                        .join(' · ')}
-                    </span>
-                  </div>
-                  {answer ? <StatusBadge answer={answer} /> : <span className={styles.notSent}>Не отправлено</span>}
+                <li key={lesson.id} className={styles.lessonItem}>
+                  <Link to={`/assignment/${lesson.id}`} className={styles.lesson}>
+                    <div className={styles.lessonText}>
+                      <span className={styles.lessonTitle}>{lesson.title}</span>
+                      <span className={styles.muted}>
+                        {[
+                          lesson.subject,
+                          answer?.submitted_at && `отправлен ${new Date(answer.submitted_at).toLocaleDateString('ru-RU')}`,
+                          answered > 0 && `ответов к заданиям: ${answered}`,
+                          lesson.deadline && `сдать до ${lesson.deadline}`,
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </span>
+                    </div>
+                    {answer ? <StatusBadge answer={answer} /> : <span className={styles.notSent}>Не отправлено</span>}
+                  </Link>
                 </li>
               )
             })}
