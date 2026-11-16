@@ -346,12 +346,16 @@
   padding: 0;
   border: none;
   background: none;
-  color: var(--accent);
+  color: var(--text);
   font: inherit;
   font-weight: 600;
   text-decoration: underline dotted;
   text-underline-offset: 3px;
   cursor: pointer;
+}
+
+.taskAnswerLink:hover {
+  color: var(--accent-text);
 }
 
 .taskAnswerLink:hover,
