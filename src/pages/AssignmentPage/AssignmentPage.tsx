@@ -153,11 +153,18 @@ function AssignmentDetails({ assignment, user, studentId, students, onUpdate, on
   const closeTasks = useCallback(() => setOpenTasks(null), [])
   // Учитель открыл ответ ученика — он показывается в панели справа вместо задания
   const [openAnswerOf, setOpenAnswerOf] = useState<number | null>(null)
-  const closeAnswer = useCallback(() => setOpenAnswerOf(null), [])
+  // При проверке учитель нажал на номер в ответе ученика — условие открывается на месте урока
+  const [peekTask, setPeekTask] = useState<TasksKey | null>(null)
+  const closePeek = useCallback(() => setPeekTask(null), [])
+  const closeAnswer = useCallback(() => {
+    setOpenAnswerOf(null)
+    setPeekTask(null)
+  }, [])
   // Каких учеников показывать в «Ответах учеников» — по нему же идёт «Следующий ученик»
   const [answerFilter, setAnswerFilter] = useState<AnswerFilter>('all')
   function openTask(key: TasksKey) {
     setOpenAnswerOf(null)
+    setPeekTask(null)
     setOpenTasks(key)
   }
   function openAnswer(studentId: number) {
@@ -225,6 +232,35 @@ function AssignmentDetails({ assignment, user, studentId, students, onUpdate, on
     ...shownHomeworkNumbered.map((t) => ({ key: `hw-${t.number}` as TasksKey, title: `${taskNumberTitle(t.number)} (дз)` })),
   ].filter(({ key }) => isDetailedRequired(key) && !hasDetailedAnswer(myAnswer, answerKey(key)))
   const needsDetailed = (key: TasksKey) => user.role === 'student' && missingDetailed.some((m) => m.key === key)
+
+  // Условие задания по ключу — для просмотра номера рядом с ответом ученика
+  const peekView = (() => {
+    if (peekTask === null) return null
+    const hwSubtitle = `${assignment.subject} · домашнее задание${assignment.deadline ? `, сдать до ${assignment.deadline}` : ''}`
+    if (peekTask === 'classwork') {
+      return assignment.tasks_latex?.trim()
+        ? { title: assignment.title, subtitle: `${assignment.subject} · классная работа`, source: assignment.tasks_latex, files: assignment.files }
+        : null
+    }
+    if (peekTask === 'homework') {
+      return assignment.homework?.tasks_latex?.trim()
+        ? { title: assignment.title, subtitle: hwSubtitle, source: assignment.homework.tasks_latex, files: assignment.homework.files }
+        : null
+    }
+    const t = numberedOf(peekTask)
+    if (!t) return null
+    const isHw = typeof peekTask === 'string'
+    const saved = isHw ? homeworkFilesSaved : lessonFiles
+    return {
+      title: `${assignment.title} · ${taskNumberTitle(t.number)}`,
+      subtitle: isHw ? hwSubtitle : `${assignment.subject} · классная работа`,
+      source: t.latex,
+      files: isHw ? assignment.homework?.files : assignment.files,
+      attachments: saved.filter((f) => f.task_number === t.number),
+      answer: t.answer,
+      taskNumber: t.number,
+    }
+  })()
 
   // Под открытым заданием: ученику — форма ответа, учителю — ответы учеников к этому заданию
   const answerBlock = (key: TasksKey) =>
@@ -355,7 +391,7 @@ function AssignmentDetails({ assignment, user, studentId, students, onUpdate, on
       <Link to="/home" state={user} className={styles.back}>← Ко всем заданиям</Link>
 
       <div className={styles.layout}>
-        <div className={styles.card}>
+        <div className={`${styles.card} ${openAnswerOf !== null && peekView ? styles.cardHidden : ''}`}>
           <span className={styles.subject}>{assignment.subject}</span>
           {isEditingTitle ? (
             <FieldEditor
@@ -797,7 +833,15 @@ function AssignmentDetails({ assignment, user, studentId, students, onUpdate, on
             onOpen={openAnswer}
             onClose={closeAnswer}
             filter={answerFilter}
+            shownTask={peekTask === null ? undefined : answerKey(peekTask)}
+            onShowTask={(key) => {
+              const k = tasksKeyOf(key)
+              setPeekTask((cur) => (cur !== null && k !== null && answerKey(cur) === key ? null : k))
+            }}
           />
+        )}
+        {openAnswerOf !== null && isReviewer && peekView && (
+          <TasksViewer {...peekView} className={styles.peekTask} closeOnEscape={false} onClose={closePeek} />
         )}
         {openNumbered && (
           <TasksViewer
@@ -1119,13 +1163,15 @@ interface StudentAnswerPanelProps {
   onOpen: (studentId: number) => void
   onClose: () => void
   filter: AnswerFilter
+  shownTask?: string // какой номер сейчас открыт на месте урока
+  onShowTask: (key: string) => void // показать условие номера на месте урока (повторное нажатие — скрыть)
 }
 
 // Ответ одного ученика в панели справа: ответы по заданиям, файлы, проверка, переписка.
 // «Следующий ученик» открывает ответ следующего приславшего, а в фильтре «Ждут проверки» —
 // следующего непроверенного: отметили ответ — ученик уходит из списка, кнопка ведёт к первому оставшемуся
 function StudentAnswerPanel({
-  assignment, students, studentId, answerOrder, correctAnswer, currentUserId, onReview, onRefresh, commentActions, onOpen, onClose, filter,
+  assignment, students, studentId, answerOrder, correctAnswer, currentUserId, onReview, onRefresh, commentActions, onOpen, onClose, filter, shownTask, onShowTask,
 }: StudentAnswerPanelProps) {
   const [chatOf, setChatOf] = useState<number | null>(null) // у какого ученика раскрыта переписка
   const isChatOpen = chatOf === studentId
@@ -1190,7 +1236,15 @@ function StudentAnswerPanel({
                 .filter((key) => hasTaskAnswer(sh, key))
                 .map((key) => (
                   <li key={key}>
-                    <span className={styles.taskAnswerTitle}>{answerKeyTitle(key)}</span>
+                    <button
+                      type="button"
+                      className={`${styles.taskAnswerTitle} ${styles.taskAnswerLink} ${shownTask === key ? styles.taskAnswerLinkActive : ''}`}
+                      onClick={() => onShowTask(key)}
+                      aria-pressed={shownTask === key}
+                      title={shownTask === key ? 'Скрыть условие' : 'Показать условие слева'}
+                    >
+                      {answerKeyTitle(key)}
+                    </button>
                     {correctAnswer(key) && (
                       <span className={styles.taskAnswerCorrect}> · верный ответ: {correctAnswer(key)}</span>
                     )}

@@ -189,7 +189,7 @@
 
 .lessonText {
   display: flex;
-  flex: 1;
+  flex: 1 1 160px;
   flex-direction: column;
   min-width: 0;
 }
@@ -211,7 +211,13 @@
   font-size: 13px;
 }
 
+.moveField {
+  min-width: 0;
+  max-width: 150px;
+}
+
 .moveField select {
+  width: 100%;
   max-width: 150px;
   min-height: 34px;
   padding: 0 6px;
@@ -240,9 +246,11 @@
 
 .lessonActions {
   display: flex;
-  flex-shrink: 0;
+  flex-wrap: wrap;
   align-items: center;
   gap: 4px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 /* ✕ — убрать урок из этого предмета (он останется в остальных) */

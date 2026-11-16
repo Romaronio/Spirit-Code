@@ -341,6 +341,33 @@
   font-weight: 600;
 }
 
+/* Номер в ответе ученика — нажатием открывает условие на месте урока */
+.taskAnswerLink {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.taskAnswerLink:hover,
+.taskAnswerLinkActive {
+  text-decoration-style: solid;
+}
+
+/* Пока открыто условие номера, карточка урока спрятана, условие встаёт на её место (слева) */
+.cardHidden {
+  display: none;
+}
+
+.peekTask {
+  order: -1;
+}
+
 /* Итог автопроверки кратких ответов у учителя */
 .autoCheck {
   margin: 8px 0 0;

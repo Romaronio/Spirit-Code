@@ -3,6 +3,7 @@
 .page {
   height: 100vh;
   height: 100dvh;
+  overflow: hidden; /* страница звонка не прокручивается — всё умещается в окне */
   background: var(--text);
   color: #f7efe4;
 }
@@ -81,11 +82,27 @@
   flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
+  overflow: hidden;
   padding: 12px;
 }
 
 .fill {
   height: 100%;
+}
+
+/* Демонстрация экрана: строки сетки LiveKit по умолчанию auto и растягиваются под исходный
+   размер видео (1080px и больше) — страница уезжала вниз. Зажимаем сетку по размеру окна */
+.stage :global(.lk-focus-layout) {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 5fr);
+  grid-template-rows: minmax(0, 1fr);
+  min-height: 0;
+}
+
+@media (max-width: 600px) {
+  .stage :global(.lk-focus-layout) {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 5fr) minmax(0, 1fr);
+  }
 }
 
 /* Стрелка над нижней панелью, по центру: убирает и возвращает кнопки */
@@ -170,14 +187,15 @@
 
 /* Лента камер убрана — экран занимает всё место */
 .stage .fill.noCameras {
-  grid-template-columns: 1fr;
-  grid-template-rows: 1fr;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
 }
 
 /* Демонстрация экрана: кнопка «Во весь экран» в углу, видна при наведении */
 .screenView {
   position: relative;
   min-width: 0;
+  min-height: 0;
   height: 100%;
 }
 

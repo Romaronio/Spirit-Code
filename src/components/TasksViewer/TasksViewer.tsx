@@ -13,6 +13,8 @@ interface Props {
   onClose: () => void
   onNext?: () => void // открыть следующее задание; нет — значит, это последнее
   nextLabel?: string // подпись кнопки «дальше», по умолчанию «Следующее задание →»
+  className?: string
+  closeOnEscape?: boolean // по умолчанию Esc закрывает панель
   children?: ReactNode // под заданием: форма ответа ученика или ответы учеников для учителя
 }
 
@@ -20,18 +22,19 @@ interface Props {
 const FULLSCREEN_QUERY = '(max-width: 1000px)'
 
 // Задания в панели справа от задания — вместо скачивания PDF
-function TasksViewer({ title, subtitle, source, files, attachments = [], answer, taskNumber, onClose, onNext, nextLabel = 'Следующее задание →', children }: Props) {
+function TasksViewer({ title, subtitle, source, files, attachments = [], answer, taskNumber, onClose, onNext, nextLabel = 'Следующее задание →', className, closeOnEscape = true, children }: Props) {
   const closeRef = useRef<HTMLButtonElement>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
 
   // Esc закрывает
   useEffect(() => {
+    if (!closeOnEscape) return
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') onClose()
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [onClose])
+  }, [onClose, closeOnEscape])
 
   // Новый документ — с начала; во весь экран страница под панелью не прокручивается
   useEffect(() => {
@@ -46,7 +49,7 @@ function TasksViewer({ title, subtitle, source, files, attachments = [], answer,
   }, [source, title])
 
   return (
-    <aside className={styles.panel} aria-label={title}>
+    <aside className={`${styles.panel} ${className ?? ''}`} aria-label={title}>
       <header className={styles.header}>
         <div>
           <h2 className={styles.title}>{title}</h2>
